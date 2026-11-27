@@ -96,6 +96,38 @@ export function storageContract(
       expect(await s.incrementUsage?.({ ...k, subjectId: "*" })).toBe(1);
     });
 
+    it("keeps a request log, filterable and newest first", async () => {
+      const s = await make();
+      const ev = (id: string, at: string, tenantId: string, outcome: "refused" | "proposed") => ({
+        id,
+        at,
+        tenantId,
+        outcome,
+        surfaceId: "s",
+        userId: "u1",
+        prompt: `p ${id}`,
+        reason: outcome === "refused" ? "action" : null,
+        source: outcome === "refused" ? ("model" as const) : null,
+        message: null,
+        proposalId: null,
+        model: "m",
+        latencyMs: 12,
+        modelCalls: 1,
+      });
+      await s.logRequest?.(ev("a", "2026-11-01T00:00:00.000Z", "t1", "refused"));
+      await s.logRequest?.(ev("b", "2026-11-02T00:00:00.000Z", "t2", "proposed"));
+      await s.logRequest?.(ev("c", "2026-11-03T00:00:00.000Z", "t1", "proposed"));
+      expect((await s.listRequests?.({}))?.map((e) => e.id)).toEqual(["c", "b", "a"]);
+      expect((await s.listRequests?.({ tenantId: "t1" }))?.map((e) => e.id)).toEqual(["c", "a"]);
+      expect(
+        (await s.listRequests?.({ since: "2026-11-02T00:00:00.000Z" }))?.map((e) => e.id),
+      ).toEqual(["c", "b"]);
+      expect((await s.listRequests?.({ outcomes: ["refused"] }))?.[0]).toEqual(
+        ev("a", "2026-11-01T00:00:00.000Z", "t1", "refused"),
+      );
+      expect((await s.listRequests?.({ limit: 1 }))?.length).toBe(1);
+    });
+
     it("redacts old prompts", async () => {
       const s = await make();
       await s.append(key, patch("a"), 0);

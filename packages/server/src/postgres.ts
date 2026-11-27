@@ -5,6 +5,7 @@ import {
   type HistoryKey,
   type NewEntry,
   type Proposal,
+  type RequestEvent,
   type StorageAdapter,
 } from "./storage.js";
 
@@ -53,6 +54,25 @@ create table if not exists patina_proposals (
 );
 create index if not exists patina_proposals_expires_at on patina_proposals (expires_at);
 
+create table if not exists patina_requests (
+  id           text        primary key,
+  created_at   timestamptz not null default now(),
+  tenant_id    text        not null default '',
+  surface_id   text        not null,
+  user_id      text        not null,
+  prompt       text        null,       -- the user's words (retention: redactPrompts)
+  outcome      text        not null,
+  reason       text        null,
+  source       text        null,
+  message      text        null,
+  proposal_id  text        null,
+  model        text        null,
+  latency_ms   integer     null,
+  model_calls  integer     null
+);
+create index if not exists patina_requests_created_at on patina_requests (created_at);
+create index if not exists patina_requests_tenant on patina_requests (tenant_id, created_at);
+
 create table if not exists patina_usage (
   tenant_id   text    not null default '',
   subject_id  text    not null,
@@ -100,10 +120,11 @@ const keyParams = (k: HistoryKey) => [k.tenantId ?? "", k.layer, k.subjectId, k.
  * Postgres storage. History is append-only; `append` uses the unique
  * `(tenant_id, layer, subject_id, surface_id, seq)` constraint for optimistic concurrency.
  */
-export function postgresStorage({ query }: { query: QueryFn }): StorageAdapter & {
-  /** Clears stored prompts older than `before` (prompt retention). Returns the number of rows changed. */
-  redactPrompts(before: Date): Promise<number>;
-} {
+export function postgresStorage({ query }: { query: QueryFn }): StorageAdapter &
+  Required<Pick<StorageAdapter, "incrementUsage" | "logRequest" | "listRequests">> & {
+    /** Clears stored prompts older than `before` (prompt retention). Returns the number of rows changed. */
+    redactPrompts(before: Date): Promise<number>;
+  } {
   return {
     async list(key) {
       const { rows } = await query(
@@ -199,7 +220,74 @@ export function postgresStorage({ query }: { query: QueryFn }): StorageAdapter &
       return Number(rows[0]?.count ?? 0);
     },
 
+    async logRequest(e) {
+      await query(
+        `insert into patina_requests
+           (id, created_at, tenant_id, surface_id, user_id, prompt, outcome, reason, source, message,
+            proposal_id, model, latency_ms, model_calls)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+        [
+          e.id,
+          e.at,
+          e.tenantId ?? "",
+          e.surfaceId,
+          e.userId,
+          e.prompt,
+          e.outcome,
+          e.reason,
+          e.source,
+          e.message,
+          e.proposalId,
+          e.model,
+          e.latencyMs,
+          e.modelCalls,
+        ],
+      );
+    },
+
+    async listRequests(f) {
+      const where: string[] = [];
+      const params: unknown[] = [];
+      const add = (sql: string, v: unknown) => {
+        params.push(v);
+        where.push(sql.replace("?", `$${params.length}`));
+      };
+      if (f.since) add("created_at >= ?", f.since);
+      if (f.until) add("created_at < ?", f.until);
+      if (f.tenantId) add("tenant_id = ?", f.tenantId);
+      if (f.surfaceId) add("surface_id = ?", f.surfaceId);
+      if (f.outcomes?.length) add("outcome = any(?)", f.outcomes);
+      params.push(Math.min(f.limit ?? 1000, 10_000));
+      const { rows } = await query(
+        `select * from patina_requests ${where.length ? `where ${where.join(" and ")}` : ""}
+         order by created_at desc limit $${params.length}`,
+        params,
+      );
+      return rows.map((r) => ({
+        id: r.id as string,
+        at: iso(r.created_at),
+        surfaceId: r.surface_id as string,
+        userId: r.user_id as string,
+        tenantId: (r.tenant_id as string) || null,
+        prompt: (r.prompt as string | null) ?? null,
+        outcome: r.outcome as RequestEvent["outcome"],
+        reason: (r.reason as string | null) ?? null,
+        source: (r.source as RequestEvent["source"]) ?? null,
+        message: (r.message as string | null) ?? null,
+        proposalId: (r.proposal_id as string | null) ?? null,
+        model: (r.model as string | null) ?? null,
+        latencyMs:
+          r.latency_ms === null || r.latency_ms === undefined ? null : Number(r.latency_ms),
+        modelCalls:
+          r.model_calls === null || r.model_calls === undefined ? null : Number(r.model_calls),
+      }));
+    },
+
     async redactPrompts(before) {
+      await query(
+        "update patina_requests set prompt = null where prompt is not null and created_at < $1",
+        [before.toISOString()],
+      );
       const { rows } = await query(
         "update patina_history set prompt = null where prompt is not null and created_at < $1 returning id",
         [before.toISOString()],

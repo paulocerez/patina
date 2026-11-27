@@ -35,6 +35,55 @@ export interface Proposal {
   expiresAt: string;
 }
 
+/** What happened to one customization request. */
+export type RequestOutcome =
+  | "proposed" // a valid change was previewed
+  | "applied" // the user applied a previewed change
+  | "refused" // it couldn't be done (see reason/source)
+  | "clarified" // the model asked a question back
+  | "unavailable" // the host's availability hook turned customizing off
+  | "over_quota" // monthly quota or per-minute rate limit
+  | "error"; // the model was unreachable, or something failed
+
+/** One row of the request log: the record of what customers asked for and what happened. */
+export interface RequestEvent {
+  id: string;
+  /** ISO timestamp. */
+  at: string;
+  surfaceId: string;
+  userId: string;
+  tenantId: string | null;
+  /** The user's words. Cleared by `redactPrompts` after your retention period. */
+  prompt: string | null;
+  outcome: RequestOutcome;
+  /**
+   * Why, as a code. Refusals by the model use its category (data_access, action, new_component,
+   * styling, not_on_page, unclear, other, safety, no_change); refusals by the validator use the
+   * issue code (preset_not_allowed, not_customizable, …); the host's rules use customize_off,
+   * data_views_off, quota_user, quota_tenant, rate_limit; errors use model_unavailable or internal.
+   */
+  reason: string | null;
+  /** Who decided: the model, Patina's validator, or the host's own rules. */
+  source: "model" | "validator" | "host" | null;
+  /** What the user was shown. */
+  message: string | null;
+  proposalId: string | null;
+  model: string | null;
+  latencyMs: number | null;
+  /** 2 means the model needed its one repair round-trip. */
+  modelCalls: number | null;
+}
+
+export interface RequestFilter {
+  since?: string;
+  until?: string;
+  tenantId?: string;
+  surfaceId?: string;
+  outcomes?: RequestOutcome[];
+  /** Default 1000, at most 10 000. Newest first. */
+  limit?: number;
+}
+
 export interface UsageKey {
   tenantId: string | null;
   subjectId: string;
@@ -63,6 +112,10 @@ export interface StorageAdapter {
    * `limits.monthlyProposals` quota. `subjectId` is a user id, or "*" for a whole tenant.
    */
   incrementUsage?(key: UsageKey): Promise<number>;
+  /** Appends to the request log (see `RequestEvent`). Optional; enables insights. */
+  logRequest?(event: RequestEvent): Promise<void>;
+  /** Reads the request log, newest first. */
+  listRequests?(filter: RequestFilter): Promise<RequestEvent[]>;
 }
 
 export function keyString(k: HistoryKey): string {
@@ -70,13 +123,15 @@ export function keyString(k: HistoryKey): string {
 }
 
 /** In-process storage for tests, demos and prototypes. Data is lost on restart. */
-export function memoryStorage(): StorageAdapter & {
-  clear(): void;
-  redactPrompts(before: Date): Promise<number>;
-} {
+export function memoryStorage(): StorageAdapter &
+  Required<Pick<StorageAdapter, "incrementUsage" | "logRequest" | "listRequests">> & {
+    clear(): void;
+    redactPrompts(before: Date): Promise<number>;
+  } {
   const histories = new Map<string, Entry[]>();
   const proposals = new Map<string, Proposal>();
   const usage = new Map<string, number>();
+  const requests: RequestEvent[] = [];
   return {
     async list(key) {
       return structuredClone(histories.get(keyString(key)) ?? []);
@@ -109,8 +164,32 @@ export function memoryStorage(): StorageAdapter & {
       usage.set(id, n);
       return n;
     },
+    async logRequest(e) {
+      requests.push(structuredClone(e));
+    },
+    async listRequests(f) {
+      const limit = Math.min(f.limit ?? 1000, 10_000);
+      return structuredClone(
+        requests
+          .filter(
+            (e) =>
+              (!f.since || e.at >= f.since) &&
+              (!f.until || e.at < f.until) &&
+              (!f.tenantId || e.tenantId === f.tenantId) &&
+              (!f.surfaceId || e.surfaceId === f.surfaceId) &&
+              (!f.outcomes || f.outcomes.includes(e.outcome)),
+          )
+          .sort((a, b) => b.at.localeCompare(a.at))
+          .slice(0, limit),
+      );
+    },
     async redactPrompts(before) {
       let n = 0;
+      for (const e of requests)
+        if (e.prompt !== null && Date.parse(e.at) < before.getTime()) {
+          e.prompt = null;
+          n++;
+        }
       for (const list of histories.values())
         for (const e of list)
           if (e.kind === "patch" && e.prompt && Date.parse(e.createdAt) < before.getTime()) {
@@ -123,6 +202,7 @@ export function memoryStorage(): StorageAdapter & {
       histories.clear();
       proposals.clear();
       usage.clear();
+      requests.length = 0;
     },
   };
 }

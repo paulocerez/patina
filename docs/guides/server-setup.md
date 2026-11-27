@@ -27,6 +27,12 @@ feature flags, plans or anything else. `limits.monthlyProposals(ctx)` sets month
 The view always renders, and users who lose access keep their saved changes by default. See
 [Availability](availability.md).
 
+## What customers ask for
+
+Every request is logged with its outcome and reason, including refusals. `onEvent(e)` forwards
+each event to your analytics, and `insights: { allow }` serves a report to your staff at
+`GET {basePath}/insights`. See [Insights](insights.md).
+
 ## Mounting
 
 The handler is `(request: Request) => Promise<Response>`, so it works anywhere the Fetch API

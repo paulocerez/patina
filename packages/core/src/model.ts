@@ -15,9 +15,24 @@ import { type Manifest, nodeLabel } from "./manifest.js";
 import type { Anchor, CollectionItem, Op, SurfaceSpec, Value } from "./types.js";
 import { jsonSchemaFor } from "./values.js";
 
+/**
+ * Why a request couldn't be done, as tagged by the model. Lets the host group unmet requests
+ * into themes (see request logging in @patina-ui/server).
+ */
+export const REFUSAL_CATEGORIES = [
+  "data_access", // wants data they can't already see (other users, hidden records, more permissions)
+  "action", // wants to do something to data (delete, edit, send, export)
+  "new_component", // wants a kind of UI that doesn't exist here
+  "styling", // colors, fonts, custom CSS, layout beyond what's offered
+  "not_on_page", // refers to something that isn't on this page or in its data
+  "unclear", // couldn't tell what was meant
+  "other",
+] as const;
+export type RefusalCategory = (typeof REFUSAL_CATEGORIES)[number];
+
 export type ModelResult =
   | { kind: "patch"; ops: Op[]; summary: string }
-  | { kind: "refusal"; reason: string }
+  | { kind: "refusal"; reason: string; category: RefusalCategory }
   | { kind: "clarify"; question: string };
 
 /** Everything an adapter needs to make one call. */
@@ -138,6 +153,10 @@ export function buildOutputSchema(m: Manifest<unknown>, spec: SurfaceSpec): Json
       description:
         "patch: one-sentence summary of the change. refusal: short, friendly explanation for the user. clarify: one question.",
     },
+    category: {
+      anyOf: [{ type: "string", enum: [...REFUSAL_CATEGORIES] }, { type: "null" }],
+      description: "refusal only: why it can't be done. null otherwise.",
+    },
     ops: { type: "array", items: variants.length ? { anyOf: variants } : obj({}) },
   });
 }
@@ -154,7 +173,13 @@ export function fromModelOutput(raw: unknown, newKey: () => string = randomUserK
   const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const message = typeof o.message === "string" ? o.message.slice(0, 500) : "";
   if (o.kind === "refusal")
-    return { kind: "refusal", reason: message || "That isn't something this view can do." };
+    return {
+      kind: "refusal",
+      reason: message || "That isn't something this view can do.",
+      category: (REFUSAL_CATEGORIES as readonly string[]).includes(o.category as string)
+        ? (o.category as RefusalCategory)
+        : "other",
+    };
   if (o.kind === "clarify")
     return { kind: "clarify", question: message || "Could you say a bit more?" };
   const ops: Op[] = [];
@@ -218,7 +243,7 @@ const SYSTEM_RULES = `You customize how one screen of an application is laid out
 
 You never write code. You answer with JSON that follows the given schema:
 - kind "patch": the smallest list of ops that does what the user asked, and a one-sentence summary in "message".
-- kind "refusal": when the request can't be expressed with the available ops. Say briefly and kindly what you can change instead.
+- kind "refusal": when the request can't be expressed with the available ops. Say briefly and kindly what you can change instead, and set "category" to why: data_access, action, new_component, styling, not_on_page, unclear or other.
 - kind "clarify": when the request is ambiguous enough that guessing would likely be wrong. Ask one short question.
 
 You can only change presentation: order, visibility, and the listed settings. Refuse anything else, including:

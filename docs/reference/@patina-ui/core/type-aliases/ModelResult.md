@@ -2,4 +2,4 @@
 
 # Type Alias: ModelResult
 
-> **ModelResult** = \{ `kind`: `"patch"`; `ops`: [`Op`](Op.md)[]; `summary`: `string`; \} \| \{ `kind`: `"refusal"`; `reason`: `string`; \} \| \{ `kind`: `"clarify"`; `question`: `string`; \}
+> **ModelResult** = \{ `kind`: `"patch"`; `ops`: [`Op`](Op.md)[]; `summary`: `string`; \} \| \{ `category`: [`RefusalCategory`](RefusalCategory.md); `kind`: `"refusal"`; `reason`: `string`; \} \| \{ `kind`: `"clarify"`; `question`: `string`; \}

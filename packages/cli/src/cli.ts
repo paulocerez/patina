@@ -1,6 +1,13 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import {
+  getInsights,
+  parseSince,
+  postgresStorage,
+  renderInsightsMarkdown,
+  type StorageAdapter,
+} from "@patina-ui/server";
 import { checkRepo, renderMarkdown, type Severity } from "./check.js";
 import { renderBlocks } from "./generate/blocks.js";
 import { renderCatalog } from "./generate/catalog.js";
@@ -20,6 +27,11 @@ Usage:
   patina check [--root .] [--out patina] [--format markdown|json] [--fail-on breaking|changed|info|never]
       Report API and design changes that affect the catalog (what the GitHub Action runs).
 
+  patina insights [--database-url $DATABASE_URL] [--since 30d] [--until <date>] [--tenant <id>]
+                  [--surface <id>] [--format markdown|json]
+      What customers asked for, what was applied, and what couldn't be done and why, from the
+      request log in your Postgres database (needs the pg package).
+
   patina init-action [--root .] [--fail-on breaking] [--action paulocerez/patina/packages/action@v0]
       Write .github/workflows/patina.yml so every PR is checked.
 `;
@@ -29,7 +41,11 @@ function write(file: string, text: string) {
   writeFileSync(file, text);
 }
 
-export async function main(argv = process.argv.slice(2)): Promise<number> {
+export async function main(
+  argv = process.argv.slice(2),
+  /** For tests: use this storage instead of connecting to Postgres. */
+  deps: { storage?: StorageAdapter } = {},
+): Promise<number> {
   const [command, ...rest] = argv;
   const { values } = parseArgs({
     args: rest,
@@ -43,6 +59,11 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       format: { type: "string", default: "markdown" },
       "fail-on": { type: "string", default: "breaking" },
       action: { type: "string", default: "paulocerez/patina/packages/action@v0" },
+      "database-url": { type: "string" },
+      since: { type: "string", default: "30d" },
+      until: { type: "string" },
+      tenant: { type: "string" },
+      surface: { type: "string" },
     },
   });
   const root = resolve(values.root as string);
@@ -117,6 +138,45 @@ with dataBlocks(catalog), and commit ${out}/. See docs/guides/data-views.md.`);
             ? report.counts.breaking + report.counts.changed
             : report.counts.breaking;
     return failing > 0 ? 1 : 0;
+  }
+
+  if (command === "insights") {
+    let storage = deps.storage;
+    let close = async () => {};
+    if (!storage) {
+      const url = values["database-url"] ?? process.env.DATABASE_URL;
+      if (!url) {
+        console.error(
+          "Pass --database-url (or set DATABASE_URL) for the database Patina's server writes to.",
+        );
+        return 1;
+      }
+      let Pool: typeof import("pg").Pool;
+      try {
+        const mod = await import("pg");
+        Pool = mod.Pool ?? mod.default.Pool;
+      } catch {
+        console.error("patina insights needs the pg package: npm i -D pg");
+        return 1;
+      }
+      const pool = new Pool({ connectionString: url, max: 1 });
+      storage = postgresStorage({ query: (sql, params) => pool.query(sql, params) });
+      close = () => pool.end();
+    }
+    try {
+      const report = await getInsights(storage, {
+        since: parseSince(values.since as string),
+        ...(values.until ? { until: new Date(values.until).toISOString() } : {}),
+        ...(values.tenant ? { tenantId: values.tenant } : {}),
+        ...(values.surface ? { surfaceId: values.surface } : {}),
+      });
+      console.log(
+        values.format === "json" ? JSON.stringify(report, null, 2) : renderInsightsMarkdown(report),
+      );
+      return 0;
+    } finally {
+      await close();
+    }
   }
 
   if (command === "init-action") {

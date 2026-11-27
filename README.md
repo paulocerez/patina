@@ -186,6 +186,7 @@ view or in the model's prompt.
   - [Data views](docs/guides/data-views.md): `patina scan`, the catalog, data blocks
   - [GitHub Action](docs/guides/github-action.md): check every PR
   - [Availability](docs/guides/availability.md): who may customize, from feature flags, plans and quotas
+  - [Insights](docs/guides/insights.md): what customers asked for, what couldn't be done, and why
 - [API reference](docs/reference/README.md) (generated with `pnpm docs:api`)
 - [Releasing](docs/releasing.md): npm publishing with Changesets
 - [ARCHITECTURE.md](ARCHITECTURE.md): the design and its tradeoffs

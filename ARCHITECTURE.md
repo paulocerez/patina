@@ -1112,3 +1112,37 @@ limits.monthlyProposals?(ctx): { user?: number; tenant?: number } | undefined
 
 `restrict(ctx)` (§3) still handles _what_ may be customized. `availability` handles _whether_
 anything may be.
+
+---
+
+## 17. Request log and insights
+
+Unbuildable requests are product signal. Every customization request produces one
+`RequestEvent`:
+
+- **What happened** (`outcome`): proposed, applied, refused, clarified, unavailable,
+  over_quota or error.
+- **Who decided** (`source`): the model, the validator, or the host's rules.
+- **Why** (`reason`): a code.
+- **What the user saw** (`message`).
+- **The full prompt.** This was signed off; it is cleared by `redactPrompts` with the rest.
+
+**Decisions:**
+
+- **The model tags its own refusals.** The output schema gains a nullable `category`:
+  data_access, action, new_component, styling, not_on_page, unclear or other. Validator and
+  host refusals use their own codes, so every refusal is grouped without parsing text.
+- **Storage is optional and append-only.** `logRequest` and `listRequests` are optional
+  adapter methods (Postgres `patina_requests`), and logging can't affect the user. `onEvent`
+  receives the same events for analytics, and its errors go to `onError`.
+- **The report is computed, not generated.** `summarizeRequests` groups refused or unavailable
+  requests by normalized wording (case, punctuation, polite filler), ranks them by distinct
+  organizations and then count, and breaks down reasons. It needs no model calls, so it is
+  cheap and reproducible.
+- **Three ways to read it:**
+  - `patina insights --database-url` for developers;
+  - `GET {basePath}/insights`, gated by `insights.allow(ctx)`, for staff tools;
+  - `getInsights` / `summarizeRequests` in code.
+
+**Possible follow-up:** model-assisted clustering of differently worded requests into themes
+("export", "bulk actions"), as an opt-in `--ai` flag on `patina insights`.

@@ -325,6 +325,9 @@ importers:
       '@patina-ui/core':
         specifier: workspace:^
         version: link:../core
+      '@patina-ui/server':
+        specifier: workspace:^
+        version: link:../server
       yaml:
         specifier: ^2.9.1
         version: 2.9.1
@@ -335,6 +338,12 @@ importers:
       '@types/node':
         specifier: ^26.6.11
         version: 26.6.11
+      '@types/pg':
+        specifier: ^8.23.1
+        version: 8.23.1
+      pg:
+        specifier: ^8.23.1
+        version: 8.23.1
       tsx:
         specifier: ^4.23.15
         version: 4.23.15

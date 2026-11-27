@@ -60,13 +60,14 @@ export type {
 export { defineSurface, nodeLabel, restrictManifest, restrictSpec } from "./manifest.js";
 export type { Migration } from "./migrate.js";
 export { migratePatch, migrations } from "./migrate.js";
-export type { ModelRequest, ModelResult } from "./model.js";
+export type { ModelRequest, ModelResult, RefusalCategory } from "./model.js";
 export {
   buildModelRequest,
   buildOutputSchema,
   describeSources,
   describeView,
   fromModelOutput,
+  REFUSAL_CATEGORIES,
   randomUserKey,
 } from "./model.js";
 export type { ErrorBody, ProposeResponse, SurfaceState } from "./protocol.js";

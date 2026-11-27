@@ -2,7 +2,7 @@
 
 # Function: postgresStorage()
 
-> **postgresStorage**(`__namedParameters`): [`StorageAdapter`](../interfaces/StorageAdapter.md) & `object`
+> **postgresStorage**(`__namedParameters`): [`StorageAdapter`](../interfaces/StorageAdapter.md) & `Required`\<`Pick`\<[`StorageAdapter`](../interfaces/StorageAdapter.md), `"incrementUsage"` \| `"logRequest"` \| `"listRequests"`\>\> & `object`
 
 Postgres storage. History is append-only; `append` uses the unique
 `(tenant_id, layer, subject_id, surface_id, seq)` constraint for optimistic concurrency.
@@ -17,4 +17,4 @@ Postgres storage. History is append-only; `append` uses the unique
 
 ## Returns
 
-[`StorageAdapter`](../interfaces/StorageAdapter.md) & `object`
+[`StorageAdapter`](../interfaces/StorageAdapter.md) & `Required`\<`Pick`\<[`StorageAdapter`](../interfaces/StorageAdapter.md), `"incrementUsage"` \| `"logRequest"` \| `"listRequests"`\>\> & `object`

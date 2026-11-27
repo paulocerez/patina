@@ -57,6 +57,12 @@ covers what Patina enforces and what remains your job.
   instances. The built-in limit is per process.
 - **Decide on prompt retention** (`redactPrompts`, see [Storage](storage.md)).
 
+## What a refusal can reveal
+
+The model doesn't see data rows or anything restricted, so refusals can't leak them. Your
+manifest's descriptions and labels _can_ be paraphrased back to users, so keep them free of
+confidential information. Every refusal is logged with its reason. See [Insights](insights.md).
+
 ## Testing refusals
 
 `scriptedModel` makes refusal paths deterministic in your tests:

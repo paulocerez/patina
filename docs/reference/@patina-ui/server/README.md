@@ -13,11 +13,16 @@ Request handler and storage adapters.
 
 - [AvailabilityRule](interfaces/AvailabilityRule.md)
 - [HistoryKey](interfaces/HistoryKey.md)
+- [InsightsReport](interfaces/InsightsReport.md)
 - [ModelAdapter](interfaces/ModelAdapter.md)
 - [PatinaContext](interfaces/PatinaContext.md)
 - [PatinaHandlerOptions](interfaces/PatinaHandlerOptions.md)
 - [Proposal](interfaces/Proposal.md)
+- [ReasonCount](interfaces/ReasonCount.md)
+- [RequestEvent](interfaces/RequestEvent.md)
+- [RequestFilter](interfaces/RequestFilter.md)
 - [StorageAdapter](interfaces/StorageAdapter.md)
+- [UnmetRequest](interfaces/UnmetRequest.md)
 - [UsageKey](interfaces/UsageKey.md)
 
 ## Type Aliases
@@ -25,17 +30,24 @@ Request handler and storage adapters.
 - [Entry](type-aliases/Entry.md)
 - [NewEntry](type-aliases/NewEntry.md)
 - [QueryFn](type-aliases/QueryFn.md)
+- [RequestOutcome](type-aliases/RequestOutcome.md)
 
 ## Variables
 
 - [POSTGRES\_SCHEMA](variables/POSTGRES_SCHEMA.md)
+- [REASON\_LABELS](variables/REASON_LABELS.md)
 
 ## Functions
 
 - [createPatinaHandler](functions/createPatinaHandler.md)
+- [getInsights](functions/getInsights.md)
 - [memoryStorage](functions/memoryStorage.md)
 - [migratePostgres](functions/migratePostgres.md)
+- [normalizePrompt](functions/normalizePrompt.md)
+- [parseSince](functions/parseSince.md)
 - [postgresStorage](functions/postgresStorage.md)
+- [renderInsightsMarkdown](functions/renderInsightsMarkdown.md)
+- [summarizeRequests](functions/summarizeRequests.md)
 
 ## References
 

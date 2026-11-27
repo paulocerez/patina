@@ -18,6 +18,29 @@ Path the handler is mounted at, e.g. "/api/patina". Default: "".
 
 ***
 
+### insights?
+
+> `optional` **insights?**: `object`
+
+Enables `GET {basePath}/insights` for the users you allow (e.g. your own staff): a report of
+what customers asked for, what was refused and why. See docs/guides/insights.md.
+
+#### allow()
+
+> **allow**(`ctx`): `boolean` \| `Promise`\<`boolean`\>
+
+##### Parameters
+
+###### ctx
+
+`NoInfer`\<`Ctx`\>
+
+##### Returns
+
+`boolean` \| `Promise`\<`boolean`\>
+
+***
+
 ### limits?
 
 > `optional` **limits?**: `object`
@@ -58,6 +81,14 @@ tenant. Return undefined for no limit. Needs a storage adapter with `incrementUs
 ##### Returns
 
 \{ `tenant?`: `number`; `user?`: `number`; \} \| `null` \| `undefined`
+
+***
+
+### logRequests?
+
+> `optional` **logRequests?**: `boolean`
+
+Store the request log through the storage adapter (if it supports it). Default true.
 
 ***
 
@@ -140,3 +171,23 @@ Called with unexpected errors (they are returned to the client as a generic 500)
 #### Returns
 
 `void`
+
+***
+
+### onEvent()?
+
+> `optional` **onEvent**(`event`): `void` \| `Promise`\<`void`\>
+
+Called once per customization request with what happened (proposed, applied, refused,
+clarified, unavailable, over_quota, error) and why. Forward it to your analytics.
+Errors thrown here are reported to onError and never affect the user.
+
+#### Parameters
+
+##### event
+
+[`RequestEvent`](RequestEvent.md)
+
+#### Returns
+
+`void` \| `Promise`\<`void`\>

@@ -38,6 +38,10 @@ instead of calling `migratePostgres`. It creates two tables:
 - **`patina_proposals`**: previews waiting to be applied. They are single-use, scoped to the
   user, and expire (15 minutes by default). Expired rows are cleaned up on write.
 
+- **`patina_requests`**: the request log, one row per customization request with its outcome
+  and reason. It feeds [Insights](insights.md).
+- **`patina_usage`**: monthly counters for [quotas](availability.md#quotas).
+
 ### Prompt retention
 
 Stored prompts can contain personal data. Clear old ones from a scheduled job:
@@ -46,7 +50,8 @@ Stored prompts can contain personal data. Clear old ones from a scheduled job:
 const cleared = await storage.redactPrompts(new Date(Date.now() - 90 * 86_400_000));
 ```
 
-This keeps the ops and summary (the view is unaffected) and nulls the prompt text.
+This keeps the ops and summary (the view is unaffected) and nulls the prompt text, both in
+saved customizations and in the request log.
 `memoryStorage()` has the same method.
 
 ## Writing an adapter

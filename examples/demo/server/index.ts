@@ -40,6 +40,16 @@ const patina = createPatinaHandler({
     monthlyProposals: (ctx) => (ctx.plan === "pro" ? { user: 500 } : { tenant: 50 }),
   },
   onError: (e) => console.error("[patina]", e),
+  // Every request is logged with its outcome (memoryStorage keeps the log in memory). Forward
+  // events to your analytics here; the demo just prints the ones that couldn't be done.
+  onEvent: (e) => {
+    if (e.outcome === "refused" || e.outcome === "unavailable")
+      console.log(
+        `[patina] ${e.tenantId}/${e.userId} asked "${e.prompt}" → ${e.outcome} (${e.source}: ${e.reason})`,
+      );
+  },
+  // GET /api/patina/insights: what customers asked for and what couldn't be done. Staff only.
+  insights: { allow: (ctx) => ctx.userId === "alice" },
 });
 
 const app = express();

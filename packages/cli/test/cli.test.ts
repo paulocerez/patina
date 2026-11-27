@@ -248,3 +248,54 @@ describe("init-action", () => {
     expect(await main(["init-action", "--root", dir])).toBe(1); // won't overwrite
   });
 });
+
+describe("insights", () => {
+  it("prints the report from the request log", async () => {
+    const { memoryStorage } = await import("@patina-ui/server");
+    const storage = memoryStorage();
+    const at = new Date().toISOString();
+    const base = {
+      surfaceId: "orders",
+      userId: "u",
+      source: "model" as const,
+      message: null,
+      proposalId: null,
+      model: "m",
+      latencyMs: 9,
+      modelCalls: 1,
+    };
+    await storage.logRequest({
+      ...base,
+      id: "1",
+      at,
+      tenantId: "acme",
+      prompt: "Export to Excel",
+      outcome: "refused",
+      reason: "action",
+    });
+    await storage.logRequest({
+      ...base,
+      id: "2",
+      at,
+      tenantId: "globex",
+      prompt: "export to excel!",
+      outcome: "refused",
+      reason: "action",
+    });
+    const out: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((s) => void out.push(String(s)));
+    expect(await main(["insights", "--since", "7d"], { storage })).toBe(0);
+    expect(out.join("\n")).toMatch(/\| Export to Excel \| 2 \| 2 \| 2 \| action \|/);
+    expect(await main(["insights", "--format", "json"], { storage })).toBe(0);
+    expect(JSON.parse(out.at(-1) as string)).toMatchObject({ requests: 2, unmetRate: 1 });
+  });
+
+  it("explains what it needs without a database", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const before = process.env.DATABASE_URL;
+    delete process.env.DATABASE_URL;
+    expect(await main(["insights"])).toBe(1);
+    expect(err.mock.calls[0]?.[0]).toMatch(/--database-url/);
+    if (before) process.env.DATABASE_URL = before;
+  });
+});

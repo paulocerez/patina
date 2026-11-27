@@ -101,11 +101,21 @@ it("converts the model's flattened ops and generates insert keys itself", () => 
 
 it("passes through refusals and clarifications", () => {
   expect(
-    fromModelOutput({ kind: "refusal", message: "I can only change the layout.", ops: [] }),
+    fromModelOutput({
+      kind: "refusal",
+      message: "I can only change the layout.",
+      category: "data_access",
+      ops: [],
+    }),
   ).toEqual({
     kind: "refusal",
     reason: "I can only change the layout.",
+    category: "data_access",
   });
+  // Unknown or missing categories become "other".
+  expect(
+    fromModelOutput({ kind: "refusal", message: "No.", category: "hack", ops: [] }),
+  ).toMatchObject({ category: "other" });
   expect(fromModelOutput({ kind: "clarify", message: "Which table?", ops: [] })).toEqual({
     kind: "clarify",
     question: "Which table?",

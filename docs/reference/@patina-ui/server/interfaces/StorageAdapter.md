@@ -67,6 +67,42 @@ All entries of one history, ordered by seq.
 
 ***
 
+### listRequests()?
+
+> `optional` **listRequests**(`filter`): `Promise`\<[`RequestEvent`](RequestEvent.md)[]\>
+
+Reads the request log, newest first.
+
+#### Parameters
+
+##### filter
+
+[`RequestFilter`](RequestFilter.md)
+
+#### Returns
+
+`Promise`\<[`RequestEvent`](RequestEvent.md)[]\>
+
+***
+
+### logRequest()?
+
+> `optional` **logRequest**(`event`): `Promise`\<`void`\>
+
+Appends to the request log (see `RequestEvent`). Optional; enables insights.
+
+#### Parameters
+
+##### event
+
+[`RequestEvent`](RequestEvent.md)
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### saveProposal()
 
 > **saveProposal**(`proposal`): `Promise`\<`void`\>

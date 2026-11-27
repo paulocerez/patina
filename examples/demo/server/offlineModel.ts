@@ -46,6 +46,15 @@ export function offlineModel(): ModelAdapter {
           kind: "refusal",
           message:
             "I can only change how this dashboard is laid out and filtered: order, visibility, default filters, sorting and a few display settings.",
+          category: /other users?|everyone|all users|permission|admin|password|address|phone/.test(
+            prompt,
+          )
+            ? "data_access"
+            : /delete|remove|export|cancel/.test(prompt)
+              ? "action"
+              : /script|html|css|url|link/.test(prompt)
+                ? "styling"
+                : "other",
           ops: [],
         };
 

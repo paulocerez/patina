@@ -20,12 +20,14 @@ import {
   validate,
   withoutDataViews,
 } from "@patina-ui/core";
+import { getInsights, parseSince, renderInsightsMarkdown } from "./insights.js";
 import { type ModelAdapter, ModelRefusal } from "./model.js";
 import {
   ConflictError,
   type Entry,
   type HistoryKey,
   type NewEntry,
+  type RequestEvent,
   type StorageAdapter,
 } from "./storage.js";
 
@@ -100,6 +102,19 @@ export interface PatinaHandlerOptions<Ctx extends PatinaContext> {
   };
   /** Called with unexpected errors (they are returned to the client as a generic 500). */
   onError?(error: unknown): void;
+  /**
+   * Called once per customization request with what happened (proposed, applied, refused,
+   * clarified, unavailable, over_quota, error) and why. Forward it to your analytics.
+   * Errors thrown here are reported to onError and never affect the user.
+   */
+  onEvent?(event: RequestEvent): void | Promise<void>;
+  /** Store the request log through the storage adapter (if it supports it). Default true. */
+  logRequests?: boolean;
+  /**
+   * Enables `GET {basePath}/insights` for the users you allow (e.g. your own staff): a report of
+   * what customers asked for, what was refused and why. See docs/guides/insights.md.
+   */
+  insights?: { allow(ctx: NoInfer<Ctx>): boolean | Promise<boolean> };
 }
 
 /** Does any op add a data block or change a data query? */
@@ -113,10 +128,14 @@ function touchesDataViews(m: Manifest<unknown>, spec: SurfaceSpec, ops: Op[]): b
   });
 }
 
+type LoggedFields = Pick<RequestEvent, "outcome" | "reason" | "source">;
+
 class HttpError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** How to record this in the request log, if it should be. */
+    readonly log?: LoggedFields,
   ) {
     super(message);
   }
@@ -168,6 +187,7 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
         throw new HttpError(
           429,
           `You've used all ${q.user} customization requests for this month.`,
+          { outcome: "over_quota", reason: "quota_user", source: "host" },
         );
     }
     if (q.tenant !== undefined && tenantId) {
@@ -176,7 +196,25 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
         throw new HttpError(
           429,
           "Your organization has used all its customization requests for this month.",
+          { outcome: "over_quota", reason: "quota_tenant", source: "host" },
         );
+    }
+  }
+
+  const logRequests = options.logRequests !== false && !!options.storage.logRequest;
+
+  /** Writes one request-log event and forwards it to onEvent. Never throws. */
+  async function record(e: Omit<RequestEvent, "id" | "at">) {
+    const event: RequestEvent = { id: newId("rq"), at: new Date().toISOString(), ...e };
+    try {
+      if (logRequests) await options.storage.logRequest?.(event);
+    } catch (err) {
+      options.onError?.(err);
+    }
+    try {
+      await options.onEvent?.(event);
+    } catch (err) {
+      options.onError?.(err);
     }
   }
 
@@ -186,7 +224,11 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
     const now = Date.now();
     const times = (recent.get(k) ?? []).filter((t) => now - t < 60_000);
     if (times.length >= perMinute)
-      throw new HttpError(429, "That's a lot of changes at once. Try again in a minute.");
+      throw new HttpError(429, "That's a lot of changes at once. Try again in a minute.", {
+        outcome: "over_quota",
+        reason: "rate_limit",
+        source: "host",
+      });
     times.push(now);
     recent.set(k, times);
   }
@@ -281,16 +323,14 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
     }
   }
 
+  type Meta = { reason: string | null; source: RequestEvent["source"]; modelCalls: number };
+
   async function propose(
     manifest: Manifest<Ctx>,
     ctx: Ctx,
     av: Availability,
-    body: unknown,
-  ): Promise<ProposeResponse> {
-    const prompt =
-      typeof (body as { prompt?: unknown })?.prompt === "string"
-        ? (body as { prompt: string }).prompt.trim()
-        : "";
+    prompt: string,
+  ): Promise<{ response: ProposeResponse; meta: Meta }> {
     if (!prompt) throw new HttpError(400, "Type what you'd like to change.");
     if (prompt.length > promptMaxChars)
       throw new HttpError(400, `Please keep requests under ${promptMaxChars} characters.`);
@@ -301,10 +341,20 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
     const m = loaded.me;
     const spec = loaded.resolved.spec;
     const request = buildModelRequest(m, spec, prompt);
+    const done = (
+      response: ProposeResponse,
+      reason: string | null,
+      source: Meta["source"],
+      modelCalls: number,
+    ) => ({
+      response,
+      meta: { reason, source, modelCalls },
+    });
 
     let issues: Issue[] = [];
     let lastOps: Op[] = [];
     for (let attempt = 0; attempt < 2; attempt++) {
+      const calls = attempt + 1;
       const req =
         attempt === 0
           ? request
@@ -316,18 +366,30 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
       try {
         raw = await options.model.propose(req, { signal: AbortSignal.timeout(60_000) });
       } catch (e) {
-        if (e instanceof ModelRefusal) return { kind: "refusal", message: e.message };
+        if (e instanceof ModelRefusal)
+          return done({ kind: "refusal", message: e.message }, "safety", "model", calls);
         options.onError?.(e);
-        throw new HttpError(502, "The assistant is unavailable right now. Please try again.");
+        throw new HttpError(502, "The assistant is unavailable right now. Please try again.", {
+          outcome: "error",
+          reason: "model_unavailable",
+          source: null,
+        });
       }
       const result = fromModelOutput(raw);
-      if (result.kind === "refusal") return { kind: "refusal", message: result.reason };
-      if (result.kind === "clarify") return { kind: "clarify", question: result.question };
+      if (result.kind === "refusal")
+        return done({ kind: "refusal", message: result.reason }, result.category, "model", calls);
+      if (result.kind === "clarify")
+        return done({ kind: "clarify", question: result.question }, null, "model", calls);
       if (result.ops.length === 0)
-        return {
-          kind: "refusal",
-          message: "I couldn't find anything on this page to change for that request.",
-        };
+        return done(
+          {
+            kind: "refusal",
+            message: "I couldn't find anything on this page to change for that request.",
+          },
+          "no_change",
+          "model",
+          calls,
+        );
 
       lastOps = result.ops;
       issues = validate(m, spec, result.ops);
@@ -343,20 +405,35 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
           model: options.model.id,
           expiresAt: new Date(Date.now() + ttl * 1000).toISOString(),
         });
-        return {
-          kind: "proposal",
-          proposalId,
-          ops: result.ops,
-          changes: describe(m, spec, result.ops),
-          summary: result.summary,
-          previewSpec: apply(m, spec, result.ops).spec,
-        };
+        return done(
+          {
+            kind: "proposal",
+            proposalId,
+            ops: result.ops,
+            changes: describe(m, spec, result.ops),
+            summary: result.summary,
+            previewSpec: apply(m, spec, result.ops).spec,
+          },
+          null,
+          null,
+          calls,
+        );
       }
     }
     // Asked for a data view without access to data views: say why, not which op failed.
     if (!av.dataViews && touchesDataViews(loaded.m, spec, lastOps))
-      return { kind: "refusal", message: av.message ?? DEFAULT_DATA_VIEWS_MESSAGE };
-    return { kind: "refusal", message: issues[0]?.message ?? "That change isn't possible here." };
+      return done(
+        { kind: "refusal", message: av.message ?? DEFAULT_DATA_VIEWS_MESSAGE },
+        "data_views_off",
+        "host",
+        2,
+      );
+    return done(
+      { kind: "refusal", message: issues[0]?.message ?? "That change isn't possible here." },
+      issues[0]?.code ?? null,
+      "validator",
+      2,
+    );
   }
 
   async function commit(manifest: Manifest<Ctx>, ctx: Ctx, av: Availability, proposalId: string) {
@@ -385,6 +462,20 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
       };
     });
     if (stale) throw new HttpError(409, "Your view changed since this preview. Please ask again.");
+    await record({
+      surfaceId: manifest.id,
+      userId: ctx.userId,
+      tenantId: ctx.tenantId ?? null,
+      prompt: proposal.prompt,
+      outcome: "applied",
+      reason: null,
+      source: null,
+      message: null,
+      proposalId: proposal.id,
+      model: proposal.model,
+      latencyMs: null,
+      modelCalls: null,
+    });
     return state(manifest, after, av);
   }
 
@@ -405,6 +496,27 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
     return state(manifest, after, av);
   }
 
+  async function insightsRoute(request: Request, url: URL): Promise<Response> {
+    if (!options.insights) return json({ error: { message: "Not found" } }, 404);
+    if (request.method !== "GET") return json({ error: { message: "Not found" } }, 404);
+    const ctx = await options.getContext(request);
+    if (!ctx?.userId) return json({ error: { message: "Not signed in" } }, 401);
+    if (!(await options.insights.allow(ctx)))
+      return json({ error: { message: "Not allowed" } }, 403);
+    const q = url.searchParams;
+    const report = await getInsights(options.storage, {
+      since: parseSince(q.get("since") ?? "30d"),
+      ...(q.get("until") ? { until: q.get("until") as string } : {}),
+      ...(q.get("tenant") ? { tenantId: q.get("tenant") as string } : {}),
+      ...(q.get("surface") ? { surfaceId: q.get("surface") as string } : {}),
+    });
+    if (q.get("format") === "markdown")
+      return new Response(renderInsightsMarkdown(report), {
+        headers: { "content-type": "text/markdown; charset=utf-8", "cache-control": "no-store" },
+      });
+    return json(report);
+  }
+
   return async function handle(request: Request): Promise<Response> {
     try {
       const url = new URL(request.url);
@@ -414,6 +526,7 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
         .split("/")
         .filter(Boolean)
         .map(decodeURIComponent);
+      if (parts[0] === "insights" && parts.length === 1) return await insightsRoute(request, url);
       if (parts[0] !== "surfaces" || !parts[1])
         return json({ error: { message: "Not found" } }, 404);
 
@@ -436,6 +549,73 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
       };
 
       const av = await availabilityFor(ctx, manifest.id);
+
+      if (route === "POST proposals") {
+        // Every customization request is logged with its outcome, including refusals.
+        const started = performance.now();
+        const b = (await body()) as { prompt?: unknown };
+        const prompt = typeof b?.prompt === "string" ? b.prompt.trim() : "";
+        const base = {
+          surfaceId: manifest.id,
+          userId: ctx.userId,
+          tenantId: ctx.tenantId ?? null,
+          prompt: prompt ? prompt.slice(0, 2000) : null,
+          model: options.model.id,
+          proposalId: null,
+        };
+        const ms = () => Math.round(performance.now() - started);
+        try {
+          if (!av.customize)
+            throw new HttpError(403, av.message ?? DEFAULT_OFF_MESSAGE, {
+              outcome: "unavailable",
+              reason: "customize_off",
+              source: "host",
+            });
+          const { response, meta } = await propose(manifest, ctx, av, prompt);
+          await record({
+            ...base,
+            outcome:
+              response.kind === "proposal"
+                ? "proposed"
+                : response.kind === "refusal"
+                  ? "refused"
+                  : "clarified",
+            reason: meta.reason,
+            source: meta.source,
+            message:
+              response.kind === "refusal"
+                ? response.message
+                : response.kind === "clarify"
+                  ? response.question
+                  : null,
+            proposalId: response.kind === "proposal" ? response.proposalId : null,
+            latencyMs: ms(),
+            modelCalls: meta.modelCalls,
+          });
+          return json(response);
+        } catch (e) {
+          if (e instanceof HttpError && e.log)
+            await record({
+              ...base,
+              ...e.log,
+              message: e.message,
+              latencyMs: ms(),
+              modelCalls: null,
+            });
+          else if (!(e instanceof HttpError))
+            await record({
+              ...base,
+              outcome: "error",
+              reason: "internal",
+              source: null,
+              message: null,
+              latencyMs: ms(),
+              modelCalls: null,
+            });
+          throw e;
+        }
+      }
+
       // The view always renders; only changing it depends on availability.
       if (request.method === "POST" && !av.customize)
         throw new HttpError(403, av.message ?? DEFAULT_OFF_MESSAGE);
@@ -443,8 +623,6 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
       switch (route) {
         case "GET ":
           return json(state(manifest, await load(manifest, ctx, av), av));
-        case "POST proposals":
-          return json(await propose(manifest, ctx, av, await body()));
         case "POST proposals/:id/commit":
           return json(await commit(manifest, ctx, av, parts[3] as string));
         case "POST undo":

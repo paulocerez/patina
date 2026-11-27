@@ -93,6 +93,24 @@ function DataProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/** For the demo's "staff" user: the insights report of what customers asked for. */
+function InsightsPanel() {
+  const [report, setReport] = useState<string | null>(null);
+  const load = async () => {
+    const res = await fetch("/api/patina/insights?format=markdown&since=30d");
+    setReport(res.ok ? await res.text() : `Couldn't load insights (${res.status}).`);
+  };
+  return (
+    <details
+      className="insights"
+      onToggle={(e) => (e.currentTarget.open ? void load() : undefined)}
+    >
+      <summary>Insights: what customers asked for</summary>
+      <pre>{report ?? "Loading…"}</pre>
+    </details>
+  );
+}
+
 function Header() {
   const [me, setMe] = useState<{ user: User; users: User[] } | null>(null);
   useEffect(() => {
@@ -114,6 +132,7 @@ function Header() {
         <div className="brand">Happy Paws Veterinary</div>
         <div className="muted">Clinic dashboard · Patina demo</div>
       </div>
+      {me?.user.userId === "alice" && <InsightsPanel />}
       {me && (
         <label className="user-switch">
           Signed in as
