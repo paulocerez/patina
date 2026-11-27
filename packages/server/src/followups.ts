@@ -931,3 +931,9 @@ export function followUpWebhook(options: FollowUpWebhookOptions) {
     return ok({ shipped: shipped.key, notices });
   };
 }
+
+// ─── More sinks ──────────────────────────────────────────────────────────────────────────
+
+export * from "./sinks/customers.js";
+export * from "./sinks/github.js";
+export * from "./sinks/jira.js";

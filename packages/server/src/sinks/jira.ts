@@ -119,7 +119,7 @@ export function jiraSink(options: JiraSinkOptions): FollowUpSink {
   const base = options.baseUrl.replace(/\/+$/, "");
   const labels = options.labels?.length ? options.labels : ["patina-followup"];
   const prefix = options.titlePrefix ?? "Customer request: ";
-  const auth = `Basic ${Buffer.from(`${options.email}:${options.apiToken}`).toString("base64")}`;
+  const auth = `Basic ${base64(`${options.email}:${options.apiToken}`)}`;
   const jqlString = (s: string) => `"${s.replace(/["\\]/g, "\\$&")}"`;
 
   async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -232,4 +232,11 @@ export function jiraSink(options: JiraSinkOptions): FollowUpSink {
       return out;
     },
   };
+}
+
+/** UTF-8 safe base64 without Node's Buffer, so the sink runs on edge runtimes too. */
+function base64(text: string): string {
+  let binary = "";
+  for (const byte of new TextEncoder().encode(text)) binary += String.fromCharCode(byte);
+  return btoa(binary);
 }

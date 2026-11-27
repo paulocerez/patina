@@ -1,6 +1,6 @@
 ---
 name: patina-ui
-description: Integrate Patina UI (@patina-ui/*) into a web app so end users can customize views in plain language. Use when adding prompt-driven customization, declaring customizable surfaces or manifests, mounting the Patina server handler, rendering <Surface>, setting up data views with `patina scan`, availability/feature flags, quotas, insights, or the Patina GitHub Action.
+description: Integrate Patina UI (@patina-ui/*) into a web app so end users can customize views in plain language. Use when adding prompt-driven customization, declaring customizable surfaces or manifests, mounting the Patina server handler, rendering <Surface>, setting up data views with `patina scan`, availability/feature flags, quotas, insights, follow-ups (Linear, GitHub, Jira, Slack, HubSpot), PostHog/Sentry, or the Patina GitHub Action.
 ---
 
 # Integrating Patina UI
@@ -21,7 +21,7 @@ Docs: https://github.com/paulocerez/patina (start with `docs/getting-started.md`
 | `@patina-ui/core`      | `defineSurface`, `t.*` types, `defineCatalog`, `f.*`, `dataBlocks`, `migrations` (no deps)                                                                                                          |
 | `@patina-ui/server`    | `createPatinaHandler`, `memoryStorage`, `postgresStorage`, `migratePostgres`; subpaths `/anthropic` (`anthropicModel`), `/express` (`toExpress`), `/testing` (`scriptedModel`), `/eval` (`runEval`) |
 | `@patina-ui/react`     | `PatinaProvider`, `Surface`, `useSurface`, `PromptInput`, `ProposalPreview`, `SurfaceMessage`, `UndoButton`, `ResetButton`, `SkippedNotice`, `AvailabilityNotice`, `useQuery`, `formatField`        |
-| `@patina-ui/cli` (dev) | `patina scan`, `patina check`, `patina insights`, `patina init-action`, `patina init-agent`                                                                                                         |
+| `@patina-ui/cli` (dev) | `patina scan`, `patina check`, `patina insights`, `patina followups`, `patina init-action`, `patina init-agent`                                                                                                         |
 
 ```sh
 npm i @patina-ui/core @patina-ui/server @patina-ui/react @anthropic-ai/sdk
@@ -223,10 +223,11 @@ and tests:
 
 | Route                                                       | Body                | Returns                                                                                                                     |
 | ----------------------------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `GET {basePath}/surfaces/:id`                               |                     | `{ spec, canUndo, isCustomized, availability, skipped, render, catalog? }`                                                  |
+| `GET {basePath}/surfaces/:id`                               |                     | `{ spec, canUndo, isCustomized, availability, skipped, render, catalog?, notices? }`                                                |
 | `POST {basePath}/surfaces/:id/proposals`                    | `{ "prompt": "…" }` | `{ kind: "proposal", proposalId, changes, previewSpec }`, `{ kind: "refusal", message }` or `{ kind: "clarify", question }` |
 | `POST {basePath}/surfaces/:id/proposals/:proposalId/commit` |                     | the new state (409 if the preview is gone or isn't this user's)                                                             |
 | `POST {basePath}/surfaces/:id/undo`, `…/reset`              |                     | the new state                                                                                                               |
+| `POST {basePath}/surfaces/:id/notices/:key/dismiss`         |                     | `{ ok: true }`: hides a shipped follow-up notice for this user                                                              |
 | `GET {basePath}/insights`                                   |                     | the insights report (only with `insights.allow`)                                                                            |
 
 Errors are `{ error: { message } }`: 401 without a session, 403 when unavailable, 429 for
@@ -300,6 +301,17 @@ createPatinaHandler({
 ```
 
 Clear old prompts on a schedule with `storage.redactPrompts(cutoffDate)`.
+
+Ready-made integrations (use these rather than hand-rolling, and match what the app already uses):
+
+- **PostHog / Sentry:** `onEvent: posthogEvents({ client: posthog, groupType: "company" })`,
+  `sentryReporter(Sentry)` for `onError`, from `@patina-ui/server/integrations`; `combineEvents(a, b)`
+  for several. Prompts are not sent to PostHog unless `includePrompt: true`.
+- **Follow-ups** (`docs/guides/follow-ups.md`): a scheduled `patina followups --since 7d` files
+  what customers couldn't do as issues (Linear, GitHub, Jira), a Slack digest or HubSpot notes.
+  It needs the request log. To tell users when it ships, render `<ShippedNotice surfaceId>` next
+  to the customizer and mount `followUpWebhook({ provider, secret, storage })` before
+  `express.json()`. Ask before sending prompts to a new third party (data processing agreements).
 
 ## Verify before you finish
 

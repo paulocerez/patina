@@ -12,6 +12,8 @@ import {
 import {
   type FollowUpGrouper,
   type FollowUpSink,
+  githubIssuesSink,
+  jiraSink,
   linearSink,
   renderFollowUpsText,
   runFollowUps,
@@ -44,10 +46,12 @@ Usage:
 
   patina followups [--database-url $DATABASE_URL] [--since 7d] [--surface <id>] [--dry-run]
                    [--linear-team <team id>] [--linear-label <label id>]… [--linear-state <state id>]
+                   [--github-repo owner/name] [--jira-project KEY]
                    [--group] [--language English] [--app-name <name>]
                    [--min-requests 2] [--min-customers 1] [--max 10] [--format text|json]
-      Turn what customers asked for but couldn't do into follow-ups: a Linear issue each
-      (LINEAR_API_KEY; repeats become comments) and a Slack digest (SLACK_WEBHOOK_URL).
+      Turn what customers asked for but couldn't do into follow-ups: an issue each in Linear
+      (LINEAR_API_KEY), GitHub (GITHUB_TOKEN) or Jira (JIRA_BASE_URL, JIRA_EMAIL,
+      JIRA_API_TOKEN), where repeats become comments, and a Slack digest (SLACK_WEBHOOK_URL).
       Run it on a schedule with --since matching the interval. --group asks Claude to merge
       requests that want the same thing (ANTHROPIC_API_KEY); prompts are redacted first.
 
@@ -132,6 +136,8 @@ export async function main(
       "linear-team": { type: "string" },
       "linear-label": { type: "string", multiple: true },
       "linear-state": { type: "string" },
+      "github-repo": { type: "string" },
+      "jira-project": { type: "string" },
       group: { type: "boolean", default: false },
       language: { type: "string" },
       "app-name": { type: "string" },
@@ -277,6 +283,34 @@ with dataBlocks(catalog), and commit ${out}/. See docs/guides/data-views.md.`);
         );
       else if (linearKey || linearTeam)
         console.error("Linear needs both LINEAR_API_KEY and --linear-team (or LINEAR_TEAM_ID).");
+      const githubRepo = values["github-repo"] ?? process.env.PATINA_GITHUB_REPO;
+      if (githubRepo) {
+        const token = process.env.GITHUB_TOKEN;
+        if (token)
+          sinks.push(
+            githubIssuesSink({
+              token,
+              repo: githubRepo,
+              ...(values["app-name"] ? { appName: values["app-name"] } : {}),
+            }),
+          );
+        else console.error("GitHub Issues needs GITHUB_TOKEN.");
+      }
+      const jiraProject = values["jira-project"] ?? process.env.JIRA_PROJECT_KEY;
+      if (jiraProject) {
+        const { JIRA_BASE_URL: baseUrl, JIRA_EMAIL: email, JIRA_API_TOKEN: apiToken } = process.env;
+        if (baseUrl && email && apiToken)
+          sinks.push(
+            jiraSink({
+              baseUrl,
+              email,
+              apiToken,
+              projectKey: jiraProject,
+              ...(values["app-name"] ? { appName: values["app-name"] } : {}),
+            }),
+          );
+        else console.error("Jira needs JIRA_BASE_URL, JIRA_EMAIL and JIRA_API_TOKEN.");
+      }
       if (slackUrl)
         sinks.push(
           slackSink({
@@ -287,7 +321,7 @@ with dataBlocks(catalog), and commit ${out}/. See docs/guides/data-views.md.`);
     }
     if (sinks.length === 0 && !values["dry-run"]) {
       console.error(
-        "No destination: set LINEAR_API_KEY and --linear-team, and/or SLACK_WEBHOOK_URL (or use --dry-run).",
+        "No destination: set up Linear (LINEAR_API_KEY, --linear-team), GitHub (GITHUB_TOKEN, --github-repo), Jira (JIRA_*, --jira-project) and/or Slack (SLACK_WEBHOOK_URL), or use --dry-run.",
       );
       return 1;
     }
