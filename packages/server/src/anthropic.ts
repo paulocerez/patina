@@ -1,10 +1,10 @@
 /**
  * Anthropic model adapter.
  * @packageDocumentation
- * @module @patina/server/anthropic
+ * @module @patina-ui/server/anthropic
  */
 import Anthropic from "@anthropic-ai/sdk";
-import type { ModelRequest } from "@patina/core";
+import type { ModelRequest } from "@patina-ui/core";
 import { type ModelAdapter, ModelRefusal } from "./model.js";
 
 export interface AnthropicModelOptions {

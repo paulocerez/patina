@@ -1,9 +1,27 @@
 {
-  "name": "@patina/server",
-  "version": "0.0.0",
-  "description": "Request handler, model adapters and storage adapters for Patina.",
-  "type": "module",
+  "name": "@patina-ui/server",
+  "version": "0.1.0",
+  "description": "Patina UI server: fetch-style request handler, Anthropic model adapter, memory and Postgres storage, Express adapter, eval runner.",
+  "keywords": [
+    "patina-ui",
+    "llm",
+    "anthropic",
+    "claude",
+    "customization",
+    "express",
+    "postgres"
+  ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paulocerez/patina.git",
+    "directory": "packages/server"
+  },
+  "homepage": "https://github.com/paulocerez/patina/tree/main/packages/server#readme",
+  "bugs": {
+    "url": "https://github.com/paulocerez/patina/issues"
+  },
+  "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./anthropic": "./src/anthropic.ts",
@@ -33,18 +51,22 @@
         "types": "./dist/eval.d.ts",
         "import": "./dist/eval.js"
       }
-    }
+    },
+    "access": "public"
   },
   "files": [
     "dist"
   ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "build": "tsup src/index.ts src/anthropic.ts src/express.ts src/testing.ts src/eval.ts --format esm --clean --external @patina/core --external @anthropic-ai/sdk && tsc -p tsconfig.build.json",
+    "build": "tsup src/index.ts src/anthropic.ts src/express.ts src/testing.ts src/eval.ts --format esm --clean --external @patina-ui/core --external @anthropic-ai/sdk && tsc -p tsconfig.build.json",
     "test": "vitest run",
     "typecheck": "tsc -p ."
   },
   "dependencies": {
-    "@patina/core": "workspace:*"
+    "@patina-ui/core": "workspace:^"
   },
   "peerDependencies": {
     "@anthropic-ai/sdk": ">=1.0.0"

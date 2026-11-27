@@ -1,4 +1,4 @@
-# Patina
+# Patina UI
 
 Let the users of your app customize its views in plain language, safely.
 
@@ -16,15 +16,16 @@ is validated before it is saved, and again whenever it is replayed. Users can pr
 and reset. Permissions stay in your app.
 
 ```
-packages/core     @patina/core     spec, manifest, patch engine (no dependencies)
-packages/react    @patina/react    <Surface> renderer, useSurface, headless UX primitives
-packages/server   @patina/server   request handler, Anthropic adapter, storage adapters
-packages/cli      @patina/cli      patina scan / check / init-action (data + design detection)
+packages/core     @patina-ui/core     spec, manifest, patch engine (no dependencies)
+packages/react    @patina-ui/react    <Surface> renderer, useSurface, headless UX primitives
+packages/server   @patina-ui/server   request handler, Anthropic adapter, storage adapters
+packages/cli      @patina-ui/cli      patina scan / check / init-action (data + design detection)
 packages/action                    GitHub Action: checks PRs for changes that affect the catalog
 examples/demo                      a vet clinic dashboard wired end to end (Express + TanStack Table)
 ```
 
-> Status: pre-release (`0.0.0`, not on npm yet). To try it in your own app, see
+> Status: `0.1.0`. Packages are published to npm as `@patina-ui/*` (see
+> [Releasing](docs/releasing.md)). To try it in your own app, see
 > [Trying Patina in your app](docs/guides/try-in-your-app.md).
 > The design is in [ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -36,9 +37,10 @@ From install to a first customizable view in four steps. The full walkthrough is
 ### 1. Install
 
 ```sh
-pnpm add @patina/core @patina/server @patina/react @anthropic-ai/sdk
-# until published: pnpm pack:local in this repo, then install the tarballs
-# (see docs/guides/try-in-your-app.md)
+npm i @patina-ui/core @patina-ui/server @patina-ui/react @anthropic-ai/sdk
+npm i -D @patina-ui/cli        # optional: `patina scan` for data views
+# Before the first npm release: `pnpm pack:local` here and install the tarballs
+# (see docs/guides/try-in-your-app.md).
 ```
 
 ### 2. Declare a surface (server)
@@ -48,7 +50,7 @@ manifest (what users may change).
 
 ```ts
 // surfaces/orders.ts
-import { defineSurface, t } from "@patina/core";
+import { defineSurface, t } from "@patina-ui/core";
 
 export const orders = defineSurface({
   id: "orders",
@@ -94,9 +96,9 @@ export const orders = defineSurface({
 ```ts
 // server.ts (Express)
 import express from "express";
-import { createPatinaHandler, memoryStorage } from "@patina/server";
-import { anthropicModel } from "@patina/server/anthropic";
-import { toExpress } from "@patina/server/express";
+import { createPatinaHandler, memoryStorage } from "@patina-ui/server";
+import { anthropicModel } from "@patina-ui/server/anthropic";
+import { toExpress } from "@patina-ui/server/express";
 import { orders } from "./surfaces/orders";
 
 const patina = createPatinaHandler({
@@ -128,7 +130,7 @@ import {
   SurfaceMessage,
   UndoButton,
   ResetButton,
-} from "@patina/react";
+} from "@patina-ui/react";
 
 function OrdersTable({ columns, pageSize }: { columns: { key: string }[]; pageSize: number }) {
   // `columns` arrives ordered, with hidden columns already removed.
@@ -183,6 +185,7 @@ view or in the model's prompt.
   - [Data views](docs/guides/data-views.md): `patina scan`, the catalog, data blocks
   - [GitHub Action](docs/guides/github-action.md): check every PR
 - [API reference](docs/reference/README.md) (generated with `pnpm docs:api`)
+- [Releasing](docs/releasing.md): npm publishing with Changesets
 - [ARCHITECTURE.md](ARCHITECTURE.md): the design and its tradeoffs
 
 ## Development

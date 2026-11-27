@@ -44,7 +44,7 @@ You receive a deterministic scan of the repository, two drafts (catalog.ts and b
 Return improved versions of both files.
 
 catalog.ts rules:
-- Keep the exact format: import { defineCatalog, f } from "@patina/core"; export const catalog = defineCatalog({ ... }).
+- Keep the exact format: import { defineCatalog, f } from "@patina-ui/core"; export const catalog = defineCatalog({ ... }).
 - Only include endpoints present in the scan. Never invent endpoints, fields or URLs. Only GET.
 - Write short human labels and one-sentence descriptions. Use the app's own words where you can see them.
 - Mark anything personal or confidential as sensitive: true (contact details, health data, credentials, financial identifiers).
@@ -54,7 +54,7 @@ catalog.ts rules:
 
 blocks.tsx rules:
 - Keep the three exports and their props exactly: PatinaTable({ query }), PatinaChart({ kind, query }), PatinaStat({ query }).
-- Keep using useQuery and formatField from "@patina/react". No data fetching of your own, no business logic.
+- Keep using useQuery and formatField from "@patina-ui/react". No data fetching of your own, no business logic.
 - Use only components, classes and CSS variables that exist in the files you were shown; match their markup conventions.
 - No dangerouslySetInnerHTML, no external URLs.
 

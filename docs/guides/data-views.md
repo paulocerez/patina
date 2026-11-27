@@ -77,7 +77,7 @@ endpoints are accepted.
 
 ```ts
 // patina/catalog.ts
-import { defineCatalog, f } from "@patina/core";
+import { defineCatalog, f } from "@patina-ui/core";
 
 export const catalog = defineCatalog({
   appointments: {
@@ -127,7 +127,7 @@ paths, enums without values, and so on.
 ## 3. Register the blocks
 
 ```ts
-import { dataBlocks, defineSurface, t } from "@patina/core";
+import { dataBlocks, defineSurface, t } from "@patina-ui/core";
 import { catalog } from "../patina/catalog";
 
 const blocks = dataBlocks(catalog); // PatinaTable, PatinaChart, PatinaStat + presets
@@ -173,7 +173,7 @@ import { PatinaChart, PatinaStat, PatinaTable } from "../patina/blocks";
 ```
 
 The three blocks are ordinary components in your repo. Edit them however you like, as long as
-they keep reading data through `useQuery(query)` from `@patina/react`.
+they keep reading data through `useQuery(query)` from `@patina-ui/react`.
 
 | Block         | Query shape                                                                                | Example                                                |
 | ------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------ |

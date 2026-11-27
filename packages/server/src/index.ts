@@ -1,9 +1,9 @@
 /**
  * Request handler and storage adapters.
  * @packageDocumentation
- * @module @patina/server
+ * @module @patina-ui/server
  */
-export type { ErrorBody, ProposeResponse, SurfaceState } from "@patina/core";
+export type { ErrorBody, ProposeResponse, SurfaceState } from "@patina-ui/core";
 export type { PatinaContext, PatinaHandlerOptions } from "./handler.js";
 export { createPatinaHandler } from "./handler.js";
 export type { ModelAdapter } from "./model.js";

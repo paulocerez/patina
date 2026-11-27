@@ -1,7 +1,7 @@
 /**
  * `patina scan`, `patina check` and the GitHub Action, as a library.
  * @packageDocumentation
- * @module @patina/cli
+ * @module @patina-ui/cli
  */
 
 export { parseCatalogSource } from "./catalog-parse.js";

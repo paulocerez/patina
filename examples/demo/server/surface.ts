@@ -1,4 +1,4 @@
-import { dataBlocks, defineSurface, type SurfaceSpec, t } from "@patina/core";
+import { dataBlocks, defineSurface, type SurfaceSpec, t } from "@patina-ui/core";
 import { catalog } from "../patina/catalog.js";
 import type { DemoContext } from "./users.js";
 

@@ -11,7 +11,7 @@ storageContract("postgresStorage (PGlite)", async () => {
   return postgresStorage({ query });
 });
 
-import type { ProposeResponse, SurfaceState } from "@patina/core";
+import type { ProposeResponse, SurfaceState } from "@patina-ui/core";
 import { expect, it } from "vitest";
 import { dashboard } from "../../core/test/fixtures.js";
 import { createPatinaHandler } from "../src/index.js";

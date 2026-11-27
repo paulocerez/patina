@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: paulocerez/patina/packages/action@main
+      - uses: paulocerez/patina/packages/action@v0
         with:
           fail-on: breaking # breaking | changed | info | never
 ```

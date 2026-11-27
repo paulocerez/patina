@@ -37,7 +37,7 @@ function renderField(name: string, f: ScannedField): string {
 export function renderCatalog(scan: ScanResult): string {
   const lines: string[] = [
     HEADER,
-    `import { defineCatalog, f } from "@patina/core";`,
+    `import { defineCatalog, f } from "@patina-ui/core";`,
     "",
     "export const catalog = defineCatalog({",
   ];

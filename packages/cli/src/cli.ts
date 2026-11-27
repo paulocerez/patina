@@ -20,7 +20,7 @@ Usage:
   patina check [--root .] [--out patina] [--format markdown|json] [--fail-on breaking|changed|info|never]
       Report API and design changes that affect the catalog (what the GitHub Action runs).
 
-  patina init-action [--root .] [--fail-on breaking] [--action paulocerez/patina/packages/action@main]
+  patina init-action [--root .] [--fail-on breaking] [--action paulocerez/patina/packages/action@v0]
       Write .github/workflows/patina.yml so every PR is checked.
 `;
 
@@ -42,7 +42,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       model: { type: "string" },
       format: { type: "string", default: "markdown" },
       "fail-on": { type: "string", default: "breaking" },
-      action: { type: "string", default: "paulocerez/patina/packages/action@main" },
+      action: { type: "string", default: "paulocerez/patina/packages/action@v0" },
     },
   });
   const root = resolve(values.root as string);

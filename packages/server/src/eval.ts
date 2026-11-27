@@ -1,7 +1,7 @@
 /**
  * Eval runner.
  * @packageDocumentation
- * @module @patina/server/eval
+ * @module @patina-ui/server/eval
  */
 /**
  * Eval runner: measures how well a model turns prompts into the right patches for a surface.
@@ -18,7 +18,7 @@ import {
   restrictManifest,
   type SurfaceSpec,
   type SurfaceState,
-} from "@patina/core";
+} from "@patina-ui/core";
 import { createPatinaHandler, type PatinaContext } from "./handler.js";
 import type { ModelAdapter } from "./model.js";
 import { memoryStorage } from "./storage.js";

@@ -243,7 +243,7 @@ describe("init-action", () => {
     quiet();
     expect(await main(["init-action", "--root", dir])).toBe(0);
     const yml = readFileSync(join(dir, ".github/workflows/patina.yml"), "utf8");
-    expect(yml).toContain("uses: paulocerez/patina/packages/action@main");
+    expect(yml).toContain("uses: paulocerez/patina/packages/action@v0");
     expect(yml).toContain("pull-requests: write");
     expect(await main(["init-action", "--root", dir])).toBe(1); // won't overwrite
   });

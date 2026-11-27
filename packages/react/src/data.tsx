@@ -5,7 +5,7 @@ import {
   type QueryResult,
   runQuery,
   type SurfaceSpec,
-} from "@patina/core";
+} from "@patina-ui/core";
 import { createContext, useContext, useEffect, useState } from "react";
 
 /**

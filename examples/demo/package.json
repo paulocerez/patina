@@ -10,9 +10,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.14.0",
-    "@patina/core": "workspace:*",
-    "@patina/react": "workspace:*",
-    "@patina/server": "workspace:*",
+    "@patina-ui/core": "workspace:*",
+    "@patina-ui/react": "workspace:*",
+    "@patina-ui/server": "workspace:*",
     "@tanstack/react-table": "^9.3.1",
     "express": "^5.3.0",
     "react": "^19.3.1",

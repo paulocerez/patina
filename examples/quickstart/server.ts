@@ -1,7 +1,7 @@
-import { createPatinaHandler, type ModelAdapter, memoryStorage } from "@patina/server";
-import { anthropicModel } from "@patina/server/anthropic";
-import { toExpress } from "@patina/server/express";
-import { scriptedModel } from "@patina/server/testing";
+import { createPatinaHandler, type ModelAdapter, memoryStorage } from "@patina-ui/server";
+import { anthropicModel } from "@patina-ui/server/anthropic";
+import { toExpress } from "@patina-ui/server/express";
+import { scriptedModel } from "@patina-ui/server/testing";
 import express from "express";
 import { orders } from "./surfaces/orders.js";
 

@@ -1,4 +1,4 @@
-import type { FieldKind } from "@patina/core";
+import type { FieldKind } from "@patina-ui/core";
 
 export type UiKit = "shadcn" | "mui" | "chakra" | "mantine" | "antd" | "tailwind" | "css";
 

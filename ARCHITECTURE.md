@@ -1,6 +1,6 @@
 # Patina: architecture
 
-> Status: **signed off and implemented** (pre-release `0.0.0`). See §14 for what is
+> Status: **signed off and implemented** (`0.1.0`, published as `@patina-ui/*`). See §14 for what is
 > deferred. Where the code and this document differ, the code wins and this document should
 > be updated.
 
@@ -21,9 +21,9 @@ safely replayed.
 
 ```
 packages/
-  core/     @patina/core    types, the t.* DSL, spec, manifest, patch engine, resolver, migrations
-  react/    @patina/react   PatinaProvider, useSurface, <Surface> renderer, headless UX primitives
-  server/   @patina/server  request handler, ModelAdapter (+ Anthropic), StorageAdapter (+ memory, Postgres)
+  core/     @patina-ui/core    types, the t.* DSL, spec, manifest, patch engine, resolver, migrations
+  react/    @patina-ui/react   PatinaProvider, useSurface, <Surface> renderer, headless UX primitives
+  server/   @patina-ui/server  request handler, ModelAdapter (+ Anthropic), StorageAdapter (+ memory, Postgres)
 examples/
   demo/                     Vite + React dashboard (filter bar, stat cards, chart, TanStack Table) and an Express server
 evals/                      prompt → expected-patch cases and a runner script
@@ -40,32 +40,32 @@ The Postgres adapter takes a `query(sql, params)` function instead of importing 
 
 ### Tech stack
 
-| Layer           | Choice                                                                                                                                                                          |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Language        | TypeScript (strict), ESM-only. Node 20+ on the server                                                                                                                           |
-| Monorepo        | pnpm workspaces                                                                                                                                                                 |
-| Package build   | tsup (ESM + `.d.ts`)                                                                                                                                                            |
-| `core`          | No runtime dependencies. Its own `t.*` DSL produces validators and JSON Schema                                                                                                  |
-| `react`         | React 18 and 19 as a peer dependency. Headless, no styling library                                                                                                              |
-| `server`        | Fetch-style handler (`(Request) => Promise<Response>`). `@patina/server/express` exports `toExpress(handler)`. `@anthropic-ai/sdk` is loaded only by `@patina/server/anthropic` |
-| Model           | Anthropic structured outputs. Default Opus 5.5 at low effort; compare models with the eval set                                                                                  |
-| Storage         | Postgres through an injected `query(sql, params)`: `pg`, `postgres.js` or PGlite                                                                                                |
-| Tests           | Vitest, fast-check, Testing Library, PGlite                                                                                                                                     |
-| Evals           | A `tsx` script over `evals/*.jsonl` (`pnpm eval --model …`)                                                                                                                     |
-| Lint and format | Biome                                                                                                                                                                           |
-| Demo client     | Vite + React. **TanStack Table** for the appointments table, Recharts for the chart                                                                                             |
-| Demo server     | **Express**. `memoryStorage` by default, PGlite optional                                                                                                                        |
-| Releases and CI | Changesets, GitHub Actions                                                                                                                                                      |
+| Layer           | Choice                                                                                                                                                                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Language        | TypeScript (strict), ESM-only. Node 20+ on the server                                                                                                                                 |
+| Monorepo        | pnpm workspaces                                                                                                                                                                       |
+| Package build   | tsup (ESM + `.d.ts`)                                                                                                                                                                  |
+| `core`          | No runtime dependencies. Its own `t.*` DSL produces validators and JSON Schema                                                                                                        |
+| `react`         | React 18 and 19 as a peer dependency. Headless, no styling library                                                                                                                    |
+| `server`        | Fetch-style handler (`(Request) => Promise<Response>`). `@patina-ui/server/express` exports `toExpress(handler)`. `@anthropic-ai/sdk` is loaded only by `@patina-ui/server/anthropic` |
+| Model           | Anthropic structured outputs. Default Opus 5.5 at low effort; compare models with the eval set                                                                                        |
+| Storage         | Postgres through an injected `query(sql, params)`: `pg`, `postgres.js` or PGlite                                                                                                      |
+| Tests           | Vitest, fast-check, Testing Library, PGlite                                                                                                                                           |
+| Evals           | A `tsx` script over `evals/*.jsonl` (`pnpm eval --model …`)                                                                                                                           |
+| Lint and format | Biome                                                                                                                                                                                 |
+| Demo client     | Vite + React. **TanStack Table** for the appointments table, Recharts for the chart                                                                                                   |
+| Demo server     | **Express**. `memoryStorage` by default, PGlite optional                                                                                                                              |
+| Releases and CI | Changesets, GitHub Actions                                                                                                                                                            |
 
 TanStack Table is used only inside the demo's `DataTable` component. Patina's resolved
 `columns` collection maps directly onto TanStack's `columnOrder` and `columnVisibility`
 state. This also shows that host components need no Patina-specific code.
-`@patina/react` itself doesn't depend on TanStack.
+`@patina-ui/react` itself doesn't depend on TanStack.
 
 ### Request flow
 
 ```
- browser (@patina/react)                         host server (@patina/server)
+ browser (@patina-ui/react)                         host server (@patina-ui/server)
  ───────────────────────                         ────────────────────────────
  GET  /surfaces/:id  ───────────────────────────▶ getContext(req) → {userId, tenantId, perms}
                                                   load layers → resolve() → resolved spec
@@ -195,7 +195,7 @@ doors even by mistake.
 ### Example: the demo manifest
 
 ```ts
-import { defineSurface, t } from "@patina/core";
+import { defineSurface, t } from "@patina-ui/core";
 import baseSpec from "./dashboard.base.json";
 
 const COLUMN_KEYS = ["date", "patient", "vet", "status", "revenue"];
@@ -371,7 +371,7 @@ Its inverse, computed against the base, is:
 listed in reverse order. A `move` inverse anchors to the item's original
 previous sibling, or uses `"start"` if there was none.)
 
-### Engine API (`@patina/core`, pure and deterministic)
+### Engine API (`@patina-ui/core`, pure and deterministic)
 
 ```ts
 validate(manifest, spec, patch): Issue[]
@@ -445,7 +445,7 @@ There are two independent version numbers:
 | `baseVersion`   | host     | the host ships a new base view     | host-supplied `migrations` hooks, then tolerant replay |
 
 ```ts
-import { migrations as m } from "@patina/core";
+import { migrations as m } from "@patina-ui/core";
 
 migrations: {
   // runs on ops from patches authored at baseVersion < 2
@@ -564,8 +564,8 @@ covers `pg`, `postgres.js` (through a two-line shim) and PGlite. The adapter's t
 ### Handler
 
 ```ts
-import { createPatinaHandler, memoryStorage } from "@patina/server";
-import { anthropicModel } from "@patina/server/anthropic";
+import { createPatinaHandler, memoryStorage } from "@patina-ui/server";
+import { anthropicModel } from "@patina-ui/server/anthropic";
 
 export const patina = createPatinaHandler({
   surfaces: [dashboard],
@@ -580,7 +580,7 @@ export const patina = createPatinaHandler({
 });
 // The handler is (req: Request) => Promise<Response>. Mount it at /api/patina/* in Next or Hono,
 // or in Express (the demo's setup):
-//   import { toExpress } from "@patina/server/express";
+//   import { toExpress } from "@patina-ui/server/express";
 //   app.use("/api/patina", toExpress(patina));
 ```
 
@@ -878,7 +878,7 @@ far as the model is concerned.
 
 ```ts
 // patina/catalog.ts (generated by `patina scan`, then edited by hand)
-import { defineCatalog, f } from "@patina/core";
+import { defineCatalog, f } from "@patina-ui/core";
 
 export const catalog = defineCatalog({
   appointments: {
@@ -1031,7 +1031,7 @@ review. Nothing is applied at runtime.
 | C   | Catalog in code (`catalog.ts`) vs JSON                                                                                                                         | **Code**: type-checked, and can import the host's types                                                                                               |
 | D   | First scan targets                                                                                                                                             | **OpenAPI, Prisma, zod, Express/Next routes, and Tailwind/shadcn first.** MUI and Chakra templates next                                               |
 | E   | Should `--ai` be part of `scan` or a separate `patina enrich` step?                                                                                            | **Separate** (`patina scan --ai` is shorthand for both), so the deterministic part stays free and reproducible                                        |
-| F   | New package or part of server?                                                                                                                                 | **A new `@patina/cli`** package (bin `patina`), plus `defineCatalog`, `f.*`, `t.query` and the client-side aggregator in `core`                       |
+| F   | New package or part of server?                                                                                                                                 | **A new `@patina-ui/cli`** package (bin `patina`), plus `defineCatalog`, `f.*`, `t.query` and the client-side aggregator in `core`                    |
 
 ### 15.7 Build order (done)
 
@@ -1069,7 +1069,7 @@ To keep reports quiet, fields left out of the catalog on purpose are only report
 are _new_ since the last snapshot.
 
 `packages/action` is a Node action whose bundle is committed to `dist/`. Teams register it
-with `npx patina init-action`, or add `uses: paulocerez/patina/packages/action@main` by hand.
+with `npx patina init-action`, or add `uses: paulocerez/patina/packages/action@v0` by hand.
 The Action:
 
 - runs the check;

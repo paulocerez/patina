@@ -1,5 +1,5 @@
-import { createPatinaHandler, memoryStorage } from "@patina/server";
-import { toExpress } from "@patina/server/express";
+import { createPatinaHandler, memoryStorage } from "@patina-ui/server";
+import { toExpress } from "@patina-ui/server/express";
 import express from "express";
 import { appointments, metrics } from "./data.js";
 import { offlineModel } from "./offlineModel.js";
@@ -11,7 +11,7 @@ async function pickModel() {
     console.log("[demo] No ANTHROPIC_API_KEY set: using the offline keyword model.");
     return offlineModel();
   }
-  const { anthropicModel } = await import("@patina/server/anthropic");
+  const { anthropicModel } = await import("@patina-ui/server/anthropic");
   const model = process.env.PATINA_MODEL ?? "claude-opus-5-5";
   console.log(`[demo] Using Anthropic model ${model}.`);
   return anthropicModel({ model });

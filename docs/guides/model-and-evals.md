@@ -75,7 +75,7 @@ Full results go to `evals/results/<timestamp>.json`.
 ### Your own surfaces
 
 ```ts
-import { runEval } from "@patina/server/eval";
+import { runEval } from "@patina-ui/server/eval";
 
 const { results, summary } = await runEval(cases, {
   surface: orders,

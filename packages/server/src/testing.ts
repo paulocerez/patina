@@ -1,9 +1,9 @@
 /**
  * Test helpers.
  * @packageDocumentation
- * @module @patina/server/testing
+ * @module @patina-ui/server/testing
  */
-import type { ModelRequest } from "@patina/core";
+import type { ModelRequest } from "@patina-ui/core";
 import type { ModelAdapter } from "./model.js";
 
 /**

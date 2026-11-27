@@ -15,5 +15,5 @@ echo "Packed into $out:"
 ls -1 "$out"/patina-*.tgz
 echo
 echo "Install in your app with:"
-echo "  npm i $out/patina-core-0.0.0.tgz $out/patina-server-0.0.0.tgz $out/patina-react-0.0.0.tgz @anthropic-ai/sdk
-  npm i -D $out/patina-cli-0.0.0.tgz   # then: npx patina scan"
+echo "  npm i $out/patina-ui-core-0.1.0.tgz $out/patina-ui-server-0.1.0.tgz $out/patina-ui-react-0.1.0.tgz @anthropic-ai/sdk
+  npm i -D $out/patina-ui-cli-0.1.0.tgz   # then: npx patina scan"

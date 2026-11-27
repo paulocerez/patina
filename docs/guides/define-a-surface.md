@@ -1,7 +1,7 @@
 # Defining a surface
 
 A **surface** is one customizable view. You define it once on the server with
-`defineSurface` from `@patina/core`:
+`defineSurface` from `@patina-ui/core`:
 
 ```ts
 defineSurface<Ctx>({
@@ -154,7 +154,7 @@ patches are **replayed on read**:
    view.
 
 ```ts
-import { migrations as m } from "@patina/core";
+import { migrations as m } from "@patina-ui/core";
 
 defineSurface({
   version: 2,

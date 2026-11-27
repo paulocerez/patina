@@ -1,7 +1,7 @@
 /**
  * Express / Node adapter for the handler.
  * @packageDocumentation
- * @module @patina/server/express
+ * @module @patina-ui/server/express
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
 

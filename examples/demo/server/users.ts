@@ -1,4 +1,4 @@
-import type { PatinaContext } from "@patina/server";
+import type { PatinaContext } from "@patina-ui/server";
 
 export interface DemoContext extends PatinaContext {
   name: string;

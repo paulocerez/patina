@@ -1,6 +1,6 @@
 # Type reference
 
-Every customizable prop is declared with one of these types from `t` in `@patina/core`. The
+Every customizable prop is declared with one of these types from `t` in `@patina-ui/core`. The
 last argument is always optional metadata: `{ label?, description? }`.
 
 - **`label`** is used in previews and messages ("Rows per page must be a whole number from 10

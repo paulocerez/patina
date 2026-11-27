@@ -1,9 +1,28 @@
 {
-  "name": "@patina/react",
-  "version": "0.0.0",
-  "description": "React bindings and headless UX primitives for Patina.",
-  "type": "module",
+  "name": "@patina-ui/react",
+  "version": "0.1.0",
+  "description": "React bindings for Patina UI: <Surface> renderer, hooks, and headless UX primitives for prompt-driven customization.",
+  "keywords": [
+    "patina-ui",
+    "react",
+    "ui",
+    "customization",
+    "personalization",
+    "llm",
+    "headless"
+  ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paulocerez/patina.git",
+    "directory": "packages/react"
+  },
+  "homepage": "https://github.com/paulocerez/patina/tree/main/packages/react#readme",
+  "bugs": {
+    "url": "https://github.com/paulocerez/patina/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": "./src/index.ts"
   },
@@ -13,25 +32,28 @@
         "types": "./dist/index.d.ts",
         "import": "./dist/index.js"
       }
-    }
+    },
+    "access": "public"
   },
   "files": [
     "dist"
   ],
-  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsup && tsc -p tsconfig.build.json",
     "test": "vitest run",
     "typecheck": "tsc -p ."
   },
   "dependencies": {
-    "@patina/core": "workspace:*"
+    "@patina-ui/core": "workspace:^"
   },
   "peerDependencies": {
     "react": "^18.2.0 || ^19.0.0"
   },
   "devDependencies": {
-    "@patina/server": "workspace:*",
+    "@patina-ui/server": "workspace:*",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
     "@types/react": "^19.3.3",

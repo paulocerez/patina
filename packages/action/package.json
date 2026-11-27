@@ -1,5 +1,5 @@
 {
-  "name": "@patina/action",
+  "name": "@patina-ui/action",
   "private": true,
   "description": "GitHub Action: runs `patina check` on pull requests. The bundle in dist/ is committed (Actions run it directly).",
   "scripts": {

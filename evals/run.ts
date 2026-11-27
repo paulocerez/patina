@@ -13,8 +13,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import type { ModelAdapter } from "@patina/server";
-import { type EvalCase, runEval } from "@patina/server/eval";
+import type { ModelAdapter } from "@patina-ui/server";
+import { type EvalCase, runEval } from "@patina-ui/server/eval";
 import { offlineModel } from "../examples/demo/server/offlineModel.js";
 import { dashboard } from "../examples/demo/server/surface.js";
 import { USERS } from "../examples/demo/server/users.js";
@@ -37,7 +37,7 @@ async function pickModel(): Promise<ModelAdapter> {
     console.error("ANTHROPIC_API_KEY is not set. Use --model offline for a free baseline run.");
     process.exit(1);
   }
-  const { anthropicModel } = await import("@patina/server/anthropic");
+  const { anthropicModel } = await import("@patina-ui/server/anthropic");
   return anthropicModel({
     ...(values.model ? { model: values.model } : {}),
     ...(values.effort ? { effort: values.effort as "low" } : {}),

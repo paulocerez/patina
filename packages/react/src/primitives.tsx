@@ -1,4 +1,4 @@
-import type { Change } from "@patina/core";
+import type { Change } from "@patina-ui/core";
 import { type ButtonHTMLAttributes, type FormEvent, type ReactNode, useId, useState } from "react";
 import { useSurface } from "./context.js";
 

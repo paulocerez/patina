@@ -14,7 +14,7 @@ import {
   type SurfaceState,
   undoTarget,
   validate,
-} from "@patina/core";
+} from "@patina-ui/core";
 import { type ModelAdapter, ModelRefusal } from "./model.js";
 import {
   ConflictError,
@@ -73,7 +73,7 @@ const newId = (prefix: string) => `${prefix}_${globalThis.crypto.randomUUID().re
 /**
  * Creates the Patina request handler: `(Request) => Promise<Response>`.
  * Mount it under `basePath` in any framework that speaks the Fetch API, or wrap it with
- * `toExpress` from "@patina/server/express".
+ * `toExpress` from "@patina-ui/server/express".
  */
 export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHandlerOptions<Ctx>) {
   const surfaces = new Map(options.surfaces.map((s) => [s.id, s]));

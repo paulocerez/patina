@@ -1,10 +1,10 @@
 # Server setup
 
-`@patina/server` provides one request handler, a model adapter and storage adapters.
+`@patina-ui/server` provides one request handler, a model adapter and storage adapters.
 
 ```ts
-import { createPatinaHandler, memoryStorage } from "@patina/server";
-import { anthropicModel } from "@patina/server/anthropic";
+import { createPatinaHandler, memoryStorage } from "@patina-ui/server";
+import { anthropicModel } from "@patina-ui/server/anthropic";
 
 export const patina = createPatinaHandler({
   surfaces: [dashboard, orders],
@@ -28,7 +28,7 @@ does. Set `basePath` to wherever you mount it.
 **Express**
 
 ```ts
-import { toExpress } from "@patina/server/express";
+import { toExpress } from "@patina-ui/server/express";
 app.use("/api/patina", toExpress(patina));
 ```
 
@@ -99,7 +99,7 @@ The answer is untrusted. Patina validates it, gives the model one repair attempt
 validator's messages, and otherwise refuses with a readable reason. Throw `ModelRefusal` to
 show a message directly.
 
-For tests, `scriptedModel` from `@patina/server/testing` returns canned answers.
+For tests, `scriptedModel` from `@patina-ui/server/testing` returns canned answers.
 
 ### What the model sees
 

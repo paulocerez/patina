@@ -1,10 +1,10 @@
 /**
  * React bindings and headless UX primitives.
  * @packageDocumentation
- * @module @patina/react
+ * @module @patina-ui/react
  */
 
-export type { FieldDef, PublicCatalog, Query, QueryResult } from "@patina/core";
+export type { FieldDef, PublicCatalog, Query, QueryResult } from "@patina-ui/core";
 export type { ClientOptions, PatinaClient } from "./client.js";
 export { createPatinaClient, PatinaRequestError } from "./client.js";
 export type { PatinaProviderProps, UseSurface } from "./context.js";

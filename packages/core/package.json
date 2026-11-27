@@ -1,9 +1,29 @@
 {
-  "name": "@patina/core",
-  "version": "0.0.0",
-  "description": "Spec, capability manifest and patch engine for prompt-driven UI customization. No framework dependencies.",
-  "type": "module",
+  "name": "@patina-ui/core",
+  "version": "0.1.0",
+  "description": "Spec, capability manifest, patch engine and data catalog for prompt-driven UI customization. No framework or LLM dependencies.",
+  "keywords": [
+    "patina-ui",
+    "ui",
+    "customization",
+    "personalization",
+    "llm",
+    "patch",
+    "json-patch",
+    "schema"
+  ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paulocerez/patina.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/paulocerez/patina/tree/main/packages/core#readme",
+  "bugs": {
+    "url": "https://github.com/paulocerez/patina/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": "./src/index.ts"
   },
@@ -13,14 +33,17 @@
         "types": "./dist/index.d.ts",
         "import": "./dist/index.js"
       }
-    }
+    },
+    "access": "public"
   },
   "files": [
     "dist"
   ],
-  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --clean --external @patina/core && tsc -p tsconfig.build.json",
+    "build": "tsup src/index.ts --format esm --clean --external @patina-ui/core && tsc -p tsconfig.build.json",
     "test": "vitest run",
     "typecheck": "tsc -p ."
   }

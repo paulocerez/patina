@@ -1,4 +1,4 @@
-import type { HistoryEntry, Op } from "@patina/core";
+import type { HistoryEntry, Op } from "@patina-ui/core";
 
 /** Identifies one history: a layer (user or tenant) of one surface for one subject. */
 export interface HistoryKey {

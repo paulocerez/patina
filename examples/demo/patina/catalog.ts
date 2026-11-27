@@ -1,7 +1,7 @@
 // Started from `patina scan`, then reviewed: dropped /api/data/metrics (one summary object,
 // not rows), bound the params to the page filters, set the currency, and marked revenue as
 // finance-only. `patina check` (and the GitHub Action) compares this file with the code.
-import { defineCatalog, f } from "@patina/core";
+import { defineCatalog, f } from "@patina-ui/core";
 
 export const catalog = defineCatalog({
   appointments: {

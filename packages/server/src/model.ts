@@ -1,4 +1,4 @@
-import type { ModelRequest } from "@patina/core";
+import type { ModelRequest } from "@patina-ui/core";
 
 /** A provider-agnostic model. Implementations return the raw JSON answer; Patina validates it. */
 export interface ModelAdapter {

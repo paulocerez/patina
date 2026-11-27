@@ -1,10 +1,10 @@
 # React
 
-`@patina/react` renders surfaces and provides headless building blocks for the customization
+`@patina-ui/react` renders surfaces and provides headless building blocks for the customization
 UI. It talks only to your server's Patina handler and holds no keys or identity.
 
 ```tsx
-import { PatinaProvider, Surface, useSurface } from "@patina/react";
+import { PatinaProvider, Surface, useSurface } from "@patina-ui/react";
 
 <PatinaProvider endpoint="/api/patina">
   <Surface id="orders" components={{ OrdersTable }} fallback={<Spinner />} />
@@ -94,7 +94,7 @@ Show `changes` to the user, not `summary`. `changes` is generated from the patch
 The blocks that `patina scan` generates read data like this, and your own components can too:
 
 ```tsx
-import { formatField, type Query, useQuery } from "@patina/react";
+import { formatField, type Query, useQuery } from "@patina-ui/react";
 
 export function PatinaStat({ query }: { query?: Query }) {
   const state = useQuery(query); // fetches via fetchSource, evaluates in the browser

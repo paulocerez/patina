@@ -3,8 +3,8 @@
  * A keyword-matching stand-in for a real model, so the demo runs without an API key.
  * It understands a handful of phrasings only. Set ANTHROPIC_API_KEY to use Claude.
  */
-import type { ModelRequest } from "@patina/core";
-import type { ModelAdapter } from "@patina/server";
+import type { ModelRequest } from "@patina-ui/core";
+import type { ModelAdapter } from "@patina-ui/server";
 
 interface ViewItem {
   key: string;

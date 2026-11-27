@@ -15,7 +15,7 @@ no longer fits, and tells the user.
 ## Migrations
 
 ```ts
-import { migrations as m } from "@patina/core";
+import { migrations as m } from "@patina-ui/core";
 
 defineSurface({
   version: 3,
@@ -56,7 +56,7 @@ applies"_ with the details. The rest of their customization still applies.
 Write a test that resolves an old patch against the new manifest:
 
 ```ts
-import { resolve } from "@patina/core";
+import { resolve } from "@patina-ui/core";
 
 const r = resolve(dashboardV2, [
   { name: "user", entries: [{ kind: "patch", id: "p", seq: 1, patch: oldPatch }] },

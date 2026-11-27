@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { apply, resolve, restrictManifest } from "@patina/core";
+import { apply, resolve, restrictManifest } from "@patina-ui/core";
 import { expect, it } from "vitest";
 import { dashboard as demo } from "../../../examples/demo/server/surface.js";
 import { USERS } from "../../../examples/demo/server/users.js";

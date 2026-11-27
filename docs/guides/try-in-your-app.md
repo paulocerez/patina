@@ -1,7 +1,9 @@
 # Trying Patina in your own app
 
-Patina isn't on npm yet. You install it from local tarballs built from this repo. This takes
-about 15 minutes for an app with a React front end and a Node back end.
+Once released, install from npm: `npm i @patina-ui/core @patina-ui/server @patina-ui/react
+@anthropic-ai/sdk` (and `npm i -D @patina-ui/cli`), then skip to step 3. To try unreleased
+changes, install local tarballs built from this repo, as described in steps 1–2. Either way,
+expect about 15 minutes for an app with a React front end and a Node back end.
 
 ## 1. Pack the packages
 
@@ -9,16 +11,16 @@ In this repo:
 
 ```sh
 pnpm install
-pnpm pack:local            # builds and writes .packs/patina-{core,server,react,cli}-0.0.0.tgz
+pnpm pack:local            # builds and writes .packs/patina-ui-{core,server,react,cli}-0.1.0.tgz
 ```
 
 ## 2. Install them in your app
 
 ```sh
 cd ~/code/your-app
-npm i /path/to/patina/.packs/patina-core-0.0.0.tgz \
-      /path/to/patina/.packs/patina-server-0.0.0.tgz \
-      /path/to/patina/.packs/patina-react-0.0.0.tgz \
+npm i /path/to/patina/.packs/patina-ui-core-0.1.0.tgz \
+      /path/to/patina/.packs/patina-ui-server-0.1.0.tgz \
+      /path/to/patina/.packs/patina-ui-react-0.1.0.tgz \
       @anthropic-ai/sdk
 ```
 
@@ -26,8 +28,8 @@ npm i /path/to/patina/.packs/patina-core-0.0.0.tgz \
 and need React 18+ and Node 20+.
 
 **After changing Patina:** run `pnpm pack:local` again, then reinstall the three tarballs in
-your app. The version stays `0.0.0`, so if your package manager complains about an
-integrity mismatch, remove the three `@patina/*` entries from its lockfile first.
+your app. The version stays the same, so if your package manager complains about an
+integrity mismatch, remove the three `@patina-ui/*` entries from its lockfile first.
 
 ## 3. Pick one view to make customizable
 
@@ -60,8 +62,8 @@ Put this wherever your API lives. The important part is `getContext`: return the
 user from **your** session.
 
 ```ts
-import { createPatinaHandler, memoryStorage } from "@patina/server";
-import { anthropicModel } from "@patina/server/anthropic";
+import { createPatinaHandler, memoryStorage } from "@patina-ui/server";
+import { anthropicModel } from "@patina-ui/server/anthropic";
 
 export const patina = createPatinaHandler({
   surfaces: [orders],
@@ -79,7 +81,7 @@ Then mount it for your framework:
 
 | Framework                | Mounting                                                                                                     |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| Express                  | `app.use("/api/patina", toExpress(patina))` with `import { toExpress } from "@patina/server/express"`        |
+| Express                  | `app.use("/api/patina", toExpress(patina))` with `import { toExpress } from "@patina-ui/server/express"`     |
 | Next.js App Router       | `app/api/patina/[...path]/route.ts`: `export { patina as GET, patina as POST }`                              |
 | Hono                     | `app.all("/api/patina/*", (c) => patina(c.req.raw))`                                                         |
 | Remix / React Router     | in a resource route: `export const loader = ({ request }) => patina(request); export const action = loader;` |
@@ -94,12 +96,12 @@ Set the key in your server's environment, never in the browser:
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-**No key yet?** Use `scriptedModel` from `@patina/server/testing` to wire up the UI first. It
+**No key yet?** Use `scriptedModel` from `@patina-ui/server/testing` to wire up the UI first. It
 returns a fixed answer, so you can check rendering, preview, apply, undo and reload before
 any model calls:
 
 ```ts
-import { scriptedModel } from "@patina/server/testing";
+import { scriptedModel } from "@patina-ui/server/testing";
 const model = scriptedModel(() => ({
   kind: "patch",
   message: "Hid total",
@@ -120,7 +122,7 @@ import {
   Surface,
   SurfaceMessage,
   UndoButton,
-} from "@patina/react";
+} from "@patina-ui/react";
 
 <PatinaProvider endpoint="/api/patina">
   <PromptInput surfaceId="orders" />
@@ -132,7 +134,7 @@ import {
 </PatinaProvider>;
 ```
 
-In Next.js, the `@patina/react` bundle is already marked `"use client"`, so you can import
+In Next.js, the `@patina-ui/react` bundle is already marked `"use client"`, so you can import
 it from a client component.
 
 The primitives are unstyled. Style them with `className`, or use their render-prop form (see
@@ -167,7 +169,7 @@ Postgres:
 
 ```ts
 import { Pool } from "pg";
-import { migratePostgres, postgresStorage } from "@patina/server";
+import { migratePostgres, postgresStorage } from "@patina-ui/server";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const query = (sql: string, params?: unknown[]) => pool.query(sql, params);
@@ -184,7 +186,7 @@ Install the CLI and scan your app. It finds your GET endpoints and their row typ
 UI kit, components and colours:
 
 ```sh
-npm i -D /path/to/patina/.packs/patina-cli-0.0.0.tgz
+npm i -D /path/to/patina/.packs/patina-ui-cli-0.1.0.tgz
 npx patina scan                 # writes patina/scan.json, catalog.ts, blocks.tsx
 npx patina scan --ai            # optional: Claude refines the drafts (needs ANTHROPIC_API_KEY)
 ```
@@ -213,5 +215,5 @@ design change affects your catalog, such as a removed field or a renamed endpoin
 
 Copy `evals/dashboard.jsonl` as a template and write 20–40 prompts your users would
 actually type, with the expected ops. Then run them with `runEval` from
-`@patina/server/eval` (see [Model and evals](model-and-evals.md)). This tells you
+`@patina-ui/server/eval` (see [Model and evals](model-and-evals.md)). This tells you
 whether your manifest's descriptions and labels are good enough, and which model to use.

@@ -1,4 +1,4 @@
-import type { Op } from "@patina/core";
+import type { Op } from "@patina-ui/core";
 import {
   ConflictError,
   type Entry,

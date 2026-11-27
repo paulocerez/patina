@@ -1,7 +1,7 @@
 /**
  * Spec, manifest and patch engine. No framework or LLM dependencies.
  * @packageDocumentation
- * @module @patina/core
+ * @module @patina-ui/core
  */
 
 export { BLOCK_COMPONENTS, dataBlocks } from "./blocks.js";

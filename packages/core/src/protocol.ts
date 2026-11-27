@@ -1,4 +1,4 @@
-/** Wire types shared by `@patina/server` and client bindings. */
+/** Wire types shared by `@patina-ui/server` and client bindings. */
 import type { PublicCatalog } from "./catalog.js";
 import type { Change, Op, SurfaceSpec } from "./types.js";
 

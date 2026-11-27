@@ -1,4 +1,4 @@
-import type { ErrorBody, ProposeResponse, SurfaceState } from "@patina/core";
+import type { ErrorBody, ProposeResponse, SurfaceState } from "@patina-ui/core";
 
 export class PatinaRequestError extends Error {
   constructor(
@@ -25,7 +25,7 @@ export interface ClientOptions {
   fetch?: typeof fetch;
 }
 
-/** A thin client for the `@patina/server` routes. Holds no keys and no identity. */
+/** A thin client for the `@patina-ui/server` routes. Holds no keys and no identity. */
 export function createPatinaClient({
   endpoint,
   fetch: f = (i, init) => fetch(i, { credentials: "same-origin", ...init }),

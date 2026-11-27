@@ -1,4 +1,4 @@
-import { defineSurface, t } from "@patina/core";
+import { defineSurface, t } from "@patina-ui/core";
 
 export const orders = defineSurface({
   id: "orders",

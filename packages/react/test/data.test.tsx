@@ -1,5 +1,5 @@
-import { createPatinaHandler, memoryStorage } from "@patina/server";
-import { scriptedModel } from "@patina/server/testing";
+import { createPatinaHandler, memoryStorage } from "@patina-ui/server";
+import { scriptedModel } from "@patina-ui/server/testing";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";

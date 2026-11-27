@@ -1,6 +1,6 @@
 # Dogfoods the Patina GitHub Action on the demo app: every PR that changes the demo's API or
 # styles gets a comment listing what affects its data catalog. Other repos use
-# `paulocerez/patina/packages/action@main` instead of the local path.
+# `paulocerez/patina/packages/action@v0` instead of the local path.
 name: Patina check (demo)
 
 on:

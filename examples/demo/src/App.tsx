@@ -9,7 +9,7 @@ import {
   SurfaceMessage,
   UndoButton,
   useSurface,
-} from "@patina/react";
+} from "@patina-ui/react";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { PatinaChart, PatinaStat, PatinaTable } from "../patina/blocks.js";
 import { Chart } from "./components/Chart.js";

@@ -1,5 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { buildModelRequest } from "@patina/core";
+import { buildModelRequest } from "@patina-ui/core";
 import { expect, it } from "vitest";
 import { baseSpec, dashboard } from "../../core/test/fixtures.js";
 import { anthropicModel } from "../src/anthropic.js";

@@ -1,4 +1,4 @@
-import type { CollectionItem, SurfaceSpec, SurfaceState } from "@patina/core";
+import type { CollectionItem, SurfaceSpec, SurfaceState } from "@patina-ui/core";
 import { type ComponentType, Fragment, type ReactNode } from "react";
 import { useSurface } from "./context.js";
 import { SurfaceRenderContext } from "./data.js";

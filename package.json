@@ -15,14 +15,20 @@
     "demo": "pnpm --filter demo dev",
     "eval": "pnpm --filter evals eval",
     "docs:api": "pnpm --filter typedoc-tool docs:api",
-    "pack:local": "bash scripts/pack-local.sh"
+    "pack:local": "bash scripts/pack-local.sh",
+    "changeset": "changeset",
+    "version-packages": "changeset version && pnpm install --lockfile-only",
+    "release": "pnpm build && changeset publish"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.9",
+    "@changesets/changelog-github": "^1.0.1",
+    "@changesets/cli": "^3.0.3",
     "@types/node": "^26.6.11",
     "fast-check": "^4.11.0",
     "tsup": "^9.0.0",
     "typescript": "^7.0.2",
     "vitest": "^5.1.2"
-  }
+  },
+  "license": "MIT"
 }

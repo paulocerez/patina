@@ -8,8 +8,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.14.0",
-    "@patina/core": "workspace:*",
-    "@patina/server": "workspace:*"
+    "@patina-ui/core": "workspace:*",
+    "@patina-ui/server": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.6.11",

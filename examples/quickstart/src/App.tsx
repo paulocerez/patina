@@ -6,7 +6,7 @@ import {
   Surface,
   SurfaceMessage,
   UndoButton,
-} from "@patina/react";
+} from "@patina-ui/react";
 
 const ROWS = [
   { date: "2026-11-01", customer: "Ada", total: "€120", status: "Paid" },

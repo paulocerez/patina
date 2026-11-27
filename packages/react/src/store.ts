@@ -1,4 +1,4 @@
-import type { ProposeResponse, SurfaceSpec, SurfaceState } from "@patina/core";
+import type { ProposeResponse, SurfaceSpec, SurfaceState } from "@patina-ui/core";
 import type { PatinaClient } from "./client.js";
 
 export type Proposal = Extract<ProposeResponse, { kind: "proposal" }>;

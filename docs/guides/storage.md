@@ -11,7 +11,7 @@ In-process and lost on restart. Use it for tests, demos and trying things out.
 
 ```ts
 import { Pool } from "pg";
-import { migratePostgres, postgresStorage } from "@patina/server";
+import { migratePostgres, postgresStorage } from "@patina-ui/server";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const query = (sql: string, params?: unknown[]) => pool.query(sql, params);
