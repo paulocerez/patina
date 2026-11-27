@@ -1,6 +1,6 @@
 {
   "name": "@patina-ui/core",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Spec, capability manifest, patch engine and data catalog for prompt-driven UI customization. No framework or LLM dependencies.",
   "keywords": [
     "patina-ui",

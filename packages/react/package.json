@@ -1,6 +1,6 @@
 {
   "name": "@patina-ui/react",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "React bindings for Patina UI: <Surface> renderer, hooks, and headless UX primitives for prompt-driven customization.",
   "keywords": [
     "patina-ui",
