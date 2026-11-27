@@ -76,7 +76,7 @@ The host's version of the base view. Bump it when you ship a new base spec.
 
 ### restrict()?
 
-> `optional` **restrict**(`ctx`): [`Restriction`](Restriction.md)
+> `optional` **restrict**(`ctx`): [`Restriction`](Restriction.md) \| `Promise`\<[`Restriction`](Restriction.md)\>
 
 Narrows the manifest for one request. Called with the host's request context.
 
@@ -88,4 +88,4 @@ Narrows the manifest for one request. Called with the host's request context.
 
 #### Returns
 
-[`Restriction`](Restriction.md)
+[`Restriction`](Restriction.md) \| `Promise`\<[`Restriction`](Restriction.md)\>

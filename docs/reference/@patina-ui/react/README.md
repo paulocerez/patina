@@ -14,6 +14,7 @@ React bindings and headless UX primitives.
 - [CapabilitiesProps](interfaces/CapabilitiesProps.md)
 - [CapabilitiesRenderProps](interfaces/CapabilitiesRenderProps.md)
 - [ClientOptions](interfaces/ClientOptions.md)
+- [HookOptions](interfaces/HookOptions.md)
 - [PatinaBlockProps](interfaces/PatinaBlockProps.md)
 - [PatinaClient](interfaces/PatinaClient.md)
 - [PatinaProviderProps](interfaces/PatinaProviderProps.md)

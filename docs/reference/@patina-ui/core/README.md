@@ -45,6 +45,7 @@ Spec, manifest and patch engine. No framework or LLM dependencies.
 - [Anchor](type-aliases/Anchor.md)
 - [ApplyMode](type-aliases/ApplyMode.md)
 - [Bucket](type-aliases/Bucket.md)
+- [Derive](type-aliases/Derive.md)
 - [FieldKind](type-aliases/FieldKind.md)
 - [HistoryEntry](type-aliases/HistoryEntry.md)
 - [IssueCode](type-aliases/IssueCode.md)
@@ -79,6 +80,7 @@ Spec, manifest and patch engine. No framework or LLM dependencies.
 - [SUPPORTED\_LOCALES](variables/SUPPORTED_LOCALES.md)
 - [t](variables/t.md)
 - [USER\_KEY\_PREFIX](variables/USER_KEY_PREFIX.md)
+- [WEEKDAYS](variables/WEEKDAYS.md)
 
 ## Functions
 
@@ -93,6 +95,7 @@ Spec, manifest and patch engine. No framework or LLM dependencies.
 - [capabilityLines](functions/capabilityLines.md)
 - [checkQuery](functions/checkQuery.md)
 - [checkValue](functions/checkValue.md)
+- [choiceParams](functions/choiceParams.md)
 - [cleanQuery](functions/cleanQuery.md)
 - [compose](functions/compose.md)
 - [dataBlocks](functions/dataBlocks.md)
@@ -134,4 +137,5 @@ Spec, manifest and patch engine. No framework or LLM dependencies.
 - [tx](functions/tx.md)
 - [undoTarget](functions/undoTarget.md)
 - [validate](functions/validate.md)
+- [withDerived](functions/withDerived.md)
 - [withoutDataViews](functions/withoutDataViews.md)

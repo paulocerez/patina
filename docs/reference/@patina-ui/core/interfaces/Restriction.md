@@ -51,3 +51,13 @@ Presets the user may not insert.
 > `optional` **sources?**: `string`[]
 
 Catalog sources to remove.
+
+***
+
+### values?
+
+> `optional` **values?**: `Record`\<`string`, `string`[]\>
+
+This tenant's values for text fields, as "source.field" → values. The field becomes an
+enum for this request, so views can filter on it ("calls of the Emergency task") and the
+model knows the values. Use it for values each tenant names itself.

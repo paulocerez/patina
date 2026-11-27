@@ -2,10 +2,11 @@
 
 # Function: useCollection()
 
-> **useCollection**\<`K`\>(`surfaceId`, `nodeId`, `prop`, `fallback`): (`Record`\<`string`, `unknown`\> & `object`)[]
+> **useCollection**\<`K`\>(`surfaceId`, `nodeId`, `prop`, `fallback`, `options?`): (`Record`\<`string`, `unknown`\> & `object`)[]
 
 The ordered, visible items of a collection prop (e.g. table columns or cards), each
-`{ key, ...fields }`. Same fallback rules as `useSlot`.
+`{ key, ...fields }`. Same fallback rules as `useSlot`. Optional columns the base spec hides
+go in `options.hidden`: `useCollection("calls", "table", "columns", ["date", "status", "owner"], { hidden: ["owner"] })`.
 
 ## Type Parameters
 
@@ -30,6 +31,10 @@ The ordered, visible items of a collection prop (e.g. table columns or cards), e
 ### fallback
 
 readonly `K`[]
+
+### options?
+
+[`HookOptions`](../interfaces/HookOptions.md)\<`K`\>
 
 ## Returns
 
