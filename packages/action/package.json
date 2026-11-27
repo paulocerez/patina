@@ -4,5 +4,8 @@
   "description": "GitHub Action: runs `patina check` on pull requests. The bundle in dist/ is committed (Actions run it directly).",
   "scripts": {
     "build": "tsup"
+  },
+  "devDependencies": {
+    "tsup": "^9.0.0"
   }
 }
