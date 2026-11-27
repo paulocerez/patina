@@ -23,6 +23,19 @@ function useSpec(surfaceId: string): SurfaceSpec | null {
   return snap?.spec ?? null;
 }
 
+/**
+ * Keys your page knows but doesn't show until a user asks (e.g. an optional column). They
+ * match the base spec's `hidden: true` items, and are left out of the fallback.
+ */
+export interface HookOptions<K extends string> {
+  hidden?: readonly K[];
+}
+
+const shown = <K extends string>(fallback: readonly K[], o?: HookOptions<K>) =>
+  o?.hidden?.length ? fallback.filter((k) => !o.hidden?.includes(k)) : [...fallback];
+const knownKeys = <K extends string>(fallback: readonly K[], o?: HookOptions<K>) =>
+  new Set<string>([...fallback, ...(o?.hidden ?? [])]);
+
 function items(spec: SurfaceSpec | null, nodeId: string, prop: string): CollectionItem[] | null {
   const value = spec?.nodes[nodeId]?.props[prop];
   return Array.isArray(value) ? (value as CollectionItem[]) : null;
@@ -43,26 +56,29 @@ export function useSlot<K extends string>(
   nodeId: string,
   prop: string,
   fallback: readonly K[],
+  options?: HookOptions<K>,
 ): K[] {
   const list = items(useSpec(surfaceId), nodeId, prop);
-  if (!list) return [...fallback];
-  const known = new Set<string>(fallback);
+  if (!list) return shown(fallback, options);
+  const known = knownKeys(fallback, options);
   return list.filter((it) => it && !it.hidden && known.has(it.key)).map((it) => it.key as K);
 }
 
 /**
  * The ordered, visible items of a collection prop (e.g. table columns or cards), each
- * `{ key, ...fields }`. Same fallback rules as `useSlot`.
+ * `{ key, ...fields }`. Same fallback rules as `useSlot`. Optional columns the base spec hides
+ * go in `options.hidden`: `useCollection("calls", "table", "columns", ["date", "status", "owner"], { hidden: ["owner"] })`.
  */
 export function useCollection<K extends string>(
   surfaceId: string,
   nodeId: string,
   prop: string,
   fallback: readonly K[],
+  options?: HookOptions<K>,
 ): (Record<string, unknown> & { key: K })[] {
   const list = items(useSpec(surfaceId), nodeId, prop);
-  if (!list) return fallback.map((key) => ({ key }));
-  const known = new Set<string>(fallback);
+  if (!list) return shown(fallback, options).map((key) => ({ key }));
+  const known = knownKeys(fallback, options);
   return list
     .filter((it) => it && !it.hidden && known.has(it.key))
     .map(({ hidden: _h, ...rest }) => rest as Record<string, unknown> & { key: K });
@@ -96,11 +112,12 @@ export function useSlotItems<K extends string>(
   nodeId: string,
   prop: string,
   fallback: readonly K[],
+  options?: HookOptions<K>,
 ): SlotItem<K>[] {
   const spec = useSpec(surfaceId);
   const list = items(spec, nodeId, prop);
-  if (!spec || !list) return fallback.map((key) => ({ kind: "host", key }));
-  const known = new Set<string>(fallback);
+  if (!spec || !list) return shown(fallback, options).map((key) => ({ kind: "host", key }));
+  const known = knownKeys(fallback, options);
   const out: SlotItem<K>[] = [];
   for (const it of list) {
     if (!it || it.hidden) continue;

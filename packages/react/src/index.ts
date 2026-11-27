@@ -11,7 +11,7 @@ export type { PatinaProviderProps, UseSurface } from "./context.js";
 export { PatinaProvider, usePatinaText, useSurface } from "./context.js";
 export type { FetchSource, QueryState } from "./data.js";
 export { bindParams, defaultFetchSource, formatField, useQuery } from "./data.js";
-export type { SlotItem } from "./hooks.js";
+export type { HookOptions, SlotItem } from "./hooks.js";
 export { useCollection, useSlot, useSlotItems, useSurfaceProp } from "./hooks.js";
 export type {
   CapabilitiesProps,
