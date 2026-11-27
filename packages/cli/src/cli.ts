@@ -9,6 +9,14 @@ import {
   renderInsightsMarkdown,
   type StorageAdapter,
 } from "@patina-ui/server";
+import {
+  type FollowUpGrouper,
+  type FollowUpSink,
+  linearSink,
+  renderFollowUpsText,
+  runFollowUps,
+  slackSink,
+} from "@patina-ui/server/followups";
 import { checkRepo, renderMarkdown, type Severity } from "./check.js";
 import { renderBlocks } from "./generate/blocks.js";
 import { renderCatalog } from "./generate/catalog.js";
@@ -32,6 +40,15 @@ Usage:
                   [--surface <id>] [--format markdown|json]
       What customers asked for, what was applied, and what couldn't be done and why, from the
       request log in your Postgres database (needs the pg package).
+
+  patina followups [--database-url $DATABASE_URL] [--since 7d] [--surface <id>] [--dry-run]
+                   [--linear-team <team id>] [--linear-label <label id>]… [--linear-state <state id>]
+                   [--group] [--language English] [--app-name <name>]
+                   [--min-requests 2] [--min-customers 1] [--max 10] [--format text|json]
+      Turn what customers asked for but couldn't do into follow-ups: a Linear issue each
+      (LINEAR_API_KEY; repeats become comments) and a Slack digest (SLACK_WEBHOOK_URL).
+      Run it on a schedule with --since matching the interval. --group asks Claude to merge
+      requests that want the same thing (ANTHROPIC_API_KEY); prompts are redacted first.
 
   patina init-agent [--root .] [--agents-md] [--force]
       Install the Patina UI skill for coding agents: .claude/skills/patina-ui/SKILL.md
@@ -57,10 +74,38 @@ function write(file: string, text: string) {
   writeFileSync(file, text);
 }
 
+/** The storage to read the request log from: the test double, or Postgres at --database-url. */
+async function openStorage(
+  deps: { storage?: StorageAdapter },
+  databaseUrl: string | undefined,
+): Promise<{ storage: StorageAdapter; close: () => Promise<void> } | null> {
+  if (deps.storage) return { storage: deps.storage, close: async () => {} };
+  const url = databaseUrl ?? process.env.DATABASE_URL;
+  if (!url) {
+    console.error(
+      "Pass --database-url (or set DATABASE_URL) for the database Patina's server writes to.",
+    );
+    return null;
+  }
+  let Pool: typeof import("pg").Pool;
+  try {
+    const mod = await import("pg");
+    Pool = mod.Pool ?? mod.default.Pool;
+  } catch {
+    console.error("This command needs the pg package: npm i -D pg");
+    return null;
+  }
+  const pool = new Pool({ connectionString: url, max: 1 });
+  return {
+    storage: postgresStorage({ query: (sql, params) => pool.query(sql, params) }),
+    close: () => pool.end(),
+  };
+}
+
 export async function main(
   argv = process.argv.slice(2),
   /** For tests: use this storage instead of connecting to Postgres. */
-  deps: { storage?: StorageAdapter } = {},
+  deps: { storage?: StorageAdapter; sinks?: FollowUpSink[]; grouper?: FollowUpGrouper } = {},
 ): Promise<number> {
   const [command, ...rest] = argv;
   const { values } = parseArgs({
@@ -77,7 +122,17 @@ export async function main(
       action: { type: "string", default: "paulocerez/patina/packages/action@v0" },
       "database-url": { type: "string" },
       "agents-md": { type: "boolean", default: false },
-      since: { type: "string", default: "30d" },
+      since: { type: "string" },
+      "dry-run": { type: "boolean", default: false },
+      "linear-team": { type: "string" },
+      "linear-label": { type: "string", multiple: true },
+      "linear-state": { type: "string" },
+      group: { type: "boolean", default: false },
+      language: { type: "string" },
+      "app-name": { type: "string" },
+      "min-requests": { type: "string" },
+      "min-customers": { type: "string" },
+      max: { type: "string" },
       until: { type: "string" },
       tenant: { type: "string" },
       surface: { type: "string" },
@@ -158,31 +213,12 @@ with dataBlocks(catalog), and commit ${out}/. See docs/guides/data-views.md.`);
   }
 
   if (command === "insights") {
-    let storage = deps.storage;
-    let close = async () => {};
-    if (!storage) {
-      const url = values["database-url"] ?? process.env.DATABASE_URL;
-      if (!url) {
-        console.error(
-          "Pass --database-url (or set DATABASE_URL) for the database Patina's server writes to.",
-        );
-        return 1;
-      }
-      let Pool: typeof import("pg").Pool;
-      try {
-        const mod = await import("pg");
-        Pool = mod.Pool ?? mod.default.Pool;
-      } catch {
-        console.error("patina insights needs the pg package: npm i -D pg");
-        return 1;
-      }
-      const pool = new Pool({ connectionString: url, max: 1 });
-      storage = postgresStorage({ query: (sql, params) => pool.query(sql, params) });
-      close = () => pool.end();
-    }
+    const db = await openStorage(deps, values["database-url"]);
+    if (!db) return 1;
+    const { storage, close } = db;
     try {
       const report = await getInsights(storage, {
-        since: parseSince(values.since as string),
+        since: parseSince((values.since as string | undefined) ?? "30d"),
         ...(values.until ? { until: new Date(values.until).toISOString() } : {}),
         ...(values.tenant ? { tenantId: values.tenant } : {}),
         ...(values.surface ? { surfaceId: values.surface } : {}),
@@ -193,6 +229,75 @@ with dataBlocks(catalog), and commit ${out}/. See docs/guides/data-views.md.`);
       return 0;
     } finally {
       await close();
+    }
+  }
+
+  if (command === "followups") {
+    const linearKey = process.env.LINEAR_API_KEY;
+    const linearTeam = values["linear-team"] ?? process.env.LINEAR_TEAM_ID;
+    const slackUrl = process.env.SLACK_WEBHOOK_URL;
+    const sinks: FollowUpSink[] = [...(deps.sinks ?? [])];
+    if (!deps.sinks) {
+      if (linearKey && linearTeam)
+        sinks.push(
+          linearSink({
+            apiKey: linearKey,
+            teamId: linearTeam,
+            ...(values["linear-label"] ? { labelIds: values["linear-label"] as string[] } : {}),
+            ...(values["linear-state"] ? { stateId: values["linear-state"] } : {}),
+            ...(values["app-name"] ? { appName: values["app-name"] } : {}),
+          }),
+        );
+      else if (linearKey || linearTeam)
+        console.error("Linear needs both LINEAR_API_KEY and --linear-team (or LINEAR_TEAM_ID).");
+      if (slackUrl)
+        sinks.push(
+          slackSink({
+            webhookUrl: slackUrl,
+            ...(values["app-name"] ? { appName: values["app-name"] } : {}),
+          }),
+        );
+    }
+    if (sinks.length === 0 && !values["dry-run"]) {
+      console.error(
+        "No destination: set LINEAR_API_KEY and --linear-team, and/or SLACK_WEBHOOK_URL (or use --dry-run).",
+      );
+      return 1;
+    }
+    let grouper = deps.grouper;
+    if (!grouper && values.group) {
+      if (!process.env.ANTHROPIC_API_KEY) {
+        console.error("--group asks Claude to merge similar requests and needs ANTHROPIC_API_KEY.");
+        return 1;
+      }
+      const { anthropicGrouper } = await import("@patina-ui/server/anthropic");
+      grouper = anthropicGrouper({
+        ...(values.model ? { model: values.model } : {}),
+        ...(values.language ? { language: values.language } : {}),
+      });
+    }
+    const db = await openStorage(deps, values["database-url"]);
+    if (!db) return 1;
+    const num = (v: unknown) => (v === undefined ? undefined : Number(v));
+    try {
+      const run = await runFollowUps({
+        storage: db.storage,
+        sinks,
+        since: parseSince((values.since as string | undefined) ?? "7d"),
+        ...(values.until ? { until: new Date(values.until).toISOString() } : {}),
+        ...(values.surface ? { surfaceId: values.surface } : {}),
+        ...(values["min-requests"] ? { minRequests: num(values["min-requests"]) } : {}),
+        ...(values["min-customers"] ? { minCustomers: num(values["min-customers"]) } : {}),
+        ...(values.max ? { maxItems: num(values.max) } : {}),
+        ...(grouper ? { grouper } : {}),
+        dryRun: values["dry-run"] as boolean,
+      });
+      console.log(
+        values.format === "json" ? JSON.stringify(run, null, 2) : renderFollowUpsText(run),
+      );
+      return run.errors.length ? 1 : 0;
+    } finally {
+      await db.close();
     }
   }
 
@@ -215,7 +320,7 @@ with dataBlocks(catalog), and commit ${out}/. See docs/guides/data-views.md.`);
       const current = existsSync(agents) ? readFileSync(agents, "utf8") : "# Agent instructions\n";
       if (current.includes("## Patina UI")) console.log("AGENTS.md already points to the skill.");
       else {
-        writeFileSync(agents, current.trimEnd() + "\n" + pointer);
+        writeFileSync(agents, `${current.trimEnd()}\n${pointer}`);
         console.log(`Added a Patina UI section to ${agents}.`);
       }
     }

@@ -1,7 +1,8 @@
 # Insights: what customers ask for
 
 Every customization request is logged with what happened and why. That includes the ones
-that couldn't be done, so you can see which features customers actually want.
+that couldn't be done, so you can see which features customers actually want. To turn them
+into Linear issues and a Slack digest, see [Follow-ups](follow-ups.md).
 
 ## What the customer sees
 

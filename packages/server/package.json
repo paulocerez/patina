@@ -1,7 +1,7 @@
 {
   "name": "@patina-ui/server",
   "version": "0.2.0",
-  "description": "Patina UI server: fetch-style request handler, Anthropic model adapter, memory and Postgres storage, Express adapter, eval runner.",
+  "description": "Patina UI server: fetch-style request handler, Anthropic model adapter, memory and Postgres storage, Express adapter, eval runner, follow-ups to Linear and Slack.",
   "keywords": [
     "patina-ui",
     "llm",
@@ -9,7 +9,9 @@
     "claude",
     "customization",
     "express",
-    "postgres"
+    "postgres",
+    "linear",
+    "slack"
   ],
   "license": "MIT",
   "repository": {
@@ -27,7 +29,8 @@
     "./anthropic": "./src/anthropic.ts",
     "./express": "./src/express.ts",
     "./testing": "./src/testing.ts",
-    "./eval": "./src/eval.ts"
+    "./eval": "./src/eval.ts",
+    "./followups": "./src/followups.ts"
   },
   "publishConfig": {
     "exports": {
@@ -50,6 +53,10 @@
       "./eval": {
         "types": "./dist/eval.d.ts",
         "import": "./dist/eval.js"
+      },
+      "./followups": {
+        "types": "./dist/followups.d.ts",
+        "import": "./dist/followups.js"
       }
     },
     "access": "public"
@@ -61,7 +68,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsup src/index.ts src/anthropic.ts src/express.ts src/testing.ts src/eval.ts --format esm --clean --external @patina-ui/core --external @anthropic-ai/sdk && tsc -p tsconfig.build.json",
+    "build": "tsup src/index.ts src/anthropic.ts src/express.ts src/testing.ts src/eval.ts src/followups.ts --format esm --clean --external @patina-ui/core --external @anthropic-ai/sdk && tsc -p tsconfig.build.json",
     "test": "vitest run",
     "typecheck": "tsc -p ."
   },

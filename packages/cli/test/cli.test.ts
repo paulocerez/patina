@@ -345,3 +345,64 @@ describe("scan: Express routers mounted under prefixes", () => {
     });
   });
 });
+
+describe("followups", () => {
+  async function logWithDemand() {
+    const { memoryStorage } = await import("@patina-ui/server");
+    const storage = memoryStorage();
+    const at = new Date().toISOString();
+    for (const [id, tenantId] of [
+      ["1", "acme"],
+      ["2", "globex"],
+    ] as const)
+      await storage.logRequest({
+        id,
+        at,
+        tenantId,
+        surfaceId: "orders",
+        userId: "u",
+        source: "model",
+        message: null,
+        proposalId: null,
+        model: "m",
+        latencyMs: 9,
+        modelCalls: 1,
+        prompt: "Export to Excel",
+        outcome: "refused",
+        reason: "action",
+      });
+    return storage;
+  }
+
+  it("dry-runs without any destination", async () => {
+    const storage = await logWithDemand();
+    const out: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((s) => void out.push(String(s)));
+    expect(await main(["followups", "--dry-run"], { storage })).toBe(0);
+    expect(out.join("\n")).toMatch(/Export to Excel {2}\[pf-[0-9a-f]{10}\]/);
+    expect(out.join("\n")).toContain("2× by 2 customer(s); action");
+  });
+
+  it("delivers to the sinks and needs a destination otherwise", async () => {
+    const storage = await logWithDemand();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const delivered: string[] = [];
+    const sink = {
+      name: "test",
+      deliver: async (items: { key: string; title: string }[]) => {
+        delivered.push(...items.map((i) => i.title));
+        return items.map((i) => ({ sink: "test", key: i.key, action: "posted" as const }));
+      },
+    };
+    expect(await main(["followups", "--since", "1d"], { storage, sinks: [sink] })).toBe(0);
+    expect(delivered).toEqual(["Export to Excel"]);
+
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const env = { ...process.env };
+    delete process.env.LINEAR_API_KEY;
+    delete process.env.SLACK_WEBHOOK_URL;
+    expect(await main(["followups"], { storage })).toBe(1);
+    expect(err.mock.calls.at(-1)?.[0]).toMatch(/SLACK_WEBHOOK_URL/);
+    process.env = env;
+  });
+});
