@@ -86,6 +86,7 @@ Spec, manifest and patch engine. No framework or LLM dependencies.
 
 - [aggregate](functions/aggregate.md)
 - [apply](functions/apply.md)
+- [asRelativeRange](functions/asRelativeRange.md)
 - [buildCompactSchema](functions/buildCompactSchema.md)
 - [buildModelRequest](functions/buildModelRequest.md)
 - [buildOutputSchema](functions/buildOutputSchema.md)
@@ -128,6 +129,7 @@ Spec, manifest and patch engine. No framework or LLM dependencies.
 - [pickLocale](functions/pickLocale.md)
 - [publicCatalog](functions/publicCatalog.md)
 - [randomUserKey](functions/randomUserKey.md)
+- [rangeBounds](functions/rangeBounds.md)
 - [removeNodes](functions/removeNodes.md)
 - [resolve](functions/resolve.md)
 - [restrictCatalog](functions/restrictCatalog.md)

@@ -115,5 +115,6 @@ export {
   runQuery,
   withDerived,
 } from "./query.js";
+export { asRelativeRange, rangeBounds } from "./ranges.js";
 export * from "./types.js";
 export { checkValue, formatValue } from "./values.js";
