@@ -43,10 +43,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
         if: env.NPM_TOKEN != ''
 
-      # pnpm reads provenance from npm config, not from NPM_CONFIG_PROVENANCE.
+      # pnpm reads provenance from npm config, not from NPM_CONFIG_PROVENANCE. Write it to the
+      # runner's user config (where setup-node put the token), never into the repository.
       - name: Enable npm provenance (public repository)
         if: env.NPM_TOKEN != '' && github.event.repository.visibility == 'public'
-        run: echo "provenance=true" >> .npmrc
+        run: echo "provenance=true" >> "$NPM_CONFIG_USERCONFIG"
 
       - id: changesets
         if: env.NPM_TOKEN != ''

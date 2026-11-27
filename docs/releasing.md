@@ -95,6 +95,6 @@ was, so existing users aren't moved onto breaking changes.
 
 Releases built by the workflow from this public repo get npm provenance: a signed link from
 each package version to the commit and workflow run that built it. The workflow turns it on
-by writing `provenance=true` to `.npmrc`. pnpm doesn't read the `NPM_CONFIG_PROVENANCE`
+by writing `provenance=true` to the runner's user-level npm config (never to the repository). pnpm doesn't read the `NPM_CONFIG_PROVENANCE`
 variable, which is why 0.1.0 shipped without provenance. Later versions will have it. Local
 `pnpm release` runs don't get provenance.
