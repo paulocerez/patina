@@ -2,7 +2,7 @@
 
 # Function: useSlotItems()
 
-> **useSlotItems**\<`K`\>(`surfaceId`, `nodeId`, `prop`, `fallback`): [`SlotItem`](../type-aliases/SlotItem.md)\<`K`\>[]
+> **useSlotItems**\<`K`\>(`surfaceId`, `nodeId`, `prop`, `fallback`, `options?`): [`SlotItem`](../type-aliases/SlotItem.md)\<`K`\>[]
 
 Like `useSlot`, plus the blocks users added (data views and your presets), in place:
 
@@ -38,6 +38,10 @@ unknown key of yours is still dropped. Previews show new blocks in place.
 ### fallback
 
 readonly `K`[]
+
+### options?
+
+[`HookOptions`](../interfaces/HookOptions.md)\<`K`\>
 
 ## Returns
 

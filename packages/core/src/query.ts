@@ -5,10 +5,13 @@
  */
 import {
   type Catalog,
+  choiceParams,
+  type Derive,
   type FieldDef,
   fieldLabel,
   offerableFields,
   type SourceDef,
+  WEEKDAYS,
 } from "./catalog.js";
 import { type MessageKey, msg, type Text, tx } from "./i18n.js";
 
@@ -29,6 +32,8 @@ export interface Query {
   /** rows: sort and limit. */
   sort?: { field: string; dir: "asc" | "desc" };
   limit?: number;
+  /** This view's own value for source params that offer `choices` (e.g. a date range). */
+  params?: Record<string, string>;
 }
 
 export interface QueryDef {
@@ -43,9 +48,9 @@ export interface QueryDef {
 const NUMERIC = new Set(["number", "currency"]);
 const GROUPABLE = new Set(["enum", "string", "bool"]);
 const KEYS: Record<QueryShape, string[]> = {
-  rows: ["source", "fields", "where", "sort", "limit"],
-  series: ["source", "groupBy", "metric", "where"],
-  single: ["source", "metric", "where"],
+  rows: ["source", "fields", "where", "sort", "limit", "params"],
+  series: ["source", "groupBy", "metric", "where", "params"],
+  single: ["source", "metric", "where", "params"],
 };
 export const MAX_FIELDS = 12;
 export const MAX_LIMIT = 100;
@@ -78,6 +83,16 @@ export function checkQuery(def: QueryDef, value: unknown, locale?: string): stri
       return msg(L, "queryFieldWrongWay", { field: fieldLabel(source, f, L) });
     return null;
   };
+
+  if (value.params !== undefined) {
+    const allowed = choiceParams(source);
+    if (!isObj(value.params)) return msg(L, "queryBadParam", { param: "params" });
+    for (const [pid, v] of Object.entries(value.params)) {
+      const p = allowed[pid];
+      if (!p || typeof v !== "string" || !p.choices.includes(v))
+        return msg(L, "queryBadParam", { param: tx(p?.label, L) ?? pid });
+    }
+  }
 
   if (value.where !== undefined) {
     if (!Array.isArray(value.where) || value.where.length > 3) return msg(L, "queryMaxFilters");
@@ -182,6 +197,16 @@ export function querySchema(def: QueryDef): Record<string, unknown> {
           }),
         })
       : { type: "null" };
+    const choices = Object.entries(choiceParams(s));
+    const params = choices.length
+      ? nullable(
+          obj(
+            Object.fromEntries(
+              choices.map(([pid, p]) => [pid, nullable({ type: "string", enum: p.choices })]),
+            ),
+          ),
+        )
+      : { type: "null" };
     const numeric = of((fd) => NUMERIC.has(fd.kind));
     const metric = obj({
       op: { type: "string", enum: def.aggregations },
@@ -200,6 +225,7 @@ export function querySchema(def: QueryDef): Record<string, unknown> {
             }),
           ),
           limit: nullable({ type: "integer" }),
+          params,
         }),
       );
     } else if (s.complete) {
@@ -208,6 +234,7 @@ export function querySchema(def: QueryDef): Record<string, unknown> {
         source: { type: "string", const: id },
         metric,
         where,
+        params,
       };
       if (def.shape === "series") {
         if (!groupable.length) continue;
@@ -290,7 +317,12 @@ export function describeQuery(catalog: Catalog, q: Query, locale?: string): stri
       ? ` (${q.where.map((w) => `${fieldLabel(s, w.field, L)}: ${valueText(s, w.field, w.value, L)}`).join(", ")})`
       : ` ${msg(L, "where")} ${q.where.map((w) => `${fieldLabel(s, w.field, L)} ${msg(L, "is")} ${valueText(s, w.field, w.value, L)}`).join(` ${msg(L, "and")} `)}`
     : "";
-  if (q.fields) return `${name}: ${q.fields.map((x) => fieldLabel(s, x, L)).join(", ")}${where}`;
+  const chosen = Object.entries(q.params ?? {})
+    .map(([pid, v]) => tx(s?.params?.[pid]?.choiceLabels?.[v], L) ?? v)
+    .join(", ");
+  const suffix = chosen ? ` (${chosen})` : "";
+  if (q.fields)
+    return `${name}: ${q.fields.map((x) => fieldLabel(s, x, L)).join(", ")}${where}${suffix}`;
   const metric = q.metric
     ? q.metric.op === "count"
       ? `${msg(L, "opCount")} ${inSentence(name, L)}`
@@ -299,7 +331,7 @@ export function describeQuery(catalog: Catalog, q: Query, locale?: string): stri
   const by = q.groupBy
     ? ` ${msg(L, "by")} ${q.groupBy.bucket ? `${msg(L, BUCKET_KEY[q.groupBy.bucket])} (${inSentence(fieldLabel(s, q.groupBy.field, L), L)})` : inSentence(fieldLabel(s, q.groupBy.field, L), L)}`
     : "";
-  return `${metric}${by}${where}`;
+  return `${metric}${by}${where}${suffix}`;
 }
 
 // ─────────────────────────────── evaluation ───────────────────────────────
@@ -355,7 +387,7 @@ export function aggregate(op: AggOp, rows: Record<string, unknown>[], field?: st
 /** Evaluates a (validated) query over rows the endpoint returned. Pure and deterministic. */
 export function runQuery(catalog: Catalog, q: Query, input: unknown, locale?: string): QueryResult {
   const s = catalog.sources[q.source] as SourceDef;
-  let rows = (Array.isArray(input) ? input : []).filter(isObj);
+  let rows = withDerived(s, (Array.isArray(input) ? input : []).filter(isObj));
   for (const w of q.where ?? []) rows = rows.filter((r) => r[w.field] === w.value);
 
   if (q.fields) {
@@ -393,6 +425,7 @@ export function runQuery(catalog: Catalog, q: Query, input: unknown, locale?: st
       metric,
       ...(q.groupBy ? { groupBy: q.groupBy } : {}),
       ...(q.where ? { where: q.where } : {}),
+      ...(q.params ? { params: q.params } : {}),
     },
     locale,
   );
@@ -420,12 +453,74 @@ export function runQuery(catalog: Catalog, q: Query, input: unknown, locale?: st
         : key,
     value: aggregate(metric.op, rs, metric.field),
   }));
+  // Derived enums have a natural order (weekdays, hours, ranges); keep it.
+  const order = fd?.derive && fd.kind === "enum" ? (fd.values ?? []) : null;
   points.sort(
     bucket
       ? (a, b) => a.key.localeCompare(b.key)
-      : (a, b) => b.value - a.value || a.key.localeCompare(b.key),
+      : order
+        ? (a, b) => order.indexOf(a.key) - order.indexOf(b.key)
+        : (a, b) => b.value - a.value || a.key.localeCompare(b.key),
   );
   return { shape: "series", label, valueDef, points };
+}
+
+/** Adds the source's derived fields to each row. Rows without the input get no value. */
+export function withDerived(
+  s: SourceDef | undefined,
+  rows: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const derived = Object.entries(s?.fields ?? {}).filter(
+    (e): e is [string, FieldDef & { derive: Derive }] => !!e[1].derive,
+  );
+  if (!derived.length) return rows;
+  return rows.map((r) => {
+    const out = { ...r };
+    for (const [fid, fd] of derived) {
+      const v = deriveValue(fd.derive, r[fd.derive.from]);
+      if (v === undefined) delete out[fid];
+      else out[fid] = v;
+    }
+    return out;
+  });
+}
+
+const partsCache = new Map<string, Intl.DateTimeFormat>();
+function datePart(value: unknown, part: "weekday" | "hour", timeZone?: string): string | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  const d = new Date(value as string | number);
+  if (Number.isNaN(d.getTime())) return undefined;
+  const key = `${part}:${timeZone ?? ""}`;
+  let fmt = partsCache.get(key);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat("en-US", {
+      ...(timeZone ? { timeZone } : {}),
+      ...(part === "weekday" ? { weekday: "short" } : { hour: "2-digit", hourCycle: "h23" }),
+    });
+    partsCache.set(key, fmt);
+  }
+  const p = fmt.formatToParts(d).find((x) => x.type === part)?.value;
+  if (!p) return undefined;
+  return part === "weekday"
+    ? WEEKDAYS.find((w) => w === p.slice(0, 3).toLowerCase())
+    : p.padStart(2, "0");
+}
+
+function deriveValue(d: Derive, v: unknown): string | boolean | undefined {
+  switch (d.op) {
+    case "weekday":
+    case "hour":
+      return datePart(v, d.op, d.timeZone);
+    case "ranges": {
+      if (typeof v !== "number" || !Number.isFinite(v)) return undefined;
+      return (d.ranges.find((r) => r.below === undefined || v < r.below) ?? d.ranges.at(-1))?.value;
+    }
+    case "contains": {
+      if (v === null || v === undefined) return false;
+      const text = String(v).toLowerCase();
+      return d.any.some((w) => w.trim() && text.includes(w.trim().toLowerCase()));
+    }
+  }
 }
 
 function compare(a: unknown, b: unknown): number {

@@ -10,6 +10,24 @@ import { type Text, tx } from "./i18n.js";
 
 export type FieldKind = "string" | "number" | "currency" | "date" | "enum" | "bool";
 
+/**
+ * A field computed in the browser from another field of the same row, so users can group and
+ * filter by things the endpoint doesn't return as such ("calls by weekday", "short vs. long",
+ * "emergencies"). Declarative: Patina evaluates it, the host writes no code.
+ */
+export type Derive =
+  /** Day of the week of a date field: "mon" … "sun". */
+  | { op: "weekday"; from: string; timeZone?: string }
+  /** Hour of a date field: "00" … "23". */
+  | { op: "hour"; from: string; timeZone?: string }
+  /**
+   * Which range a number falls in. Ranges are tried in order; a value below `below` gets that
+   * range's `value`. The last range has no `below` and takes everything else.
+   */
+  | { op: "ranges"; from: string; ranges: { value: string; below?: number }[] }
+  /** Whether a text field contains any of these words (case-insensitive). */
+  | { op: "contains"; from: string; any: string[] };
+
 export interface FieldDef {
   kind: FieldKind;
   label?: Text;
@@ -24,6 +42,8 @@ export interface FieldDef {
   requires?: string;
   /** Never offered to the model and never usable in new views. */
   sensitive?: boolean;
+  /** Computed from another field of the row instead of read from it (see `Derive`). */
+  derive?: Derive;
 }
 
 export interface ParamBinding {
@@ -31,6 +51,15 @@ export interface ParamBinding {
   from?: string;
   /** Or a fixed value. */
   value?: string | number | boolean;
+  /**
+   * Values a single view may pick instead (its query's `params`), e.g. a chart of "this week"
+   * on a page that defaults to the last 30 days. Your `fetchSource` receives the value.
+   */
+  choices?: string[];
+  /** Human names for `choices`. */
+  choiceLabels?: Record<string, Text>;
+  /** What the param is, e.g. "Date range". */
+  label?: Text;
 }
 
 export interface SourceDef {
@@ -67,7 +96,58 @@ export const f = {
   date: (o: FieldOpts = {}): FieldDef => ({ kind: "date", ...o }),
   enum: (values: string[], o: FieldOpts = {}): FieldDef => ({ kind: "enum", values, ...o }),
   bool: (o: FieldOpts = {}): FieldDef => ({ kind: "bool", ...o }),
+  /** Day of the week of the date field `from`, in `timeZone` (default: the browser's). */
+  weekday: (from: string, o: FieldOpts & { timeZone?: string } = {}): FieldDef => {
+    const { timeZone, ...rest } = o;
+    return {
+      kind: "enum",
+      values: [...WEEKDAYS],
+      valueLabels: WEEKDAY_LABELS,
+      ...rest,
+      derive: { op: "weekday", from, ...(timeZone ? { timeZone } : {}) },
+    };
+  },
+  /** Hour of the date field `from`, "00" … "23", in `timeZone` (default: the browser's). */
+  hour: (from: string, o: FieldOpts & { timeZone?: string } = {}): FieldDef => {
+    const { timeZone, ...rest } = o;
+    return {
+      kind: "enum",
+      values: HOURS,
+      valueLabels: Object.fromEntries(HOURS.map((h) => [h, `${h}:00`])),
+      ...rest,
+      derive: { op: "hour", from, ...(timeZone ? { timeZone } : {}) },
+    };
+  },
+  /** Groups the number field `from` into named ranges: `[{ value: "short", below: 30 }, { value: "long" }]`. */
+  ranges: (
+    from: string,
+    ranges: { value: string; below?: number }[],
+    o: FieldOpts = {},
+  ): FieldDef => ({
+    kind: "enum",
+    values: ranges.map((r) => r.value),
+    ...o,
+    derive: { op: "ranges", from, ranges },
+  }),
+  /** True when the text field `from` contains any of `any` (case-insensitive). */
+  contains: (from: string, any: string[], o: FieldOpts = {}): FieldDef => ({
+    kind: "bool",
+    ...o,
+    derive: { op: "contains", from, any },
+  }),
 };
+
+export const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+const WEEKDAY_LABELS: Record<string, Text> = {
+  mon: { en: "Monday", de: "Montag" },
+  tue: { en: "Tuesday", de: "Dienstag" },
+  wed: { en: "Wednesday", de: "Mittwoch" },
+  thu: { en: "Thursday", de: "Donnerstag" },
+  fri: { en: "Friday", de: "Freitag" },
+  sat: { en: "Saturday", de: "Samstag" },
+  sun: { en: "Sunday", de: "Sonntag" },
+};
+const HOURS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, "0"));
 
 const ID = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 
@@ -92,22 +172,74 @@ export function defineCatalog(sources: Record<string, SourceDef>): Catalog {
         problems.push(`source "${id}": field id "${fid}" must be a simple identifier`);
       if (fd.kind === "enum" && !fd.values?.length)
         problems.push(`source "${id}" field "${fid}": enum needs values`);
+      if (fd.derive) problems.push(...deriveProblems(id, fid, fd.derive, s.fields));
     }
     for (const [pid, p] of Object.entries(s.params ?? {})) {
       if ((p.from === undefined) === (p.value === undefined))
         problems.push(`source "${id}" param "${pid}": set exactly one of "from" or "value"`);
       if (p.from !== undefined && !/^[^.]+\.[^.]+$/.test(p.from))
         problems.push(`source "${id}" param "${pid}": "from" must look like "nodeId.prop"`);
+      if (
+        p.choices !== undefined &&
+        (!p.choices.length ||
+          new Set(p.choices).size !== p.choices.length ||
+          p.choices.some((c) => typeof c !== "string" || !c))
+      )
+        problems.push(`source "${id}" param "${pid}": choices must be unique, non-empty strings`);
     }
   }
   if (problems.length) throw new Error(`defineCatalog is invalid:\n  - ${problems.join("\n  - ")}`);
   return { sources };
 }
 
+function deriveProblems(
+  id: string,
+  fid: string,
+  d: Derive,
+  fields: Record<string, FieldDef>,
+): string[] {
+  const at = `source "${id}" field "${fid}"`;
+  const from = fields[d.from];
+  if (!from) return [`${at}: derives from "${d.from}", which isn't a field of "${id}"`];
+  if (from.derive) return [`${at}: can't derive from another derived field ("${d.from}")`];
+  // A derived value is offered to the model and shown in views: it would leak what it reads.
+  if (from.sensitive) return [`${at}: can't derive from the sensitive field "${d.from}"`];
+  const need: Record<Derive["op"], FieldKind[]> = {
+    weekday: ["date"],
+    hour: ["date"],
+    ranges: ["number", "currency"],
+    contains: ["string", "enum"],
+  };
+  if (!need[d.op].includes(from.kind))
+    return [
+      `${at}: "${d.op}" needs a ${need[d.op].join(" or ")} field, "${d.from}" is ${from.kind}`,
+    ];
+  if (d.op === "ranges") {
+    const r = d.ranges ?? [];
+    const last = r[r.length - 1];
+    const bounds = r.slice(0, -1).map((x) => x.below);
+    if (r.length < 2 || !last || last.below !== undefined)
+      return [`${at}: ranges need at least two entries, the last without "below"`];
+    if (bounds.some((b, i) => typeof b !== "number" || (i > 0 && b <= (bounds[i - 1] as number))))
+      return [`${at}: every range but the last needs a "below" larger than the one before`];
+    if (new Set(r.map((x) => x.value)).size !== r.length)
+      return [`${at}: range values must be unique`];
+  }
+  if (d.op === "contains" && !(d.any ?? []).some((w) => typeof w === "string" && w.trim()))
+    return [`${at}: "contains" needs at least one word`];
+  return [];
+}
+
 /** Removes sources and fields the user lacks permission for, plus explicit removals. */
 export function restrictCatalog(
   c: Catalog,
-  r: { permissions?: string[]; sources?: string[]; fields?: string[]; keys?: string[] },
+  r: {
+    permissions?: string[];
+    sources?: string[];
+    fields?: string[];
+    keys?: string[];
+    values?: Record<string, string[]>;
+  },
 ): Catalog {
   const perms = new Set(r.permissions ?? []);
   const dropSources = new Set(r.sources ?? []);
@@ -124,6 +256,11 @@ export function restrictCatalog(
           !dropKeys.has(fid),
       ),
     );
+    for (const [fid, fd] of Object.entries(fields)) {
+      const values = r.values?.[`${id}.${fid}`];
+      if (fd.kind === "string" && !fd.derive && values?.length)
+        fields[fid] = { ...fd, kind: "enum", values: [...new Set(values)] };
+    }
     sources[id] = { ...s, fields };
   }
   return { sources };
@@ -160,9 +297,43 @@ export function publicCatalog(c: Catalog, locale?: string): PublicCatalog {
         ],
       ),
     );
-    sources[id] = { ...rest, label: tx(rest.label, locale) as string, fields };
+    const params = rest.params
+      ? Object.fromEntries(
+          Object.entries(rest.params).map(([pid, p]) => [
+            pid,
+            {
+              ...p,
+              ...(p.label !== undefined ? { label: tx(p.label, locale) as string } : {}),
+              ...(p.choiceLabels
+                ? {
+                    choiceLabels: Object.fromEntries(
+                      Object.entries(p.choiceLabels).map(([k, v]) => [k, tx(v, locale) as string]),
+                    ),
+                  }
+                : {}),
+            },
+          ]),
+        )
+      : undefined;
+    sources[id] = {
+      ...rest,
+      ...(params ? { params } : {}),
+      label: tx(rest.label, locale) as string,
+      fields,
+    };
   }
   return { sources };
+}
+
+/** Params of a source that a single view may set (those with `choices`). */
+export function choiceParams(
+  s: SourceDef | undefined,
+): Record<string, ParamBinding & { choices: string[] }> {
+  return Object.fromEntries(
+    Object.entries(s?.params ?? {}).filter(
+      (e): e is [string, ParamBinding & { choices: string[] }] => !!e[1].choices?.length,
+    ),
+  );
 }
 
 export function fieldLabel(s: SourceDef | undefined, field: string, locale?: string): string {

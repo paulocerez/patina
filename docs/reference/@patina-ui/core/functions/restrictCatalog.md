@@ -30,6 +30,10 @@ Removes sources and fields the user lacks permission for, plus explicit removals
 
 `string`[]
 
+#### values?
+
+`Record`\<`string`, `string`[]\>
+
 ## Returns
 
 [`Catalog`](../interfaces/Catalog.md)

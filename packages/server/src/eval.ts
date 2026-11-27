@@ -193,7 +193,7 @@ async function runCase<Ctx extends PatinaContext>(
       return { ...base, got, pass: true, detail: said, calls, ms };
 
     const m = restrictManifest(o.surface as Manifest<unknown>, {
-      ...(o.surface.restrict?.(ctx) ?? {}),
+      ...((await o.surface.restrict?.(ctx)) ?? {}),
       permissions: ctx.permissions ?? [],
     });
     const norm = (spec: SurfaceSpec) =>

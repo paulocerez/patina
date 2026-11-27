@@ -12,6 +12,14 @@ ISO 4217 code, for currency fields.
 
 ***
 
+### derive?
+
+> `optional` **derive?**: [`Derive`](../type-aliases/Derive.md)
+
+Computed from another field of the row instead of read from it (see `Derive`).
+
+***
+
 ### description?
 
 > `optional` **description?**: [`Text`](../type-aliases/Text.md)

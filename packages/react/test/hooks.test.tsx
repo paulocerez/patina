@@ -131,3 +131,35 @@ it("the client sends params, credentials and the locale on every request", async
   });
   expect(calls[1]?.headers).toEqual({ "content-type": "application/json" });
 });
+
+function OptionalColumns() {
+  const columns = useCollection("clinic.dashboard", "appointments", "columns", ["date", "status"], {
+    hidden: ["status"],
+  });
+  return <p>{`optional: ${columns.map((c) => c.key).join(",")}`}</p>;
+}
+
+it("keys hidden by default stay out of the fallback, and show once the spec has them visible", async () => {
+  render(<OptionalColumns />);
+  expect(screen.getByText("optional: date")).toBeTruthy();
+  cleanup();
+
+  const handler = createPatinaHandler<{ userId: string; permissions: string[] }>({
+    surfaces: [dashboard],
+    basePath: "/api",
+    storage: memoryStorage(),
+    model: scriptedModel(() => ({ kind: "clarify", message: "?" })),
+    getContext: () => ({ userId: "u", permissions: ["finance.read"] }),
+  });
+  const client = createPatinaClient({
+    endpoint: "/api",
+    fetch: (i, init) => handler(new Request(new URL(String(i), "http://t"), init)),
+  });
+  render(
+    <PatinaProvider client={client}>
+      <OptionalColumns />
+    </PatinaProvider>,
+  );
+  // The fixture's base spec shows "status", so the page renders it.
+  await waitFor(() => expect(screen.getByText("optional: date,status")).toBeTruthy());
+});

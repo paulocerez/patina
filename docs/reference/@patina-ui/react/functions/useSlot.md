@@ -2,7 +2,7 @@
 
 # Function: useSlot()
 
-> **useSlot**\<`K`\>(`surfaceId`, `nodeId`, `prop`, `fallback`): `K`[]
+> **useSlot**\<`K`\>(`surfaceId`, `nodeId`, `prop`, `fallback`, `options?`): `K`[]
 
 The ordered, visible keys of a slot, for pages that keep their own JSX:
 
@@ -36,6 +36,10 @@ customizing is behind a flag that's off) or if the node doesn't exist. Keys that
 ### fallback
 
 readonly `K`[]
+
+### options?
+
+[`HookOptions`](../interfaces/HookOptions.md)\<`K`\>
 
 ## Returns
 

@@ -60,6 +60,10 @@ npm i -D @patina-ui/cli
    - mark personal fields `sensitive: true`;
    - gate fields by permission with `requires`;
    - set `complete: true` only if the endpoint returns _all_ matching rows (no pagination).
+   - read the request log before adding endpoints: most refusals need a **derived field**
+     (`f.weekday`, `f.hour`, `f.ranges`, `f.contains`), **per-tenant values** for a text field
+     (`restrict: async (ctx) => ({ values: { "source.field": [...] } })`), or a param with
+     **`choices`** a single view may pick (e.g. "this week"). See docs/guides/data-views.md.
 11. **Keep the footprint small.** Aim for a handful of files in a first integration:
    - **Existing page: use the hooks, not `<Surface>`.** `useSlot` / `useCollection` /
      `useSurfaceProp` keep the page's JSX and data flow. Don't split the page into components

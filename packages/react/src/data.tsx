@@ -91,7 +91,7 @@ export function useQuery(query: Query | undefined): QueryState {
   const source = query ? catalog?.sources[query.source] : undefined;
   const params =
     source && surface && query
-      ? bindParams(catalog as PublicCatalog, query.source, surface.spec)
+      ? { ...bindParams(catalog as PublicCatalog, query.source, surface.spec), ...query.params }
       : {};
   const cacheKey =
     source && query ? `${query.source}?${new URLSearchParams(params).toString()}` : "";

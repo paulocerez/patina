@@ -25,6 +25,7 @@ export {
 } from "./capabilities.js";
 export type {
   Catalog,
+  Derive,
   FieldDef,
   FieldKind,
   ParamBinding,
@@ -32,12 +33,14 @@ export type {
   SourceDef,
 } from "./catalog.js";
 export {
+  choiceParams,
   defineCatalog,
   f,
   fieldLabel,
   offerableFields,
   publicCatalog,
   restrictCatalog,
+  WEEKDAYS,
 } from "./catalog.js";
 export type {
   CollectionDef,
@@ -104,6 +107,13 @@ export {
 } from "./model.js";
 export type { ErrorBody, Notice, ProposeResponse, SurfaceState } from "./protocol.js";
 export type { AggOp, Bucket, Query, QueryDef, QueryResult, QueryShape } from "./query.js";
-export { aggregate, checkQuery, cleanQuery, describeQuery, runQuery } from "./query.js";
+export {
+  aggregate,
+  checkQuery,
+  cleanQuery,
+  describeQuery,
+  runQuery,
+  withDerived,
+} from "./query.js";
 export * from "./types.js";
 export { checkValue, formatValue } from "./values.js";

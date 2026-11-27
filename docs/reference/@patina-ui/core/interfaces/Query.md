@@ -50,6 +50,14 @@ series / single: what to compute.
 
 ***
 
+### params?
+
+> `optional` **params?**: `Record`\<`string`, `string`\>
+
+This view's own value for source params that offer `choices` (e.g. a date range).
+
+***
+
 ### sort?
 
 > `optional` **sort?**: `object`
