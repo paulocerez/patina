@@ -30,6 +30,26 @@ examples/demo                      a vet clinic dashboard wired end to end (Expr
 > [Trying Patina in your app](docs/guides/try-in-your-app.md).
 > The design is in [ARCHITECTURE.md](ARCHITECTURE.md).
 
+## Using a coding agent?
+
+Give it the Patina UI skill. It covers the rules, the integration steps with working code,
+and a verification checklist:
+
+```sh
+npx patina init-agent              # Claude Code: installs .claude/skills/patina-ui/SKILL.md
+npx patina init-agent --agents-md  # also adds a pointer to AGENTS.md (Codex, Cursor, …)
+```
+
+Or paste this into any agent, followed by your task:
+
+```text
+Follow https://raw.githubusercontent.com/paulocerez/patina/main/skills/patina-ui/SKILL.md.
+Task: make the orders table on /orders customizable (column order, visibility, rows per page).
+```
+
+More in [A prompt for coding agents](docs/agent-prompt.md). [`llms.txt`](llms.txt) indexes all
+the docs.
+
 ## Quick start
 
 From install to a first customizable view in four steps. The full walkthrough is in
