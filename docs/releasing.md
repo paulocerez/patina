@@ -16,23 +16,26 @@ docs tooling are private workspace packages and are never published.
 
 ## One-time setup
 
-1. **Create the npm organization `patina-ui`** at npmjs.com/org/create. The free plan is
-   enough for public packages. Turn on two-factor auth for your account.
-2. **Create a token for CI.** Go to npmjs.com → Access Tokens → _Generate New Token →
-   Granular_:
-   - permissions: _Read and write_;
-   - packages: all packages in `@patina-ui` (for the very first publish, the whole `patina-ui`
-     organization);
-   - expiry: as short as you're comfortable renewing.
-3. **Store it on GitHub** as an Actions secret named `NPM_TOKEN`, under repository _Settings →
-   Secrets and variables → Actions_.
-4. **Let Actions open PRs.** Under _Settings → Actions → General → Workflow permissions_, turn
-   on _Allow GitHub Actions to create and approve pull requests_. The release workflow needs
-   it for the "Version Packages" PR.
-5. **Optional, once the repo is public.** Releases then get npm provenance automatically. You
-   can also switch from the token to npm trusted publishing: on each package's npm page,
-   _Settings → Trusted publishing → GitHub Actions_, with repo `paulocerez/patina` and
-   workflow `release.yml`.
+1. **Create the npm organization `patina-ui`** at npmjs.com/org/create (the free plan is
+   enough for public packages). Publishing fails with `404 Scope not found` until it exists.
+2. **Create a token for CI.** On npmjs.com, go to your avatar → Access Tokens → Generate New
+   Token → **Granular Access Token**:
+   - **packages and scopes:** read and write on the `@patina-ui` scope (create the
+     organization first, or the scope can't be selected);
+   - **"Bypass two-factor authentication":** tick it. With 2FA on your account, publishing
+     otherwise fails with `403 … granular access token with bypass 2fa enabled is required`,
+     because CI can't type a one-time code;
+   - **expiry:** as long as it allows. Note when it runs out.
+3. **Store it on GitHub** as the Actions secret `NPM_TOKEN`, under _Settings → Secrets and
+   variables → Actions_.
+4. **Let Actions open pull requests.** Under _Settings → Actions → General → Workflow
+   permissions_, tick _Allow GitHub Actions to create and approve pull requests_.
+5. **Optional: switch to trusted publishing.** Since the repo is public and the packages
+   exist, you can replace the token with npm trusted publishing: on each package's npm page,
+   _Settings → Trusted publishing → GitHub Actions_, repo `paulocerez/patina`, workflow
+   `release.yml`. Then delete the `NPM_TOKEN` secret.
+
+Status: all of the above except step 5 is done, and 0.1.0 is published.
 
 ## Every change
 
@@ -72,6 +75,10 @@ pnpm release                                        # build + changeset publish
 
 ## Checking a release
 
+New versions can take a few minutes to show up on npm, because the registry's public
+metadata lags behind the publish. `npm access get status @patina-ui/core` confirms a package
+exists sooner.
+
 ```sh
 npm view @patina-ui/core version
 mkdir /tmp/try && cd /tmp/try && npm init -y && npm i @patina-ui/core @patina-ui/react @patina-ui/server @patina-ui/cli
@@ -83,3 +90,11 @@ npx patina --help
 While on `0.x`, a minor bump may contain breaking changes (semver for 0.x). The Action is
 pinned by major tag (`@v0`). At `1.0.0` the workflow starts a `v1` tag and leaves `v0` where it
 was, so existing users aren't moved onto breaking changes.
+
+## Provenance
+
+Releases built by the workflow from this public repo get npm provenance: a signed link from
+each package version to the commit and workflow run that built it. The workflow turns it on
+by writing `provenance=true` to `.npmrc`. pnpm doesn't read the `NPM_CONFIG_PROVENANCE`
+variable, which is why 0.1.0 shipped without provenance. Later versions will have it. Local
+`pnpm release` runs don't get provenance.
