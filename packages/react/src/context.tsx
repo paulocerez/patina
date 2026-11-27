@@ -63,6 +63,7 @@ export interface UseSurface extends SurfaceSnapshot {
   undo(): Promise<void>;
   reset(): Promise<void>;
   reload(): Promise<void>;
+  dismissNotice(key: string): Promise<void>;
   canUndo: boolean;
   isCustomized: boolean;
   /**
@@ -87,6 +88,7 @@ export function useSurface(surfaceId: string): UseSurface {
     undo: store.undo,
     reset: store.reset,
     reload: store.reload,
+    dismissNotice: store.dismissNotice,
     canUndo: snap.state?.canUndo ?? false,
     isCustomized: snap.state?.isCustomized ?? false,
     availability: snap.state?.availability ?? { customize: true, dataViews: true },

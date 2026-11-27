@@ -175,6 +175,8 @@ const en = {
   reset: () => "Reset to default",
   skippedOne: () => "1 of your earlier changes no longer applies",
   skippedMany: (p: P) => `${p.count} of your earlier changes no longer apply`,
+  shipped: (p: P) => `You asked for “${p.title}”. That's now possible.`,
+  dismiss: () => "Dismiss",
   loadError: (p: P) => `Couldn't load data (${p.status})`,
   // data blocks (labels users see in previews)
   blockTable: () => "Table",
@@ -319,6 +321,8 @@ const de: Catalog = {
   reset: () => "Auf Standard zurücksetzen",
   skippedOne: () => "1 Ihrer früheren Änderungen gilt nicht mehr",
   skippedMany: (p) => `${p.count} Ihrer früheren Änderungen gelten nicht mehr`,
+  shipped: (p) => `Sie hatten sich „${p.title}“ gewünscht. Das ist jetzt möglich.`,
+  dismiss: () => "Ausblenden",
   loadError: (p) => `Daten konnten nicht geladen werden (${p.status})`,
   blockTable: () => "Tabelle",
   blockChart: () => "Diagramm",

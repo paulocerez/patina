@@ -3,6 +3,17 @@ import type { PublicCatalog } from "./catalog.js";
 import type { Change, Op, SurfaceSpec } from "./types.js";
 
 /** Body of GET /surfaces/:id and of successful commit, undo and reset. */
+/** "You asked for X. It's now possible." */
+export interface Notice {
+  /** The follow-up key (pf-…). */
+  key: string;
+  /** What they asked for, as the follow-up's title. */
+  title: string;
+  /** The host's own text, if it set one when shipping; otherwise show `msg("shipped", { title })`. */
+  message: string | null;
+  shippedAt: string;
+}
+
 export interface SurfaceState {
   surfaceId: string;
   spec: SurfaceSpec;
@@ -16,6 +27,11 @@ export interface SurfaceState {
   catalog?: PublicCatalog;
   /** The locale messages and previews are in (en, de). */
   locale?: string;
+  /**
+   * Things this user asked for that weren't possible then and are now (shipped follow-ups).
+   * Sent with GET only; dismiss with POST /surfaces/:id/notices/:key/dismiss.
+   */
+  notices?: Notice[];
   /** What this user may do here (from the host's `availability` hook). */
   availability: {
     /** May change this view at all (prompt, apply, undo, reset). */

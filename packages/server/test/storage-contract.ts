@@ -1,10 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { ConflictError, type HistoryKey, type StorageAdapter } from "../src/index.js";
+import {
+  ConflictError,
+  type FollowUpLinks,
+  type HistoryKey,
+  type StorageAdapter,
+} from "../src/index.js";
 
 /** The behaviour every StorageAdapter must have. Run it against each implementation. */
 export function storageContract(
   name: string,
-  make: () => Promise<StorageAdapter & { redactPrompts(before: Date): Promise<number> }>,
+  make: () => Promise<
+    StorageAdapter & FollowUpLinks & { redactPrompts(before: Date): Promise<number> }
+  >,
 ) {
   const key: HistoryKey = { tenantId: "t1", layer: "user", subjectId: "u1", surfaceId: "s" };
   const other: HistoryKey = { ...key, subjectId: "u2" };
@@ -134,6 +141,32 @@ export function storageContract(
       expect(await s.redactPrompts(new Date(Date.now() - 60_000))).toBe(0);
       expect(await s.redactPrompts(new Date(Date.now() + 60_000))).toBe(1);
       expect((await s.list(key))[0]).toMatchObject({ prompt: null, patch: { id: "a" } });
+    });
+
+    it("links follow-ups to users and shows notices once shipped, until dismissed", async () => {
+      const s = await make();
+      const ann = { tenantId: "t1", userId: "ann", surfaceId: "dash" };
+      const ben = { tenantId: null, userId: "ben", surfaceId: "dash" };
+      await s.linkFollowUp({ key: "pf-0000000001", title: "Old title", requesters: [ann, ben] });
+      await s.linkFollowUp({ key: "pf-0000000001", title: "Show no-shows", requesters: [ann] });
+      await s.linkFollowUp({ key: "pf-0000000002", title: "Export", requesters: [ann] });
+      expect(await s.listNotices(ann)).toEqual([]);
+
+      expect(await s.shipFollowUp("pf-0000000001")).toBe(2);
+      const [notice] = await s.listNotices(ann);
+      expect(notice).toMatchObject({ key: "pf-0000000001", title: "Show no-shows", message: null });
+      expect(Date.parse(notice?.shippedAt as string)).toBeGreaterThan(0);
+      expect(await s.listNotices(ben)).toHaveLength(1);
+      expect(await s.listNotices({ ...ann, surfaceId: "other" })).toEqual([]);
+      expect(await s.listNotices({ ...ann, tenantId: "t2" })).toEqual([]);
+
+      await s.dismissNotice(ann, "pf-0000000001");
+      expect(await s.listNotices(ann)).toEqual([]);
+      // Shipping again (e.g. a reopened and re-closed issue) updates the text, not the dismissal.
+      expect(await s.shipFollowUp("pf-0000000001", "Jetzt unter Statistik")).toBe(1);
+      expect(await s.listNotices(ann)).toEqual([]);
+      expect((await s.listNotices(ben))[0]?.message).toBe("Jetzt unter Statistik");
+      expect(await s.shipFollowUp("pf-unknown000")).toBe(0);
     });
   });
 }

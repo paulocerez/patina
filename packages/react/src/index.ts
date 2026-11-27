@@ -4,7 +4,7 @@
  * @module @patina-ui/react
  */
 
-export type { FieldDef, PublicCatalog, Query, QueryResult } from "@patina-ui/core";
+export type { FieldDef, Notice, PublicCatalog, Query, QueryResult } from "@patina-ui/core";
 export type { ClientOptions, PatinaClient } from "./client.js";
 export { createPatinaClient, PatinaRequestError } from "./client.js";
 export type { PatinaProviderProps, UseSurface } from "./context.js";
@@ -16,12 +16,14 @@ export type {
   PromptInputRenderProps,
   ProposalPreviewProps,
   ProposalPreviewRenderProps,
+  ShippedNoticeProps,
 } from "./primitives.js";
 export {
   AvailabilityNotice,
   PromptInput,
   ProposalPreview,
   ResetButton,
+  ShippedNotice,
   SkippedNotice,
   SurfaceMessage,
   UndoButton,

@@ -178,6 +178,11 @@ export interface FollowUpOptions {
   redact?(prompt: string): string | null;
   /** Compute and return the follow-ups without calling any sink's `deliver`. */
   dryRun?: boolean;
+  /**
+   * Remember who asked for each delivered follow-up, so they can be told when it ships
+   * (`shipFollowUp`, `followUpWebhook`). Default: on if the storage supports it.
+   */
+  link?: boolean;
   now?: () => number;
 }
 
@@ -415,6 +420,26 @@ export async function runFollowUps(options: FollowUpOptions): Promise<FollowUpRu
         deliveries.push(...(await sink.deliver(followUps, deliveries)));
       } catch (e) {
         errors.push({ sink: sink.name, error: e instanceof Error ? e.message : String(e) });
+      }
+    }
+
+  // Link users to the follow-ups that reached at least one sink.
+  const delivered = new Set(deliveries.filter((d) => d.action !== "skipped").map((d) => d.key));
+  if (!options.dryRun && options.link !== false && storage.linkFollowUp)
+    for (const f of followUps) {
+      if (!delivered.has(f.key)) continue;
+      try {
+        await storage.linkFollowUp({
+          key: f.key,
+          title: f.title,
+          requesters: f.requesters.map(({ tenantId, userId, surfaceId }) => ({
+            tenantId,
+            userId,
+            surfaceId,
+          })),
+        });
+      } catch (e) {
+        errors.push({ sink: "storage", error: e instanceof Error ? e.message : String(e) });
       }
     }
 
@@ -765,5 +790,144 @@ export function webhookSink(options: {
       if (!res.ok) throw new Error(`Webhook ${res.status}`);
       return items.map((f) => ({ sink: "webhook", key: f.key, action: "posted" as const }));
     },
+  };
+}
+
+// ─── Shipped: tell the users who asked ───────────────────────────────────────────────────
+
+/**
+ * Marks a follow-up as shipped: everyone who asked for it sees a notice on the page where they
+ * asked ("You asked for … That's now possible."), until they dismiss it. Pass `message` to use
+ * your own text (e.g. with a pointer to where to find it). Returns the number of notices.
+ */
+export async function shipFollowUp(
+  storage: StorageAdapter,
+  key: string,
+  message?: string | null,
+): Promise<number> {
+  if (!storage.shipFollowUp)
+    throw new Error("This storage adapter doesn't keep follow-up links (shipFollowUp).");
+  return storage.shipFollowUp(key, message ?? null);
+}
+
+export interface FollowUpWebhookOptions {
+  /** Which tracker calls this webhook. */
+  provider: "linear" | "github" | "jira";
+  /** The webhook's signing secret. Requests without a valid signature get a 401. */
+  secret: string;
+  storage: StorageAdapter;
+  /** Your own notice text per shipped follow-up; default: Patina's localized text. */
+  message?(shipped: { key: string; title: string; url?: string }): string | null | undefined;
+  /** Called after a follow-up was marked shipped. */
+  onShipped?(shipped: { key: string; notices: number }): void | Promise<void>;
+  now?: () => number;
+}
+
+const enc = new TextEncoder();
+
+async function hmacHex(secret: string, body: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode(body)));
+  return [...sig].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function sameHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+const JIRA_KEY = /^pf-[0-9a-f]{10}$/;
+
+/**
+ * A fetch-style handler for your tracker's webhook. When a follow-up's issue is completed,
+ * it marks the follow-up as shipped (see `shipFollowUp`). Issues closed as not planned or
+ * canceled are ignored.
+ *
+ * - Linear: Settings → API → Webhooks, data type "Issues"; signature header `linear-signature`.
+ * - GitHub: repository webhook, event "Issues", content type JSON; header `x-hub-signature-256`.
+ * - Jira Cloud: admin webhook for "Issue updated" with a secret; header `x-hub-signature`.
+ *
+ * It needs the raw request body: with Express, mount it before `express.json()`.
+ */
+export function followUpWebhook(options: FollowUpWebhookOptions) {
+  const ok = (body: Record<string, unknown>) =>
+    new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } });
+  return async function handle(request: Request): Promise<Response> {
+    if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+    const raw = await request.text();
+    const header =
+      options.provider === "linear"
+        ? request.headers.get("linear-signature")
+        : options.provider === "github"
+          ? request.headers.get("x-hub-signature-256")
+          : request.headers.get("x-hub-signature");
+    const expected = await hmacHex(options.secret, raw);
+    const given = (header ?? "").replace(/^sha256=/, "").toLowerCase();
+    if (!given || !sameHex(given, expected)) return new Response("Bad signature", { status: 401 });
+
+    let payload: Record<string, unknown>;
+    try {
+      payload = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return new Response("Invalid JSON", { status: 400 });
+    }
+
+    let shipped: { key: string; title: string; url?: string } | null = null;
+    if (options.provider === "linear") {
+      // Reject replays: Linear signs a timestamp into the payload.
+      const ts = Number(payload.webhookTimestamp);
+      const now = options.now?.() ?? Date.now();
+      if (Number.isFinite(ts) && Math.abs(now - ts) > 5 * 60_000)
+        return new Response("Stale webhook", { status: 401 });
+      const data = payload.data as
+        | { title?: string; description?: string; url?: string; state?: { type?: string } }
+        | undefined;
+      const key = parseFollowUpMarker(data?.description);
+      if (payload.type === "Issue" && data?.state?.type === "completed" && key)
+        shipped = { key, title: data.title ?? "", ...(data.url ? { url: data.url } : {}) };
+    } else if (options.provider === "github") {
+      const issue = payload.issue as
+        | { title?: string; body?: string; html_url?: string; state_reason?: string }
+        | undefined;
+      const key = parseFollowUpMarker(issue?.body);
+      if (
+        request.headers.get("x-github-event") === "issues" &&
+        payload.action === "closed" &&
+        issue?.state_reason === "completed" &&
+        key
+      )
+        shipped = {
+          key,
+          title: issue.title ?? "",
+          ...(issue.html_url ? { url: issue.html_url } : {}),
+        };
+    } else {
+      const issue = payload.issue as
+        | {
+            key?: string;
+            fields?: {
+              summary?: string;
+              labels?: string[];
+              status?: { statusCategory?: { key?: string } };
+            };
+          }
+        | undefined;
+      const key = issue?.fields?.labels?.find((l) => JIRA_KEY.test(l));
+      if (issue?.fields?.status?.statusCategory?.key === "done" && key)
+        shipped = { key, title: issue.fields?.summary ?? "" };
+    }
+
+    if (!shipped) return ok({ ignored: true });
+    const notices = await shipFollowUp(options.storage, shipped.key, options.message?.(shipped));
+    await options.onShipped?.({ key: shipped.key, notices });
+    return ok({ shipped: shipped.key, notices });
   };
 }

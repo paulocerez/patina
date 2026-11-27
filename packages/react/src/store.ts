@@ -1,4 +1,4 @@
-import type { ProposeResponse, SurfaceSpec, SurfaceState } from "@patina-ui/core";
+import type { Notice, ProposeResponse, SurfaceSpec, SurfaceState } from "@patina-ui/core";
 import type { PatinaClient } from "./client.js";
 
 export type Proposal = Extract<ProposeResponse, { kind: "proposal" }>;
@@ -20,6 +20,8 @@ export interface SurfaceSnapshot {
   proposal: Proposal | null;
   /** A refusal or clarifying question from the last request, for the user to read. */
   message: { kind: "refusal" | "clarify" | "error"; text: string } | null;
+  /** Things this user asked for earlier that are now possible (from the last load). */
+  notices: Notice[];
 }
 
 /** Framework-agnostic state for one surface. React subscribes via useSyncExternalStore. */
@@ -30,6 +32,7 @@ export class SurfaceStore {
     spec: null,
     proposal: null,
     message: null,
+    notices: [],
   };
   private listeners = new Set<() => void>();
   private loaded = false;
@@ -70,7 +73,16 @@ export class SurfaceStore {
   }
 
   reload = () =>
-    this.run("loading", async () => ({ state: await this.client.get(this.surfaceId) }));
+    this.run("loading", async () => {
+      const state = await this.client.get(this.surfaceId);
+      return { state, notices: state.notices ?? [] };
+    });
+
+  /** Hides a notice right away and tells the server, so it doesn't come back. */
+  dismissNotice = async (key: string) => {
+    this.set({ notices: this.snapshot.notices.filter((n) => n.key !== key) });
+    await this.client.dismissNotice?.(this.surfaceId, key).catch(() => undefined);
+  };
 
   propose = (prompt: string) =>
     this.run("proposing", async () => {

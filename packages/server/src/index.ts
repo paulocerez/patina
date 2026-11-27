@@ -3,7 +3,7 @@
  * @packageDocumentation
  * @module @patina-ui/server
  */
-export type { ErrorBody, ProposeResponse, SurfaceState } from "@patina-ui/core";
+export type { ErrorBody, Notice, ProposeResponse, SurfaceState } from "@patina-ui/core";
 export type { AvailabilityRule, PatinaContext, PatinaHandlerOptions } from "./handler.js";
 export { createPatinaHandler } from "./handler.js";
 export type { InsightsReport, ReasonCount, UnmetRequest } from "./insights.js";
@@ -21,8 +21,10 @@ export type { QueryFn } from "./postgres.js";
 export { migratePostgres, POSTGRES_SCHEMA, postgresStorage } from "./postgres.js";
 export type {
   Entry,
+  FollowUpLinks,
   HistoryKey,
   NewEntry,
+  NoticeTarget,
   Proposal,
   RequestEvent,
   RequestFilter,

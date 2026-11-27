@@ -89,7 +89,7 @@ export {
   REFUSAL_CATEGORIES,
   randomUserKey,
 } from "./model.js";
-export type { ErrorBody, ProposeResponse, SurfaceState } from "./protocol.js";
+export type { ErrorBody, Notice, ProposeResponse, SurfaceState } from "./protocol.js";
 export type { AggOp, Bucket, Query, QueryDef, QueryResult, QueryShape } from "./query.js";
 export { aggregate, checkQuery, cleanQuery, describeQuery, runQuery } from "./query.js";
 export * from "./types.js";

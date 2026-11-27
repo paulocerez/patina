@@ -1,4 +1,4 @@
-import type { Change } from "@patina-ui/core";
+import type { Change, Notice } from "@patina-ui/core";
 import { type ButtonHTMLAttributes, type FormEvent, type ReactNode, useId, useState } from "react";
 import { usePatinaText, useSurface } from "./context.js";
 
@@ -231,6 +231,41 @@ export function SkippedNotice({ surfaceId, className, children }: SkippedNoticeP
         ))}
       </ul>
     </details>
+  );
+}
+
+export interface ShippedNoticeProps {
+  surfaceId: string;
+  className?: string;
+  /** Render each notice yourself; `text` is the host's message or Patina's localized default. */
+  children?: (notices: (Notice & { text: string; dismiss(): void })[]) => ReactNode;
+}
+
+/**
+ * "You asked for … That's now possible.": shown to users whose earlier request (one Patina
+ * couldn't do) has since shipped. See docs/guides/follow-ups.md.
+ */
+export function ShippedNotice({ surfaceId, className, children }: ShippedNoticeProps) {
+  const { notices, dismissNotice } = useSurface(surfaceId);
+  const { t } = usePatinaText();
+  if (notices.length === 0) return null;
+  const items = notices.map((n) => ({
+    ...n,
+    text: n.message ?? t("shipped", { title: n.title }),
+    dismiss: () => void dismissNotice(n.key),
+  }));
+  if (children) return <>{children(items)}</>;
+  return (
+    <ul className={className} data-patina="shipped">
+      {items.map((n) => (
+        <li key={n.key} role="status">
+          <span>{n.text}</span>{" "}
+          <button type="button" onClick={n.dismiss}>
+            {t("dismiss")}
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
 

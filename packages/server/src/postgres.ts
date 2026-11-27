@@ -2,6 +2,7 @@ import type { Op } from "@patina-ui/core";
 import {
   ConflictError,
   type Entry,
+  type FollowUpLinks,
   type HistoryKey,
   type NewEntry,
   type Proposal,
@@ -80,6 +81,20 @@ create table if not exists patina_usage (
   count       integer not null default 0,
   primary key (tenant_id, subject_id, period)
 );
+
+create table if not exists patina_followups (
+  followup_key  text        not null,
+  tenant_id     text        not null default '',
+  user_id       text        not null,
+  surface_id    text        not null,
+  title         text        not null,
+  linked_at     timestamptz not null default now(),
+  shipped_at    timestamptz null,
+  message       text        null,
+  dismissed_at  timestamptz null,
+  primary key (followup_key, tenant_id, user_id, surface_id)
+);
+create index if not exists patina_followups_user on patina_followups (tenant_id, user_id, surface_id) where shipped_at is not null and dismissed_at is null;
 `;
 
 export async function migratePostgres(query: QueryFn): Promise<void> {
@@ -121,7 +136,8 @@ const keyParams = (k: HistoryKey) => [k.tenantId ?? "", k.layer, k.subjectId, k.
  * `(tenant_id, layer, subject_id, surface_id, seq)` constraint for optimistic concurrency.
  */
 export function postgresStorage({ query }: { query: QueryFn }): StorageAdapter &
-  Required<Pick<StorageAdapter, "incrementUsage" | "logRequest" | "listRequests">> & {
+  Required<Pick<StorageAdapter, "incrementUsage" | "logRequest" | "listRequests">> &
+  FollowUpLinks & {
     /** Clears stored prompts older than `before` (prompt retention). Returns the number of rows changed. */
     redactPrompts(before: Date): Promise<number>;
   } {
@@ -283,6 +299,49 @@ export function postgresStorage({ query }: { query: QueryFn }): StorageAdapter &
       }));
     },
 
+    async linkFollowUp({ key, title, requesters }) {
+      for (const r of requesters)
+        await query(
+          `insert into patina_followups (followup_key, tenant_id, user_id, surface_id, title)
+           values ($1, $2, $3, $4, $5)
+           on conflict (followup_key, tenant_id, user_id, surface_id) do nothing`,
+          [key, r.tenantId ?? "", r.userId, r.surfaceId, title],
+        );
+      await query("update patina_followups set title = $2 where followup_key = $1", [key, title]);
+    },
+    async shipFollowUp(key, message = null) {
+      const { rows } = await query(
+        `update patina_followups
+            set shipped_at = coalesce(shipped_at, now()), message = $2
+          where followup_key = $1
+         returning dismissed_at`,
+        [key, message],
+      );
+      return rows.filter((r) => r.dismissed_at === null || r.dismissed_at === undefined).length;
+    },
+    async listNotices(w) {
+      const { rows } = await query(
+        `select followup_key, title, message, shipped_at from patina_followups
+          where tenant_id = $1 and user_id = $2 and surface_id = $3
+            and shipped_at is not null and dismissed_at is null
+          order by shipped_at desc
+          limit 20`,
+        [w.tenantId ?? "", w.userId, w.surfaceId],
+      );
+      return rows.map((r) => ({
+        key: r.followup_key as string,
+        title: r.title as string,
+        message: (r.message as string | null) ?? null,
+        shippedAt: iso(r.shipped_at),
+      }));
+    },
+    async dismissNotice(w, key) {
+      await query(
+        `update patina_followups set dismissed_at = now()
+          where followup_key = $1 and tenant_id = $2 and user_id = $3 and surface_id = $4`,
+        [key, w.tenantId ?? "", w.userId, w.surfaceId],
+      );
+    },
     async redactPrompts(before) {
       await query(
         "update patina_requests set prompt = null where prompt is not null and created_at < $1",

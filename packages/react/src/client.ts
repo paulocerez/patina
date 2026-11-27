@@ -16,6 +16,8 @@ export interface PatinaClient {
   commit(surfaceId: string, proposalId: string): Promise<SurfaceState>;
   undo(surfaceId: string): Promise<SurfaceState>;
   reset(surfaceId: string): Promise<SurfaceState>;
+  /** Hides a "now possible" notice for good. */
+  dismissNotice?(surfaceId: string, key: string): Promise<void>;
 }
 
 export interface ClientOptions {
@@ -58,5 +60,8 @@ export function createPatinaClient({
     commit: (id, pid) => call("POST", `${s(id)}/proposals/${encodeURIComponent(pid)}/commit`),
     undo: (id) => call("POST", `${s(id)}/undo`),
     reset: (id) => call("POST", `${s(id)}/reset`),
+    dismissNotice: async (id, key) => {
+      await call("POST", `${s(id)}/notices/${encodeURIComponent(key)}/dismiss`);
+    },
   };
 }

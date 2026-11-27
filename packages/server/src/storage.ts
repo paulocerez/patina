@@ -1,4 +1,4 @@
-import type { HistoryEntry, Op } from "@patina-ui/core";
+import type { HistoryEntry, Notice, Op } from "@patina-ui/core";
 
 /** Identifies one history: a layer (user or tenant) of one surface for one subject. */
 export interface HistoryKey {
@@ -116,6 +116,32 @@ export interface StorageAdapter {
   logRequest?(event: RequestEvent): Promise<void>;
   /** Reads the request log, newest first. */
   listRequests?(filter: RequestFilter): Promise<RequestEvent[]>;
+  /** Optional; enables "it's now possible" notices for shipped follow-ups. */
+  linkFollowUp?: FollowUpLinks["linkFollowUp"];
+  shipFollowUp?: FollowUpLinks["shipFollowUp"];
+  listNotices?: FollowUpLinks["listNotices"];
+  dismissNotice?: FollowUpLinks["dismissNotice"];
+}
+
+/** Who a follow-up notice is for: one user on one surface. */
+export interface NoticeTarget {
+  tenantId: string | null;
+  userId: string;
+  surfaceId: string;
+}
+
+/** Follow-ups and the users who asked for them, so they can be told when it ships. */
+export interface FollowUpLinks {
+  /** Records (or refreshes) who asked for a follow-up. Called by `runFollowUps` after delivery. */
+  linkFollowUp(link: { key: string; title: string; requesters: NoticeTarget[] }): Promise<void>;
+  /**
+   * Marks a follow-up as shipped, so everyone who asked sees a notice on the surface where they
+   * asked. Returns how many notices that makes. Idempotent.
+   */
+  shipFollowUp(key: string, message?: string | null): Promise<number>;
+  /** Shipped, not yet dismissed notices for one user on one surface. */
+  listNotices(who: NoticeTarget): Promise<Notice[]>;
+  dismissNotice(who: NoticeTarget, key: string): Promise<void>;
 }
 
 export function keyString(k: HistoryKey): string {
@@ -124,7 +150,8 @@ export function keyString(k: HistoryKey): string {
 
 /** In-process storage for tests, demos and prototypes. Data is lost on restart. */
 export function memoryStorage(): StorageAdapter &
-  Required<Pick<StorageAdapter, "incrementUsage" | "logRequest" | "listRequests">> & {
+  Required<Pick<StorageAdapter, "incrementUsage" | "logRequest" | "listRequests">> &
+  FollowUpLinks & {
     clear(): void;
     redactPrompts(before: Date): Promise<number>;
   } {
@@ -132,6 +159,16 @@ export function memoryStorage(): StorageAdapter &
   const proposals = new Map<string, Proposal>();
   const usage = new Map<string, number>();
   const requests: RequestEvent[] = [];
+  type Link = NoticeTarget & {
+    key: string;
+    title: string;
+    shippedAt: string | null;
+    message: string | null;
+    dismissedAt: string | null;
+  };
+  const links = new Map<string, Link>();
+  const linkId = (key: string, w: NoticeTarget) =>
+    JSON.stringify([key, w.tenantId ?? "", w.userId, w.surfaceId]);
   return {
     async list(key) {
       return structuredClone(histories.get(keyString(key)) ?? []);
@@ -198,7 +235,59 @@ export function memoryStorage(): StorageAdapter &
           }
       return n;
     },
+    async linkFollowUp({ key, title, requesters }) {
+      for (const r of requesters) {
+        const id = linkId(key, r);
+        const prev = links.get(id);
+        links.set(id, {
+          tenantId: r.tenantId,
+          userId: r.userId,
+          surfaceId: r.surfaceId,
+          key,
+          title,
+          shippedAt: prev?.shippedAt ?? null,
+          message: prev?.message ?? null,
+          dismissedAt: prev?.dismissedAt ?? null,
+        });
+      }
+      // Everyone linked to this follow-up sees the latest title.
+      for (const l of links.values()) if (l.key === key) l.title = title;
+    },
+    async shipFollowUp(key, message = null) {
+      let n = 0;
+      const at = new Date().toISOString();
+      for (const l of links.values())
+        if (l.key === key) {
+          if (!l.shippedAt) l.shippedAt = at;
+          l.message = message;
+          if (!l.dismissedAt) n++;
+        }
+      return n;
+    },
+    async listNotices(w) {
+      return [...links.values()]
+        .filter(
+          (l) =>
+            l.shippedAt &&
+            !l.dismissedAt &&
+            (l.tenantId ?? "") === (w.tenantId ?? "") &&
+            l.userId === w.userId &&
+            l.surfaceId === w.surfaceId,
+        )
+        .sort((a, b) => String(b.shippedAt).localeCompare(String(a.shippedAt)))
+        .map((l) => ({
+          key: l.key,
+          title: l.title,
+          message: l.message,
+          shippedAt: l.shippedAt as string,
+        }));
+    },
+    async dismissNotice(w, key) {
+      const l = links.get(linkId(key, w));
+      if (l) l.dismissedAt = new Date().toISOString();
+    },
     clear() {
+      links.clear();
       histories.clear();
       proposals.clear();
       usage.clear();

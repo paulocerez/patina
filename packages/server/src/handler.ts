@@ -640,13 +640,35 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
         }
       }
 
+      // Dismissing a notice is always allowed: it changes nothing on the page.
+      const dismiss = route.match(/^POST notices\/([^/]+)\/dismiss$/);
+      if (dismiss) {
+        await options.storage.dismissNotice?.(
+          { tenantId: ctx.tenantId ?? null, userId: ctx.userId, surfaceId: manifest.id },
+          dismiss[1] as string,
+        );
+        return json({ ok: true });
+      }
+
       // The view always renders; only changing it depends on availability.
       if (request.method === "POST" && !av.customize)
         throw new HttpError(403, av.message ?? msg(av.locale, "customizeOff"));
 
       switch (route) {
-        case "GET ":
-          return json(state(manifest, await load(manifest, ctx, av), av));
+        case "GET ": {
+          const st = state(manifest, await load(manifest, ctx, av), av);
+          const notices = await options.storage
+            .listNotices?.({
+              tenantId: ctx.tenantId ?? null,
+              userId: ctx.userId,
+              surfaceId: manifest.id,
+            })
+            .catch((e: unknown) => {
+              options.onError?.(e);
+              return [];
+            });
+          return json(notices?.length ? { ...st, notices } : st);
+        }
         case "POST proposals/:id/commit":
           return json(await commit(manifest, ctx, av, parts[3] as string));
         case "POST undo":

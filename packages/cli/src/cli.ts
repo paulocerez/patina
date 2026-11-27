@@ -15,6 +15,7 @@ import {
   linearSink,
   renderFollowUpsText,
   runFollowUps,
+  shipFollowUp,
   slackSink,
 } from "@patina-ui/server/followups";
 import { checkRepo, renderMarkdown, type Severity } from "./check.js";
@@ -49,6 +50,10 @@ Usage:
       (LINEAR_API_KEY; repeats become comments) and a Slack digest (SLACK_WEBHOOK_URL).
       Run it on a schedule with --since matching the interval. --group asks Claude to merge
       requests that want the same thing (ANTHROPIC_API_KEY); prompts are redacted first.
+
+  patina followups ship <pf-key> [--message <text>] [--database-url $DATABASE_URL]
+      Mark a follow-up as shipped: everyone who asked for it sees a notice on that page
+      (<ShippedNotice>). Usually done by followUpWebhook when the issue is completed.
 
   patina init-agent [--root .] [--agents-md] [--force]
       Install the Patina UI skill for coding agents: .claude/skills/patina-ui/SKILL.md
@@ -108,7 +113,7 @@ export async function main(
   deps: { storage?: StorageAdapter; sinks?: FollowUpSink[]; grouper?: FollowUpGrouper } = {},
 ): Promise<number> {
   const [command, ...rest] = argv;
-  const { values } = parseArgs({
+  const { values, positionals } = parseArgs({
     args: rest,
     allowPositionals: true,
     options: {
@@ -133,6 +138,7 @@ export async function main(
       "min-requests": { type: "string" },
       "min-customers": { type: "string" },
       max: { type: "string" },
+      message: { type: "string" },
       until: { type: "string" },
       tenant: { type: "string" },
       surface: { type: "string" },
@@ -229,6 +235,27 @@ with dataBlocks(catalog), and commit ${out}/. See docs/guides/data-views.md.`);
       return 0;
     } finally {
       await close();
+    }
+  }
+
+  if (command === "followups" && positionals[0] === "ship") {
+    const key = positionals[1];
+    if (!key || !/^pf-[0-9a-f]{10}$/.test(key)) {
+      console.error("Usage: patina followups ship <pf-key> [--message <text>]");
+      return 1;
+    }
+    const db = await openStorage(deps, values["database-url"]);
+    if (!db) return 1;
+    try {
+      const n = await shipFollowUp(db.storage, key, values.message ?? null);
+      console.log(
+        n === 0
+          ? `No one is waiting for ${key} (unknown key, or everyone dismissed it).`
+          : `Marked ${key} as shipped: ${n} user${n === 1 ? "" : "s"} will see a notice.`,
+      );
+      return 0;
+    } finally {
+      await db.close();
     }
   }
 
