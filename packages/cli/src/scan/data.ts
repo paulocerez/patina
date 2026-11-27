@@ -427,7 +427,15 @@ function scanRoutes(repo: Repo, files: string[]): Route[] {
       const refFile = handlerFile(file, args, imports);
       const helpers = ref ? requestHelpers(repo.read(refFile) ?? src, ref) : "";
       const snippet = [inline, ref, helpers].filter(Boolean).join("\n");
-      const rows = /res\.json\(\s*\{\s*([a-z]\w*)\s*[,}:]/.exec(snippet)?.[1];
+      // The key a list is wrapped under (`res.json({ items, total })`). Only list-like names:
+      // `res.json({ user })` is one object, not rows.
+      const wrapped = /res\.json\(\s*\{\s*([a-z]\w*)\s*[,}:]/.exec(snippet)?.[1];
+      const rows =
+        wrapped &&
+        (/^(data|items|rows|results|records|entries|list|nodes|edges)$/.test(wrapped) ||
+          /[^s]s$/.test(wrapped))
+          ? wrapped
+          : undefined;
       for (const prefix of mounts.prefixesFor(file, receiver)) {
         const path = joinPath(prefix, local);
         const placeholders = [...path.matchAll(/:(\w+)/g)].map((p) => p[1] as string);
