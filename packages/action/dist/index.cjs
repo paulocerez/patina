@@ -7739,7 +7739,7 @@ function functionBody(src, name) {
   }
   return src.slice(open, open + 8e3);
 }
-function handlerBody(repo, file, src, args, imports) {
+function handlerBody(repo, src, args, imports) {
   const last = args.split(",").pop()?.trim() ?? "";
   const ref = /([A-Za-z_$][\w$]*)(?:\.([A-Za-z_$][\w$]*))?\s*\)*\s*$/.exec(last);
   if (!ref) return null;
@@ -7813,7 +7813,7 @@ function scanRoutes(repo, files) {
       const nextRoute = src.slice(after, start + 1200).search(/\b\w+\.(get|post|put|patch|delete|use|all|route|listen)\(/);
       const inline = src.slice(start, nextRoute >= 0 ? after + nextRoute : start + 1200);
       const args = callArgs(src, start + m[0].indexOf("("));
-      const ref = handlerBody(repo, file, src, args, imports);
+      const ref = handlerBody(repo, src, args, imports);
       const refFile = handlerFile(file, args, imports);
       const helpers = ref ? requestHelpers(repo.read(refFile) ?? src, ref) : "";
       const snippet = [inline, ref, helpers].filter(Boolean).join("\n");
