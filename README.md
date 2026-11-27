@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-# Patina UI
+# Patina
 
 Let the users of your app customize its views in plain language, safely.
 
