@@ -1,4 +1,9 @@
-import type { CollectionItem, SurfaceSpec } from "@patina-ui/core";
+import {
+  type CollectionItem,
+  type SpecNode,
+  type SurfaceSpec,
+  USER_KEY_PREFIX,
+} from "@patina-ui/core";
 import { useContext, useSyncExternalStore } from "react";
 import { Ctx } from "./context.js";
 import type { SurfaceSnapshot } from "./store.js";
@@ -67,4 +72,41 @@ export function useCollection<K extends string>(
 export function useSurfaceProp<T>(surfaceId: string, nodeId: string, prop: string, fallback: T): T {
   const value = useSpec(surfaceId)?.nodes[nodeId]?.props[prop];
   return value === undefined ? fallback : (value as T);
+}
+
+/** One entry of a slot: one of your own sections, or a block a user added. */
+export type SlotItem<K extends string = string> =
+  | { kind: "host"; key: K }
+  | { kind: "block"; key: string; node: SpecNode };
+
+/**
+ * Like `useSlot`, plus the blocks users added (data views and your presets), in place:
+ *
+ *   useSlotItems("dashboard", "overview", "sections", SECTIONS).map((item) =>
+ *     item.kind === "host"
+ *       ? <Fragment key={item.key}>{blocks[item.key]}</Fragment>
+ *       : <PatinaBlock key={item.key} surfaceId="dashboard" nodeId={item.key} components={DATA_BLOCKS} />)
+ *
+ * Your own keys still only appear if they're in `fallback`. Added blocks are recognizable by
+ * their key (Patina gives every inserted node a `u_` key, which base items never use), so an
+ * unknown key of yours is still dropped. Previews show new blocks in place.
+ */
+export function useSlotItems<K extends string>(
+  surfaceId: string,
+  nodeId: string,
+  prop: string,
+  fallback: readonly K[],
+): SlotItem<K>[] {
+  const spec = useSpec(surfaceId);
+  const list = items(spec, nodeId, prop);
+  if (!spec || !list) return fallback.map((key) => ({ kind: "host", key }));
+  const known = new Set<string>(fallback);
+  const out: SlotItem<K>[] = [];
+  for (const it of list) {
+    if (!it || it.hidden) continue;
+    if (known.has(it.key)) out.push({ kind: "host", key: it.key as K });
+    else if (it.key.startsWith(USER_KEY_PREFIX) && spec.nodes[it.key])
+      out.push({ kind: "block", key: it.key, node: spec.nodes[it.key] as SpecNode });
+  }
+  return out;
 }

@@ -1,6 +1,8 @@
 import {
   apply,
   buildModelRequest,
+  capabilities,
+  capabilityHint,
   dataPresetIds,
   describe,
   effectivePatches,
@@ -314,6 +316,13 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
       isCustomized: loaded.resolved.patchCount > 0,
       render: { slots, collections },
       ...(loaded.m.catalog ? { catalog: publicCatalog(loaded.m.catalog, av.locale) } : {}),
+      ...(av.customize
+        ? {
+            capabilities: capabilities(loaded.me, loaded.resolved.spec, {
+              dataViews: av.dataViews,
+            }),
+          }
+        : {}),
       locale: av.locale,
       availability: {
         customize: av.customize,
@@ -405,8 +414,19 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
         });
       }
       const result = fromModelOutput(raw, undefined, L);
-      if (result.kind === "refusal")
-        return done({ kind: "refusal", message: result.reason }, result.category, "model", calls);
+      if (result.kind === "refusal") {
+        // Asked for something that isn't here: say what is, from the manifest, not the model.
+        const hint =
+          result.category === "data_access" || result.category === "not_on_page"
+            ? capabilityHint(capabilities(m, spec, { dataViews: av.dataViews }), L, "data")
+            : "";
+        return done(
+          { kind: "refusal", message: hint ? `${result.reason} ${hint}` : result.reason },
+          result.category,
+          "model",
+          calls,
+        );
+      }
       if (result.kind === "clarify")
         return done({ kind: "clarify", question: result.question }, null, "model", calls);
       if (result.ops.length === 0)

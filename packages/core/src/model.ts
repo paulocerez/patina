@@ -7,7 +7,10 @@
 import { offerableFields } from "./catalog.js";
 import { msg, pickLocale, type Text, tx } from "./i18n.js";
 
-const LANGUAGE_NAMES: Record<string, string> = { en: "English", de: "German" };
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: "English",
+  de: 'German (formal: address the user as "Sie")',
+};
 
 import { type CollectionDef, humanize, isListType, type SlotDef, type TypeDef } from "./dsl.js";
 import { cleanQuery } from "./query.js";
@@ -374,7 +377,7 @@ const SYSTEM_RULES = `You customize how one screen of an application is laid out
 
 You never write code. You answer with JSON that follows the given schema:
 - kind "patch": the smallest list of ops that does what the user asked, and a one-sentence summary in "message".
-- kind "refusal": when the request can't be expressed with the available ops. Say briefly and kindly what you can change instead, and set "category" to why: data_access, action, new_component, styling, not_on_page, unclear or other.
+- kind "refusal": when the request can't be expressed with the available ops. Set "category" to why: data_access, action, new_component, styling, not_on_page, unclear or other. For data_access and not_on_page, write one short sentence saying why; the app then lists what is available, so don't list alternatives yourself. For the other categories, say briefly and kindly what you can change instead.
 - kind "clarify": when the request is ambiguous enough that guessing would likely be wrong. Ask one short question.
 
 You can only change presentation: order, visibility, and the listed settings. Refuse anything else, including:

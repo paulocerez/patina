@@ -1,4 +1,10 @@
-import type { Change, Notice } from "@patina-ui/core";
+import {
+  type Capabilities as CapabilityList,
+  type Change,
+  capabilityExamples,
+  capabilityLines,
+  type Notice,
+} from "@patina-ui/core";
 import { type ButtonHTMLAttributes, type FormEvent, type ReactNode, useId, useState } from "react";
 import { usePatinaText, useSurface } from "./context.js";
 
@@ -292,5 +298,72 @@ export function AvailabilityNotice({ surfaceId, className, children }: Availabil
     <p className={className} data-patina="availability" role="note">
       {a.message}
     </p>
+  );
+}
+
+/**
+ * What this user can ask for on a surface (from the server, in their language): the lists
+ * they can rearrange, the settings and their values, and the data they can add as views.
+ * Null until the surface has loaded, or when customizing is off.
+ */
+export function useCapabilities(surfaceId: string): CapabilityList | null {
+  const { state, availability } = useSurface(surfaceId);
+  if (!availability.customize) return null;
+  return state?.capabilities ?? null;
+}
+
+export interface CapabilitiesRenderProps {
+  capabilities: CapabilityList;
+  /** One readable line per capability ("Sections (…): reorder, hide"). */
+  lines: string[];
+  /** A few example prompts for this surface, e.g. for chips in the prompt box. */
+  examples: string[];
+  /** Sends a prompt, e.g. when a chip is clicked. */
+  propose(prompt: string): Promise<void>;
+  /** The localized heading ("What you can ask for"). */
+  title: string;
+}
+
+export interface CapabilitiesProps {
+  surfaceId: string;
+  className?: string;
+  /** How many example prompts to offer. Default 4. */
+  maxExamples?: number;
+  children?: (props: CapabilitiesRenderProps) => ReactNode;
+}
+
+/**
+ * "What you can ask for": a list of the customizable parts and data, or (with the
+ * render-prop form) example chips for the prompt box. Unstyled.
+ */
+export function Capabilities({
+  surfaceId,
+  className,
+  maxExamples = 4,
+  children,
+}: CapabilitiesProps) {
+  const caps = useCapabilities(surfaceId);
+  const { propose } = useSurface(surfaceId);
+  const { locale, t } = usePatinaText();
+  if (!caps) return null;
+  const lines = capabilityLines(caps, locale);
+  if (lines.length === 0) return null;
+  const props: CapabilitiesRenderProps = {
+    capabilities: caps,
+    lines,
+    examples: capabilityExamples(caps, locale, maxExamples),
+    propose,
+    title: t("capTitle"),
+  };
+  if (children) return <>{children(props)}</>;
+  return (
+    <details className={className} data-patina="capabilities">
+      <summary>{props.title}</summary>
+      <ul>
+        {lines.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+    </details>
   );
 }

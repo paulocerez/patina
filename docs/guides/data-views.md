@@ -176,6 +176,11 @@ import { PatinaChart, PatinaStat, PatinaTable } from "../patina/blocks";
 </PatinaProvider>;
 ```
 
+**On a page that renders itself** (the [hooks path](react.md#existing-pages-useslot-usecollection-usesurfaceprop)),
+switch the slot from `useSlot` to `useSlotItems` and render inserted blocks with
+`<PatinaBlock surfaceId="dashboard" nodeId={item.key} components={{ PatinaTable, PatinaChart, PatinaStat }} />`.
+See [Adding data views to such a page](react.md#adding-data-views-to-such-a-page).
+
 The three blocks are ordinary components in your repo. Edit them however you like, as long as
 they keep reading data through `useQuery(query)` from `@patina-ui/react`.
 

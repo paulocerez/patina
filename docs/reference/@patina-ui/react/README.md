@@ -11,7 +11,10 @@ React bindings and headless UX primitives.
 
 ## Interfaces
 
+- [CapabilitiesProps](interfaces/CapabilitiesProps.md)
+- [CapabilitiesRenderProps](interfaces/CapabilitiesRenderProps.md)
 - [ClientOptions](interfaces/ClientOptions.md)
+- [PatinaBlockProps](interfaces/PatinaBlockProps.md)
 - [PatinaClient](interfaces/PatinaClient.md)
 - [PatinaProviderProps](interfaces/PatinaProviderProps.md)
 - [PromptInputProps](interfaces/PromptInputProps.md)
@@ -20,6 +23,7 @@ React bindings and headless UX primitives.
 - [ProposalPreviewRenderProps](interfaces/ProposalPreviewRenderProps.md)
 - [ShippedNoticeProps](interfaces/ShippedNoticeProps.md)
 - [SurfaceProps](interfaces/SurfaceProps.md)
+- [SurfaceScopeProps](interfaces/SurfaceScopeProps.md)
 - [SurfaceSnapshot](interfaces/SurfaceSnapshot.md)
 - [UseSurface](interfaces/UseSurface.md)
 
@@ -29,6 +33,7 @@ React bindings and headless UX primitives.
 - [FetchSource](type-aliases/FetchSource.md)
 - [Proposal](type-aliases/Proposal.md)
 - [QueryState](type-aliases/QueryState.md)
+- [SlotItem](type-aliases/SlotItem.md)
 - [SurfaceStatus](type-aliases/SurfaceStatus.md)
 
 ## Variables
@@ -39,8 +44,10 @@ React bindings and headless UX primitives.
 
 - [AvailabilityNotice](functions/AvailabilityNotice.md)
 - [bindParams](functions/bindParams.md)
+- [Capabilities](functions/Capabilities.md)
 - [createPatinaClient](functions/createPatinaClient.md)
 - [formatField](functions/formatField.md)
+- [PatinaBlock](functions/PatinaBlock.md)
 - [PatinaProvider](functions/PatinaProvider.md)
 - [PromptInput](functions/PromptInput.md)
 - [ProposalPreview](functions/ProposalPreview.md)
@@ -49,11 +56,14 @@ React bindings and headless UX primitives.
 - [SkippedNotice](functions/SkippedNotice.md)
 - [Surface](functions/Surface.md)
 - [SurfaceMessage](functions/SurfaceMessage.md)
+- [SurfaceScope](functions/SurfaceScope.md)
 - [UndoButton](functions/UndoButton.md)
+- [useCapabilities](functions/useCapabilities.md)
 - [useCollection](functions/useCollection.md)
 - [usePatinaText](functions/usePatinaText.md)
 - [useQuery](functions/useQuery.md)
 - [useSlot](functions/useSlot.md)
+- [useSlotItems](functions/useSlotItems.md)
 - [useSurface](functions/useSurface.md)
 - [useSurfaceProp](functions/useSurfaceProp.md)
 

@@ -4,8 +4,6 @@
 
 > **listOr**(`items`, `locale?`): `string`
 
-Locale-aware "a, b or c" / "a, b oder c".
-
 ## Parameters
 
 ### items

@@ -33,7 +33,8 @@ export function Surface({ id, components, fallback = null }: SurfaceProps) {
   );
 }
 
-function renderNode(
+/** Renders one node (and its children) the way <Surface> does. */
+export function renderNode(
   spec: SurfaceSpec,
   render: SurfaceState["render"],
   components: ComponentMap,
@@ -71,4 +72,50 @@ function renderNode(
 
 function visible(list: unknown[]): CollectionItem[] {
   return (list as CollectionItem[]).filter((it) => it && !it.hidden);
+}
+
+export interface SurfaceScopeProps {
+  surfaceId: string;
+  children: ReactNode;
+}
+
+/**
+ * Gives components outside <Surface> (on a page that renders itself) the surface's spec and
+ * catalog, so `useQuery` and data blocks work there. <PatinaBlock> sets it for you.
+ */
+export function SurfaceScope({ surfaceId, children }: SurfaceScopeProps) {
+  const { spec, state } = useSurface(surfaceId);
+  if (!spec) return <>{children}</>;
+  return (
+    <SurfaceRenderContext.Provider
+      value={{ spec, ...(state?.catalog ? { catalog: state.catalog } : {}) }}
+    >
+      {children}
+    </SurfaceRenderContext.Provider>
+  );
+}
+
+export interface PatinaBlockProps {
+  surfaceId: string;
+  /** The block's node ID: `item.key` from `useSlotItems`. */
+  nodeId: string;
+  /** Your block components, e.g. `{ PatinaTable, PatinaChart, PatinaStat }` from patina/blocks. */
+  components: ComponentMap;
+}
+
+/**
+ * Renders a block a user inserted (a data view, or one of your presets) on a page that
+ * renders itself, with the data context its `useQuery` needs. Use it for the
+ * `{ kind: "block" }` items from `useSlotItems`.
+ */
+export function PatinaBlock({ surfaceId, nodeId, components }: PatinaBlockProps) {
+  const { spec, state } = useSurface(surfaceId);
+  if (!spec || !state) return null;
+  return (
+    <SurfaceRenderContext.Provider
+      value={{ spec, ...(state.catalog ? { catalog: state.catalog } : {}) }}
+    >
+      {renderNode(spec, state.render, components, nodeId, new Set())}
+    </SurfaceRenderContext.Provider>
+  );
 }

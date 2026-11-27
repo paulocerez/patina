@@ -78,7 +78,9 @@ it("previews and refuses in the user's language (x-patina-locale, then Accept-La
   expect(preview.kind === "proposal" && preview.changes[0]?.text).toBe(
     "„Revenue“ in Terminliste ausblenden",
   );
-  expect(model.calls.at(-1)?.user).toContain("<reply_language>German</reply_language>");
+  expect(model.calls.at(-1)?.user).toContain(
+    '<reply_language>German (formal: address the user as "Sie")</reply_language>',
+  );
 
   const refusal = await ask(h, "delete button", { "accept-language": "de-DE,de;q=0.9" });
   expect(refusal).toMatchObject({

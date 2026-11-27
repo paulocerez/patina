@@ -11,8 +11,11 @@ export type { PatinaProviderProps, UseSurface } from "./context.js";
 export { PatinaProvider, usePatinaText, useSurface } from "./context.js";
 export type { FetchSource, QueryState } from "./data.js";
 export { bindParams, defaultFetchSource, formatField, useQuery } from "./data.js";
-export { useCollection, useSlot, useSurfaceProp } from "./hooks.js";
+export type { SlotItem } from "./hooks.js";
+export { useCollection, useSlot, useSlotItems, useSurfaceProp } from "./hooks.js";
 export type {
+  CapabilitiesProps,
+  CapabilitiesRenderProps,
   PromptInputProps,
   PromptInputRenderProps,
   ProposalPreviewProps,
@@ -21,6 +24,7 @@ export type {
 } from "./primitives.js";
 export {
   AvailabilityNotice,
+  Capabilities,
   PromptInput,
   ProposalPreview,
   ResetButton,
@@ -28,8 +32,14 @@ export {
   SkippedNotice,
   SurfaceMessage,
   UndoButton,
+  useCapabilities,
 } from "./primitives.js";
-export type { ComponentMap, SurfaceProps } from "./Surface.js";
-export { Surface } from "./Surface.js";
+export type {
+  ComponentMap,
+  PatinaBlockProps,
+  SurfaceProps,
+  SurfaceScopeProps,
+} from "./Surface.js";
+export { PatinaBlock, Surface, SurfaceScope } from "./Surface.js";
 export type { Proposal, SurfaceSnapshot, SurfaceStatus } from "./store.js";
 export { SurfaceStore } from "./store.js";

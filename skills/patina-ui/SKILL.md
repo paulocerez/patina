@@ -63,13 +63,21 @@ npm i -D @patina-ui/cli
 11. **Keep the footprint small.** Aim for a handful of files in a first integration:
    - **Existing page: use the hooks, not `<Surface>`.** `useSlot` / `useCollection` /
      `useSurfaceProp` keep the page's JSX and data flow. Don't split the page into components
-     or add a data context just for Patina.
+     or add a data context just for Patina. With data views, use `useSlotItems` for the slot
+     and render the `{ kind: "block" }` items with `<PatinaBlock>`: the hooks path supports
+     data views too, so there's no reason to move to `<Surface>` for them.
    - **Use the app's own values.** If the page already has a date filter (`"last7days"`),
      declare `t.enum([...the app's values])` instead of `t.relativeDateRange`, so nothing needs
      mapping.
-   - **Only the tables you need:** `postgresStorage({ query, previews: "memory", requestLog: false,
-     usage: false, followUps: false })` needs only `patina_history`. With Drizzle, re-export
-     `patinaHistory` from `@patina-ui/server/drizzle` instead of writing the table by hand.
+   - **Only the tables you need:** `postgresStorage({ query, previews: "memory", usage: false,
+     followUps: false })`. **Keep `requestLog` on while the surface is new**: without it
+     (`requestLog: false`) there are no insights, so nobody can see what users asked for or
+     why it was refused. With Drizzle, re-export `patinaHistory` (and `patinaRequests`) from
+     `@patina-ui/server/drizzle` instead of writing tables by hand.
+   - **Show users what they can ask for:** put `<Capabilities surfaceId>` (a list, or example
+     chips via its render prop) in the customizer. Refusals already name what's available.
+   - **Another page = another surface**, sharing the handler, storage and customizer. See
+     docs/guides/another-page.md.
    - **No workarounds:** Patina works with CommonJS and `moduleResolution: node`, without an API key
      (customizing is just off) and across origins (`credentials`, `params` on the provider; the
      locale is a query parameter, so no CORS change). Don't add loaders, type shims, fake models or
@@ -177,6 +185,16 @@ const range = useSurfaceProp("dashboard", "overview", "defaultDateRange", "last3
 The hooks return the defaults while loading and without a `<PatinaProvider>`, and drop keys
 the page doesn't know. Previews show in place.
 
+With data views (a catalog), the slot also contains blocks users added. Use `useSlotItems`
+and render those with `<PatinaBlock>` and the blocks from `patina/blocks.tsx`:
+
+```tsx
+useSlotItems("dashboard", "overview", "sections", SECTIONS).map((item) =>
+  item.kind === "host"
+    ? <Fragment key={item.key}>{blocks[item.key]}</Fragment>
+    : <PatinaBlock key={item.key} surfaceId="dashboard" nodeId={item.key} components={{ PatinaTable, PatinaChart, PatinaStat }} />)
+```
+
 **A page built for Patina:** `<Surface>` renders each node as `<Component {...props} nodeId="…" />`:
 
 | Prop type      | What the component receives                                                                   |
@@ -196,7 +214,7 @@ import { createPatinaHandler, postgresStorage, migratePostgres } from "@patina-u
 import { anthropicModel } from "@patina-ui/server/anthropic";
 
 const query = (sql: string, params?: unknown[]) => pool.query(sql, params); // pg, PGlite, postgres.js shim
-const features = { previews: "memory", requestLog: false, usage: false, followUps: false } as const; // only patina_history
+const features = { previews: "memory", usage: false, followUps: false } as const; // patina_history + patina_requests (keep the log while the surface is new)
 await migratePostgres(query, features); // or: postgresSchema(features) into a migration, or Drizzle (@patina-ui/server/drizzle)
 
 export const patina = createPatinaHandler({
@@ -267,10 +285,11 @@ quotas and rate limits.
 ### 4. Render it (client)
 
 ```tsx
-import { AvailabilityNotice, PatinaProvider, PromptInput, ProposalPreview, ResetButton, Surface, SurfaceMessage, UndoButton } from "@patina-ui/react";
+import { AvailabilityNotice, Capabilities, PatinaProvider, PromptInput, ProposalPreview, ResetButton, Surface, SurfaceMessage, UndoButton } from "@patina-ui/react";
 
 <PatinaProvider endpoint="/api/patina" locale={i18n.language}> {/* API on another origin: credentials="include" params={{ accountId }} */}
   <AvailabilityNotice surfaceId="orders" />  {/* the host's message when customizing is off */}
+  <Capabilities surfaceId="orders" />        {/* "What you can ask for", from this user's manifest and catalog */}
   <PromptInput surfaceId="orders" />
   <SurfaceMessage surfaceId="orders" />      {/* refusals, clarifying questions, errors */}
   <ProposalPreview surfaceId="orders" />     {/* change list + Apply / Discard; Surface shows the preview */}

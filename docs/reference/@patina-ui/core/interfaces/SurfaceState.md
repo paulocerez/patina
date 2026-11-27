@@ -36,6 +36,14 @@ Shown to the user when something is unavailable.
 
 ***
 
+### capabilities?
+
+> `optional` **capabilities?**: [`Capabilities`](Capabilities.md)
+
+What this user can ask for here (see `capabilities`), in their language.
+
+***
+
 ### catalog?
 
 > `optional` **catalog?**: [`Catalog`](Catalog.md)

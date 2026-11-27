@@ -176,6 +176,18 @@ button.primary {
   font-size: 13px;
   color: var(--warn);
 }
+.capabilities {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.capabilities summary {
+  cursor: pointer;
+}
+.capabilities ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
 
 .sections {
   display: grid;

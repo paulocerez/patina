@@ -1,3 +1,4 @@
+import type { Capabilities } from "./capabilities.js";
 /** Wire types shared by `@patina-ui/server` and client bindings. */
 import type { PublicCatalog } from "./catalog.js";
 import type { Change, Op, SurfaceSpec } from "./types.js";
@@ -15,6 +16,8 @@ export interface Notice {
 }
 
 export interface SurfaceState {
+  /** What this user can ask for here (see `capabilities`), in their language. */
+  capabilities?: Capabilities;
   surfaceId: string;
   spec: SurfaceSpec;
   /** Earlier changes that no longer apply. */

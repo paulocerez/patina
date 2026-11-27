@@ -12,6 +12,18 @@ export {
   withoutDataViews,
 } from "./blocks.js";
 export type {
+  ArrangeCapability,
+  Capabilities,
+  DataCapability,
+  SettingCapability,
+} from "./capabilities.js";
+export {
+  capabilities,
+  capabilityExamples,
+  capabilityHint,
+  capabilityLines,
+} from "./capabilities.js";
+export type {
   Catalog,
   FieldDef,
   FieldKind,
@@ -53,6 +65,7 @@ export { effectivePatches, headSeq, resolve, undoTarget } from "./history.js";
 export type { Locale, MessageKey, Text } from "./i18n.js";
 export {
   DEFAULT_LOCALE,
+  listAnd,
   listOr,
   msg,
   msgText,

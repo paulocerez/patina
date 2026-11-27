@@ -107,7 +107,9 @@ group("German surface", () => {
 
   it("asks the model to reply in German and shows it German names", () => {
     const req = buildModelRequest(de, baseSpec, "Umsatzspalte ausblenden");
-    expect(req.user).toContain("<reply_language>German</reply_language>");
+    expect(req.user).toContain(
+      '<reply_language>German (formal: address the user as "Sie")</reply_language>',
+    );
     expect(req.user).toContain('"name": "Terminliste"');
     // The system prompt stays the same for every user (cacheable): English.
     expect(req.system).toBe(buildModelRequest(localizeManifest(de, "en"), baseSpec, "x").system);

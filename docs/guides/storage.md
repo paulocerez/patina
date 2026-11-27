@@ -42,9 +42,13 @@ const storage = postgresStorage({ query, ...features });
 | Option               | Table              | What you lose without it                                                                         |
 | -------------------- | ------------------ | ------------------------------------------------------------------------------------------------ |
 | `previews: "memory"` | `patina_proposals` | Nothing on one server. With several, an Apply that reaches another one gets a 409 and is retried |
-| `requestLog: false`  | `patina_requests`  | [Insights](insights.md) and [follow-ups](follow-ups.md)                                          |
+| `requestLog: false`  | `patina_requests`  | [Insights](insights.md) and [follow-ups](follow-ups.md): you can't see what users asked for      |
 | `usage: false`       | `patina_usage`     | Monthly [quotas](availability.md#quotas)                                                         |
 | `followUps: false`   | `patina_followups` | "It's now possible" notices for [shipped follow-ups](follow-ups.md#telling-users-when-it-ships)  |
+
+**Keep the request log on while you introduce a surface.** It's how you see what users try
+to do, what gets refused and why, which tells you what to open up next. Turn it off later if
+you don't need it.
 
 ### In your own migrations
 

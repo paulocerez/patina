@@ -212,6 +212,7 @@ view or in the model's prompt.
   - [GitHub Action](docs/guides/github-action.md): check every PR
   - [Availability](docs/guides/availability.md): who may customize, from feature flags, plans and quotas
   - [Insights](docs/guides/insights.md): what customers asked for, what couldn't be done, and why
+  - [Customizing another page](docs/guides/another-page.md): a checklist for a second surface
   - [Follow-ups](docs/guides/follow-ups.md): issues in Linear, GitHub or Jira, a Slack digest and HubSpot notes from what customers asked for, and a notice to them when it ships
   - [Analytics and errors](docs/guides/analytics-and-errors.md): PostHog and Sentry
   - [Localization](docs/guides/localization.md): English and German, labels per language

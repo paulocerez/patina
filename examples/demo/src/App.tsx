@@ -1,5 +1,6 @@
 import {
   AvailabilityNotice,
+  Capabilities,
   type FetchSource,
   PatinaProvider,
   PromptInput,
@@ -226,6 +227,9 @@ function Customizer() {
         <ResetButton surfaceId={SURFACE}>Reset to default</ResetButton>
         <SkippedNotice surfaceId={SURFACE} className="skipped" />
       </div>
+
+      {/* Built from this user's manifest and catalog: Bob (no finance access) sees no revenue. */}
+      <Capabilities surfaceId={SURFACE} className="capabilities" />
     </section>
   );
 }

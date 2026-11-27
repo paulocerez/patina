@@ -60,6 +60,73 @@ function Dashboard() {
 - Only keys in that default are returned, so the page never renders something it doesn't know.
 - Previews show up in place, like with `<Surface>`.
 
+### Adding data views to such a page
+
+`useSlot` only returns your own keys. Once the surface has a [catalog](data-views.md), users
+can also insert blocks (tables, charts, numbers). `useSlotItems` returns both, in order, and
+`<PatinaBlock>` renders a block with the data context its `useQuery` needs:
+
+```tsx
+import { PatinaBlock, useSlotItems } from "@patina-ui/react";
+import { PatinaChart, PatinaStat, PatinaTable } from "../patina/blocks"; // from `patina scan`
+
+const DATA_BLOCKS = { PatinaTable, PatinaChart, PatinaStat };
+
+function Dashboard() {
+  const items = useSlotItems("dashboard", "overview", "sections", SECTIONS);
+  return items.map((item) =>
+    item.kind === "host" ? (
+      <Fragment key={item.key}>{blocks[item.key]}</Fragment> // your sections, as before
+    ) : (
+      <PatinaBlock
+        key={item.key}
+        surfaceId="dashboard"
+        nodeId={item.key}
+        components={DATA_BLOCKS}
+      />
+    ),
+  );
+}
+```
+
+- Your own keys still only appear if they're in the default list. Added blocks are told
+  apart by their key: Patina gives every inserted node a `u_` key, which base items never
+  use. So an unknown key of yours is still dropped.
+- A preview shows the new block in place, with live data, before the user applies it.
+- Rendering `useQuery` in your own component outside `<Surface>`? Wrap it in
+  `<SurfaceScope surfaceId="dashboard">`.
+
+The path: start with `useSlot` (rearrange and hide), then add a catalog on the server and
+switch that one call to `useSlotItems` + `<PatinaBlock>`. Nothing else on the page changes.
+
+## Showing what's possible: `useCapabilities`, `<Capabilities>`
+
+Users can't see what the manifest allows. The server sends it with every state, built for
+this user (after `restrict` and permissions) and in their language, never by the model:
+
+```ts
+const caps = useCapabilities("dashboard");
+caps.arrange; // [{ label: "Sections", reorder, hide, items: [{ key, label, hidden }], add: [{ preset, label }] }]
+caps.settings; // [{ label: "Default date range", values: [{ value, label: "Last 7 days" }, …] }]
+caps.data; // [{ label: "Calls", fields: [{ field, label }], aggregates }] (empty if data views are off)
+```
+
+`<Capabilities>` turns it into a "What you can ask for" list, or, with the render prop,
+example prompts for chips in the prompt box:
+
+```tsx
+<Capabilities surfaceId="dashboard" />  {/* <details> with one line per capability */}
+
+<Capabilities surfaceId="dashboard">
+  {({ examples, propose }) =>
+    examples.map((e) => <Chip key={e} onClick={() => propose(e)}>{e}</Chip>)}
+</Capabilities>
+```
+
+Refusals use the same data: when a request asks for data that isn't there (`data_access`,
+`not_on_page`), the message ends with what is available, e.g. _"You can add tables, charts
+and numbers from Calls (Date, Task, Duration)."_, or the parts of the page that can change.
+
 ## `<Surface>`
 
 Renders the resolved spec, or the **preview** while a proposal is pending. Each node becomes

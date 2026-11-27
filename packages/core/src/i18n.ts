@@ -178,6 +178,23 @@ const en = {
   shipped: (p: P) => `You asked for “${p.title}”. That's now possible.`,
   dismiss: () => "Dismiss",
   notConfigured: () => "Customizing isn't set up here yet.",
+  capReorder: () => "reorder",
+  capHide: () => "hide",
+  capArrange: (p: P) => `${p.what} (${p.items}): ${p.verbs}`,
+  capAdd: (p: P) => `${p.what}: add ${p.items}`,
+  capSet: (p: P) => (p.values ? `${p.what}: ${p.values}` : String(p.what)),
+  capData: (p: P) => `New views of ${p.what}: ${p.fields}`,
+  capHintData: (p: P) => `You can add tables, charts and numbers from ${p.sources}.`,
+  capHintArrange: (p: P) => `rearrange or hide ${p.what}`,
+  capHintSet: (p: P) => `set ${p.what}${p.values}`,
+  capHintAddData: (p: P) => `add views of ${p.sources}`,
+  capHintPage: (p: P) => `Here you can ${p.parts}.`,
+  capTitle: () => "What you can ask for",
+  exMoveTop: (p: P) => `Move ${p.item} to the top`,
+  exHide: (p: P) => `Hide ${p.item}`,
+  exSet: (p: P) => `Set ${p.what} to ${p.value}`,
+  exChart: (p: P) => `Add a chart of ${p.what} by ${p.field}`,
+  exTable: (p: P) => `Add a table of ${p.what}`,
   loadError: (p: P) => `Couldn't load data (${p.status})`,
   // data blocks (labels users see in previews)
   blockTable: () => "Table",
@@ -325,6 +342,23 @@ const de: Catalog = {
   shipped: (p) => `Sie hatten sich „${p.title}“ gewünscht. Das ist jetzt möglich.`,
   dismiss: () => "Ausblenden",
   notConfigured: () => "Das Anpassen ist hier noch nicht eingerichtet.",
+  capReorder: () => "umordnen",
+  capHide: () => "ausblenden",
+  capArrange: (p) => `${p.what} (${p.items}): ${p.verbs}`,
+  capAdd: (p) => `${p.what}: ${p.items} hinzufügen`,
+  capSet: (p) => (p.values ? `${p.what}: ${p.values}` : String(p.what)),
+  capData: (p) => `Neue Ansichten aus ${p.what}: ${p.fields}`,
+  capHintData: (p) => `Sie können Tabellen, Diagramme und Kennzahlen aus ${p.sources} hinzufügen.`,
+  capHintArrange: (p) => `${p.what} umordnen oder ausblenden`,
+  capHintSet: (p) => `${p.what}${p.values} festlegen`,
+  capHintAddData: (p) => `Ansichten aus ${p.sources} hinzufügen`,
+  capHintPage: (p) => `Hier können Sie ${p.parts}.`,
+  capTitle: () => "Was Sie anfragen können",
+  exMoveTop: (p) => `${p.item} nach oben verschieben`,
+  exHide: (p) => `${p.item} ausblenden`,
+  exSet: (p) => `${p.what} auf ${p.value} setzen`,
+  exChart: (p) => `Diagramm: ${p.what} nach ${p.field}`,
+  exTable: (p) => `Tabelle mit ${p.what} hinzufügen`,
   loadError: (p) => `Daten konnten nicht geladen werden (${p.status})`,
   blockTable: () => "Tabelle",
   blockChart: () => "Diagramm",
@@ -350,6 +384,12 @@ export function msgText(key: MessageKey): Text {
 }
 
 /** Locale-aware "a, b or c" / "a, b oder c". */
+/** "a, b and c" in the locale. */
+export function listAnd(items: string[], locale?: string): string {
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join(", ")} ${msg(locale, "and")} ${items[items.length - 1]}`;
+}
+
 export function listOr(items: string[], locale?: string): string {
   if (items.length <= 1) return items.join("");
   return `${items.slice(0, -1).join(", ")} ${msg(locale, "or")} ${items[items.length - 1]}`;
