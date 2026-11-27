@@ -1,6 +1,6 @@
 {
   "name": "@patina-ui/server",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Patina UI server: fetch-style request handler, Anthropic model adapter, memory and Postgres storage, Express adapter, eval runner.",
   "keywords": [
     "patina-ui",
