@@ -11,7 +11,8 @@
       "!packages/cli/test/fixtures",
       "!packages/action/dist",
       "!skills",
-      "!packages/cli/skill"
+      "!packages/cli/skill",
+      "!**/CHANGELOG.md"
     ]
   },
   "formatter": {
