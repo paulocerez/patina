@@ -1,35 +1,27 @@
 # Trying Patina in your own app
 
-Once released, install from npm: `npm i @patina-ui/core @patina-ui/server @patina-ui/react
-@anthropic-ai/sdk` (and `npm i -D @patina-ui/cli`), then skip to step 3. To try unreleased
-changes, install local tarballs built from this repo, as described in steps 1–2. Either way,
-expect about 15 minutes for an app with a React front end and a Node back end.
+About 15 minutes for an app with a React front end and a Node back end. The packages are ESM
+with TypeScript types, and need React 18+ and Node 20+.
 
-## 1. Pack the packages
-
-In this repo:
+## 1. Install
 
 ```sh
-pnpm install
-pnpm pack:local            # builds and writes .packs/patina-ui-{core,server,react,cli}-0.1.0.tgz
+npm i @patina-ui/core @patina-ui/server @patina-ui/react @anthropic-ai/sdk
+npm i -D @patina-ui/cli
 ```
 
-## 2. Install them in your app
+(`pnpm add` and `yarn add` work the same way.)
+
+## 2. Optional: let a coding agent do it
 
 ```sh
-cd ~/code/your-app
-npm i /path/to/patina/.packs/patina-ui-core-0.1.0.tgz \
-      /path/to/patina/.packs/patina-ui-server-0.1.0.tgz \
-      /path/to/patina/.packs/patina-ui-react-0.1.0.tgz \
-      @anthropic-ai/sdk
+npx patina init-agent --agents-md   # installs the Patina UI skill (Claude Code) + an AGENTS.md pointer
 ```
 
-(`pnpm add` and `yarn add` work the same way.) The packages are ESM with TypeScript types,
-and need React 18+ and Node 20+.
-
-**After changing Patina:** run `pnpm pack:local` again, then reinstall the three tarballs in
-your app. The version stays the same, so if your package manager complains about an
-integrity mismatch, remove the three `@patina-ui/*` entries from its lockfile first.
+Then give your agent a task like _"Make the orders table on /orders customizable (column
+order, visibility, rows per page) for signed-in users, and run the verification checklist."_
+The skill covers the steps below, the rules, and how to check the result. Doing it by hand
+works too: read on.
 
 ## 3. Pick one view to make customizable
 
@@ -186,7 +178,7 @@ Install the CLI and scan your app. It finds your GET endpoints and their row typ
 UI kit, components and colours:
 
 ```sh
-npm i -D /path/to/patina/.packs/patina-ui-cli-0.1.0.tgz
+npm i -D @patina-ui/cli         # if you skipped it in step 1
 npx patina scan                 # writes patina/scan.json, catalog.ts, blocks.tsx
 npx patina scan --ai            # optional: Claude refines the drafts (needs ANTHROPIC_API_KEY)
 ```
@@ -217,3 +209,18 @@ Copy `evals/dashboard.jsonl` as a template and write 20–40 prompts your users 
 actually type, with the expected ops. Then run them with `runEval` from
 `@patina-ui/server/eval` (see [Model and evals](model-and-evals.md)). This tells you
 whether your manifest's descriptions and labels are good enough, and which model to use.
+
+## Appendix: trying unreleased changes
+
+To test changes to Patina itself before they're on npm, install tarballs built from this repo:
+
+```sh
+# in the patina repo
+pnpm install && pnpm pack:local     # writes .packs/patina-ui-{core,server,react,cli}-<version>.tgz
+# in your app
+npm i /path/to/patina/.packs/patina-ui-{core,server,react}-*.tgz
+npm i -D /path/to/patina/.packs/patina-ui-cli-*.tgz
+```
+
+The version doesn't change between packs. If your package manager complains about an
+integrity mismatch, remove the `@patina-ui/*` entries from its lockfile first.

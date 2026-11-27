@@ -60,8 +60,6 @@ From install to a first customizable view in four steps. The full walkthrough is
 ```sh
 npm i @patina-ui/core @patina-ui/server @patina-ui/react @anthropic-ai/sdk
 npm i -D @patina-ui/cli        # optional: `patina scan` for data views
-# Before the first npm release: `pnpm pack:local` here and install the tarballs
-# (see docs/guides/try-in-your-app.md).
 ```
 
 ### 2. Declare a surface (server)
