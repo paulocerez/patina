@@ -12,10 +12,6 @@ var __commonJS = (cb, mod) => function __require() {
     throw mod = 0, e;
   }
 };
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
     for (let key of __getOwnPropNames(from))
@@ -32,7 +28,6 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
   mod
 ));
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // ../../node_modules/.pnpm/yaml@2.9.1/node_modules/yaml/dist/nodes/identity.js
 var require_identity = __commonJS({
@@ -7365,11 +7360,6 @@ var require_dist = __commonJS({
 });
 
 // ../cli/src/action.ts
-var action_exports = {};
-__export(action_exports, {
-  runAction: () => runAction
-});
-module.exports = __toCommonJS(action_exports);
 var import_node_fs3 = require("fs");
 var import_node_path4 = require("path");
 
@@ -8352,16 +8342,12 @@ info=${report.counts.info}
   }
   return 0;
 }
-if (process.env.GITHUB_ACTIONS === "true" && process.env.PATINA_ACTION_AUTORUN !== "false") {
-  runAction().then(
-    (code2) => process.exit(code2),
-    (e) => {
-      console.log(`::error::${e instanceof Error ? e.stack : String(e)}`);
-      process.exit(1);
-    }
-  );
-}
-// Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
-  runAction
-});
+
+// ../cli/src/action-main.ts
+runAction().then(
+  (code2) => process.exit(code2),
+  (e) => {
+    console.log(`::error::${e instanceof Error ? e.stack : String(e)}`);
+    process.exit(1);
+  }
+);

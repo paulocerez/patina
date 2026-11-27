@@ -71,13 +71,3 @@ export async function runAction(env: NodeJS.ProcessEnv = process.env): Promise<n
   }
   return 0;
 }
-
-if (process.env.GITHUB_ACTIONS === "true" && process.env.PATINA_ACTION_AUTORUN !== "false") {
-  runAction().then(
-    (code) => process.exit(code),
-    (e) => {
-      console.log(`::error::${e instanceof Error ? e.stack : String(e)}`);
-      process.exit(1);
-    },
-  );
-}
