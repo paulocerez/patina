@@ -33,10 +33,49 @@ export interface FollowUp {
   examples: string[];
   /** Customer names from `customerName`, if you provided it (most requests first). */
   customerNames: string[];
+  /**
+   * Who asked: one row per user and surface. Ids stay on your server: the built-in ticket and
+   * chat sinks never send them. Used to tell these users when it ships (`shipFollowUp`) and by
+   * per-customer sinks (HubSpot) to find the account.
+   */
+  requesters: Requester[];
   firstAt: string;
   lastAt: string;
   /** The window this run looked at. */
   window: { since: string; until: string };
+}
+
+export interface Requester {
+  tenantId: string | null;
+  userId: string;
+  surfaceId: string;
+  count: number;
+}
+
+function requestersOf(es: RequestEvent[]): Requester[] {
+  const map = new Map<string, Requester>();
+  for (const e of es) {
+    const k = JSON.stringify([e.tenantId, e.userId, e.surfaceId]);
+    const r = map.get(k) ?? {
+      tenantId: e.tenantId,
+      userId: e.userId,
+      surfaceId: e.surfaceId,
+      count: 0,
+    };
+    r.count++;
+    map.set(k, r);
+  }
+  return [...map.values()].sort((a, b) => b.count - a.count);
+}
+
+function mergeRequesters(a: Requester[], b: Requester[]): Requester[] {
+  const map = new Map<string, Requester>();
+  for (const r of [...a, ...b]) {
+    const k = JSON.stringify([r.tenantId, r.userId, r.surfaceId]);
+    const prev = map.get(k);
+    map.set(k, prev ? { ...prev, count: prev.count + r.count } : { ...r });
+  }
+  return [...map.values()].sort((x, y) => y.count - x.count);
 }
 
 /** What a sink already filed, so a grouper can attach new requests to it. */
@@ -298,6 +337,7 @@ export async function buildFollowUps(
       surfaces: [...new Set(es.map((e) => e.surfaceId))].sort(),
       examples,
       customerNames,
+      requesters: requestersOf(es),
       firstAt: sorted[0]?.at as string,
       lastAt: sorted.at(-1)?.at as string,
       window: options.window,
@@ -316,6 +356,7 @@ export async function buildFollowUps(
         customers: Math.max(prev.customers, f.customers),
         users: Math.max(prev.users, f.users),
         examples: [...new Set([...prev.examples, ...f.examples])].slice(0, 5),
+        requesters: mergeRequesters(prev.requesters, f.requesters),
         // biome-ignore lint/complexity/useMathMinMax: ISO strings, not numbers
         firstAt: prev.firstAt < f.firstAt ? prev.firstAt : f.firstAt,
         // biome-ignore lint/complexity/useMathMinMax: ISO strings, not numbers
@@ -704,6 +745,8 @@ export function slackSink(options: SlackSinkOptions): FollowUpSink {
 /** POSTs the follow-ups as JSON to your own endpoint (Zapier, n8n, an internal service). */
 export function webhookSink(options: {
   url: string;
+  /** Include who asked (tenant and user ids). Default false. */
+  includeRequesters?: boolean;
   headers?: Record<string, string>;
   fetch?: typeof fetch;
 }): FollowUpSink {
@@ -714,7 +757,10 @@ export function webhookSink(options: {
       const res = await doFetch(options.url, {
         method: "POST",
         headers: { "content-type": "application/json", ...options.headers },
-        body: JSON.stringify({ followUps: items, deliveries: earlier }),
+        body: JSON.stringify({
+          followUps: options.includeRequesters ? items : items.map(({ requesters: _r, ...f }) => f),
+          deliveries: earlier,
+        }),
       });
       if (!res.ok) throw new Error(`Webhook ${res.status}`);
       return items.map((f) => ({ sink: "webhook", key: f.key, action: "posted" as const }));
