@@ -1,5 +1,13 @@
 # @patina-ui/cli
 
+## 0.4.0
+
+### Patch Changes
+
+- Updated dependencies [[`ff974af`](https://github.com/paulocerez/patina/commit/ff974af6e03da79bdb3d80cad2e8837e985216bd)]:
+  - @patina-ui/core@0.4.0
+  - @patina-ui/server@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

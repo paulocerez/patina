@@ -1,6 +1,6 @@
 {
   "name": "@patina-ui/server",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Patina UI server: fetch-style request handler, Anthropic model adapter, memory and Postgres storage, Express adapter, eval runner, follow-ups (Linear, Slack, GitHub, Jira, HubSpot) and analytics (PostHog, Sentry).",
   "keywords": [
     "patina-ui",
