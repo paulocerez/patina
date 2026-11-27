@@ -87,16 +87,19 @@ organization, which also enables the tenant layer (see below).
 `anthropicModel(options)` calls Claude with structured outputs. The JSON Schema is compiled
 from the user's restricted manifest, so most invalid patches can't even be expressed.
 
-| Option              | Default              |                                                                                                                                            |
-| ------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `model`             | `"claude-opus-5-5"`  | Compare models on your own surfaces with the eval set                                                                                      |
-| `effort`            | `"low"`              | The task is small and tightly constrained, and latency matters                                                                             |
-| `client` / `apiKey` | `new Anthropic()`    | Reads `ANTHROPIC_API_KEY`                                                                                                                  |
-| `fallbacks`         | on, except for Haiku | Server-side refusal fallback. Set to `false` on Bedrock, Vertex and Foundry                                                                |
-| `maxTokens`         | 4096                 |                                                                                                                                            |
-| `schema`            | `"auto"`             | `"auto"` tries the precise output schema and falls back to the compact one if the API can't compile it; or force `"precise"` / `"compact"` |
+| Option              | Default               |                                                                                                                                            |
+| ------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `model`             | `"claude-haiku-5-5"`  | The model that answers first                                                                                                               |
+| `backupModel`       | `"claude-sonnet-5-5"` | Takes the repair round-trip, errors and safety declines; `null` for a single model                                                         |
+| `effort`            | `"low"`               | The task is small and tightly constrained, and latency matters                                                                             |
+| `client` / `apiKey` | `new Anthropic()`     | Reads `ANTHROPIC_API_KEY`                                                                                                                  |
+| `fallbacks`         | on, except for Haiku  | Server-side refusal fallback. Set to `false` on Bedrock, Vertex and Foundry                                                                |
+| `maxTokens`         | 4096                  |                                                                                                                                            |
+| `schema`            | `"auto"`              | `"auto"` tries the precise output schema and falls back to the compact one if the API can't compile it; or force `"precise"` / `"compact"` |
 
 Calls only happen server-side, so the API key never reaches the browser.
+
+Pair any two adapters with `withBackup(primary, backup)` from `@patina-ui/server`.
 
 **Bring your own provider** by implementing `ModelAdapter`:
 

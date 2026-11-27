@@ -169,7 +169,7 @@ await migratePostgres(query); // or copy POSTGRES_SCHEMA into the app's migratio
 export const patina = createPatinaHandler({
   surfaces: [orders],
   storage: postgresStorage({ query }),
-  model: anthropicModel(), // ANTHROPIC_API_KEY; default model claude-opus-5-5, effort "low"
+  model: anthropicModel(), // ANTHROPIC_API_KEY; Claude Haiku 5.5 answers, Sonnet 5.5 is the backup
   basePath: "/api/patina",
   getContext: async (req: Request): Promise<AppContext | null> => {
     const session = await getSession(req); // the app's existing auth

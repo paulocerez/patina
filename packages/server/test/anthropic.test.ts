@@ -1,9 +1,9 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { buildModelRequest } from "@patina-ui/core";
-import { expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { baseSpec, dashboard } from "../../core/test/fixtures.js";
 import { anthropicModel } from "../src/anthropic.js";
-import { ModelRefusal } from "../src/model.js";
+import { type ModelAdapter, ModelRefusal, withBackup } from "../src/model.js";
 
 function fakeClient(response: Record<string, unknown>) {
   const calls: Record<string, unknown>[] = [];
@@ -28,8 +28,8 @@ it("sends a structured-output request with the manifest's schema and parses the 
     stop_reason: "end_turn",
     content: [{ type: "text", text: JSON.stringify(answer) }],
   });
-  const model = anthropicModel({ client });
-  expect(model.id).toBe("anthropic/claude-opus-5-5");
+  const model = anthropicModel({ client, model: "claude-sonnet-5-5", backupModel: null });
+  expect(model.id).toBe("anthropic/claude-sonnet-5-5");
   expect(await model.propose(request)).toEqual(answer);
 
   const params = calls[0] as {
@@ -40,7 +40,7 @@ it("sends a structured-output request with the manifest's schema and parses the 
     betas: unknown;
     fallbacks: unknown;
   };
-  expect(params.model).toBe("claude-opus-5-5");
+  expect(params.model).toBe("claude-sonnet-5-5");
   expect(params.output_config).toEqual({
     effort: "low",
     format: { type: "json_schema", schema: request.outputSchema },
@@ -53,6 +53,18 @@ it("sends a structured-output request with the manifest's schema and parses the 
   expect(params.messages).toEqual([{ role: "user", content: request.user }]);
   expect(params.betas).toEqual(["server-side-fallback-2026-07-01"]);
   expect(params.fallbacks).toBe("default");
+});
+
+it("defaults to Haiku first and Sonnet for the retry", async () => {
+  const { client, calls } = fakeClient({
+    stop_reason: "end_turn",
+    content: [{ type: "text", text: "{}" }],
+  });
+  const model = anthropicModel({ client });
+  expect(model.id).toBe("anthropic/claude-haiku-5-5+anthropic/claude-sonnet-5-5");
+  await model.propose(request);
+  await model.propose(request, { attempt: 1 });
+  expect(calls.map((c) => c.model)).toEqual(["claude-haiku-5-5", "claude-sonnet-5-5"]);
 });
 
 it("leaves out fallbacks for Haiku", async () => {
@@ -122,4 +134,51 @@ it("doesn't hide other API errors behind the fallback", async () => {
   await expect(
     anthropicModel({ client: client as unknown as Anthropic }).propose(request),
   ).rejects.toThrow(/401/);
+});
+
+describe("withBackup", () => {
+  const fake = (id: string, behave: () => unknown): ModelAdapter & { n: number } => {
+    const m = {
+      id,
+      n: 0,
+      async propose() {
+        m.n++;
+        return behave();
+      },
+    };
+    return m;
+  };
+
+  it("routes the repair round-trip to the backup", async () => {
+    const a = fake("a", () => "from a");
+    const b = fake("b", () => "from b");
+    const m = withBackup(a, b);
+    expect(await m.propose(request)).toBe("from a");
+    expect(await m.propose(request, { attempt: 1 })).toBe("from b");
+    expect([a.n, b.n]).toEqual([1, 1]);
+  });
+
+  it("uses the backup when the primary errors or declines, but not after an abort", async () => {
+    const b = fake("b", () => "from b");
+    expect(
+      await withBackup(
+        fake("a", () => Promise.reject(new Error("overloaded"))),
+        b,
+      ).propose(request),
+    ).toBe("from b");
+    expect(
+      await withBackup(
+        fake("a", () => Promise.reject(new ModelRefusal("no"))),
+        b,
+      ).propose(request),
+    ).toBe("from b");
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      withBackup(
+        fake("a", () => Promise.reject(new Error("aborted"))),
+        b,
+      ).propose(request, { signal: controller.signal }),
+    ).rejects.toThrow("aborted");
+  });
 });

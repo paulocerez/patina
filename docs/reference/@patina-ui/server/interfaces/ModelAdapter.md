@@ -18,6 +18,9 @@ e.g. "anthropic/claude-opus-5-5". Stored with each patch.
 
 > **propose**(`request`, `options?`): `Promise`\<`unknown`\>
 
+`attempt` is 0 for the first answer and 1 for the repair round-trip (when the first answer
+didn't validate). Adapters may use it to route the retry elsewhere (see `withBackup`).
+
 #### Parameters
 
 ##### request
@@ -25,6 +28,10 @@ e.g. "anthropic/claude-opus-5-5". Stored with each patch.
 [`ModelRequest`](../../core/interfaces/ModelRequest.md)
 
 ##### options?
+
+###### attempt?
+
+`number`
 
 ###### signal?
 

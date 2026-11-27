@@ -117,7 +117,7 @@ prompt can point the chart at another metric. See
 const patina = createPatinaHandler({
   surfaces: [dashboard],
   storage: memoryStorage(),
-  model: anthropicModel({ model: process.env.PATINA_MODEL ?? "claude-opus-5-5" }),
+  model: anthropicModel(), // Claude Haiku 5.5, with Sonnet 5.5 as backup
   basePath: "/api/patina",
   getContext: (req) => userFromCookie(req.headers.get("cookie")),
 });

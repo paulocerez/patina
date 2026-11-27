@@ -12,9 +12,11 @@ async function pickModel() {
     return offlineModel();
   }
   const { anthropicModel } = await import("@patina-ui/server/anthropic");
-  const model = process.env.PATINA_MODEL ?? "claude-opus-5-5";
-  console.log(`[demo] Using Anthropic model ${model}.`);
-  return anthropicModel({ model });
+  // Default: Claude Haiku 5.5 answers, Sonnet 5.5 is the backup. PATINA_MODEL picks a single model.
+  const model = process.env.PATINA_MODEL;
+  const adapter = anthropicModel(model ? { model, backupModel: null } : {});
+  console.log(`[demo] Using ${adapter.id}.`);
+  return adapter;
 }
 
 const patina = createPatinaHandler({

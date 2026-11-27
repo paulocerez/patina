@@ -20,8 +20,13 @@ and `labels` (_"Appointments table"_, _"Default date range"_) are the main lever
 
 ## Choosing a model
 
-`anthropicModel()` defaults to `claude-opus-5-5` at `effort: "low"`. Try others with the
-eval set before switching:
+By default, `anthropicModel()` uses two models at `effort: "low"`:
+
+- **Claude Haiku 5.5** answers each request. It is fast and inexpensive.
+- **Claude Sonnet 5.5** is the backup. It takes the repair round-trip when Haiku's answer
+  doesn't validate, and steps in if Haiku errors or declines.
+
+Try others with the eval set before switching:
 
 ```ts
 anthropicModel({ model: "claude-sonnet-5-5" });
@@ -32,11 +37,12 @@ anthropicModel({ model: "claude-haiku-5-5" }); // cheapest and fastest; check it
 
 These are the full eval set (58 cases on the demo surface), effort `low`, compact schema:
 
-| Model               | Accuracy | Refusal precision / recall | p50 / p95 latency |
-| ------------------- | -------- | -------------------------- | ----------------- |
-| `claude-opus-5-5`   | 58/58    | 100% / 100%                | 1.7 s / 2.8 s     |
-| `claude-sonnet-5-5` | 58/58    | 100% / 100%                | 1.8 s / 2.7 s     |
-| `claude-haiku-5-5`  | 57/58    | 100% / 100%                | 1.4 s / 3.4 s     |
+| Model                                      | Accuracy                 | Refusal precision / recall | p50 / p95 latency |
+| ------------------------------------------ | ------------------------ | -------------------------- | ----------------- |
+| **default:** Haiku 5.5 + Sonnet 5.5 backup | **58/58** in 3 of 3 runs | 100% / 100%                | 1.4 s / 1.9–2.3 s |
+| `claude-opus-5-5`                          | 58/58                    | 100% / 100%                | 1.7 s / 2.8 s     |
+| `claude-sonnet-5-5`                        | 58/58                    | 100% / 100%                | 1.8 s / 2.7 s     |
+| `claude-haiku-5-5`                         | 57/58                    | 100% / 100%                | 1.4 s / 3.4 s     |
 
 Haiku's only miss: asked to _remove_ a card the user had added, it hid it instead.
 

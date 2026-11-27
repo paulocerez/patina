@@ -5,14 +5,22 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 import type { ModelRequest } from "@patina-ui/core";
-import { type ModelAdapter, ModelRefusal } from "./model.js";
+import { type ModelAdapter, ModelRefusal, withBackup } from "./model.js";
 
 export interface AnthropicModelOptions {
   /** Defaults to `new Anthropic()`, which reads ANTHROPIC_API_KEY (or an `ant auth login` profile). */
   client?: Anthropic;
   apiKey?: string;
-  /** Default "claude-opus-5-5". Use the eval set to compare models for your surfaces. */
+  /**
+   * The model that answers first. Default "claude-haiku-5-5": fast and inexpensive, and with the
+   * backup below it matched the larger models on the eval set.
+   */
   model?: string;
+  /**
+   * The model for the repair round-trip (when the first answer doesn't validate) and for when
+   * the first model errors or declines. Default "claude-sonnet-5-5". `null` uses `model` only.
+   */
+  backupModel?: string | null;
   /** Default "low": the task is small and tightly constrained, and latency matters. */
   effort?: "low" | "medium" | "high" | "xhigh" | "max";
   /** Default 4096. */
@@ -35,10 +43,22 @@ const GRAMMAR_TOO_LARGE =
 /**
  * Anthropic implementation of `ModelAdapter`, using structured outputs with the JSON Schema
  * compiled from the manifest. Runs server-side only: the API key never reaches the browser.
+ *
+ * By default Claude Haiku 5.5 answers and Claude Sonnet 5.5 is the backup (see `backupModel`).
  */
 export function anthropicModel(options: AnthropicModelOptions = {}): ModelAdapter {
   const client = options.client ?? new Anthropic(options.apiKey ? { apiKey: options.apiKey } : {});
-  const model = options.model ?? "claude-opus-5-5";
+  const primary = singleModel(client, options.model ?? "claude-haiku-5-5", options);
+  const backupId = options.backupModel === undefined ? "claude-sonnet-5-5" : options.backupModel;
+  if (!backupId || backupId === (options.model ?? "claude-haiku-5-5")) return primary;
+  return withBackup(primary, singleModel(client, backupId, options));
+}
+
+function singleModel(
+  client: Anthropic,
+  model: string,
+  options: AnthropicModelOptions,
+): ModelAdapter {
   const useFallbacks = options.fallbacks ?? !model.includes("haiku");
 
   // Surfaces whose precise schema the API couldn't compile (keyed by the schema's size and

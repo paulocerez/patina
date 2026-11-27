@@ -365,7 +365,7 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
             };
       let raw: unknown;
       try {
-        raw = await options.model.propose(req, { signal: AbortSignal.timeout(60_000) });
+        raw = await options.model.propose(req, { signal: AbortSignal.timeout(60_000), attempt });
       } catch (e) {
         if (e instanceof ModelRefusal)
           return done({ kind: "refusal", message: e.message }, "safety", "model", calls);

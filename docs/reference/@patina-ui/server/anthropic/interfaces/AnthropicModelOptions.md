@@ -10,6 +10,15 @@
 
 ***
 
+### backupModel?
+
+> `optional` **backupModel?**: `string` \| `null`
+
+The model for the repair round-trip (when the first answer doesn't validate) and for when
+the first model errors or declines. Default "claude-sonnet-5-5". `null` uses `model` only.
+
+***
+
 ### client?
 
 > `optional` **client?**: `Anthropic`
@@ -47,7 +56,8 @@ Default 4096.
 
 > `optional` **model?**: `string`
 
-Default "claude-opus-5-5". Use the eval set to compare models for your surfaces.
+The model that answers first. Default "claude-haiku-5-5": fast and inexpensive, and with the
+backup below it matched the larger models on the eval set.
 
 ***
 

@@ -16,7 +16,7 @@ export {
   summarizeRequests,
 } from "./insights.js";
 export type { ModelAdapter } from "./model.js";
-export { ModelRefusal } from "./model.js";
+export { ModelRefusal, withBackup } from "./model.js";
 export type { QueryFn } from "./postgres.js";
 export { migratePostgres, POSTGRES_SCHEMA, postgresStorage } from "./postgres.js";
 export type {

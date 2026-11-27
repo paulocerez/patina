@@ -48,7 +48,7 @@ The Postgres adapter takes a `query(sql, params)` function instead of importing 
 | `core`          | No runtime dependencies. Its own `t.*` DSL produces validators and JSON Schema                                                                                                        |
 | `react`         | React 18 and 19 as a peer dependency. Headless, no styling library                                                                                                                    |
 | `server`        | Fetch-style handler (`(Request) => Promise<Response>`). `@patina-ui/server/express` exports `toExpress(handler)`. `@anthropic-ai/sdk` is loaded only by `@patina-ui/server/anthropic` |
-| Model           | Anthropic structured outputs. Default Opus 5.5 at low effort; compare models with the eval set                                                                                        |
+| Model           | Anthropic structured outputs. Default: Haiku 5.5 answers, Sonnet 5.5 handles retries (low effort)                                                                                     |
 | Storage         | Postgres through an injected `query(sql, params)`: `pg`, `postgres.js` or PGlite                                                                                                      |
 | Tests           | Vitest, fast-check, Testing Library, PGlite                                                                                                                                           |
 | Evals           | A `tsx` script over `evals/*.jsonl` (`pnpm eval --model …`)                                                                                                                           |
@@ -570,7 +570,7 @@ import { anthropicModel } from "@patina-ui/server/anthropic";
 export const patina = createPatinaHandler({
   surfaces: [dashboard],
   storage: memoryStorage(),
-  model: anthropicModel({ model: "claude-opus-5-5" }) // reads ANTHROPIC_API_KEY,
+  model: anthropicModel() // Haiku 5.5, Sonnet 5.5 as backup; reads ANTHROPIC_API_KEY,
   getContext: async (req) => {
     // identity ALWAYS comes from the host's session
     const s = await getSession(req);
@@ -624,7 +624,9 @@ with the validator's message.
 schema ("compiled grammar is too large"). The adapter therefore also has a **compact**
 schema: a single op shape, node and prop as enums, values as JSON text, with each prop's
 allowed values written into the system prompt. It falls back to it automatically. With the
-compact schema, the eval set scores 58/58 (Opus 5.5 and Sonnet 5.5) and 57/58 (Haiku 5.5),
+compact schema, the eval set scores 58/58 (Opus 5.5 and Sonnet 5.5) and 57/58 (Haiku 5.5 alone);
+the default, Haiku 5.5 with Sonnet 5.5 as backup and two prompt rules added, scored 58/58 in
+three runs out of three,
 at a p50 latency of 1.4–1.8 s (see docs/guides/model-and-evals.md).
 
 **Prompt construction**
@@ -739,22 +741,22 @@ renders for this user. It never fetches data, never calls actions and never defi
 
 ## 12. Open questions and tradeoffs
 
-| #   | Question                                      | Options                                                  | Recommendation                                                                                                                                                                    |
-| --- | --------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | How are columns modeled?                      | (a) child nodes, (b) keyed collections inside props      | **(b)**. Fewer registered components, and slots and columns share one mechanism.                                                                                                  |
-| 2   | Can users remove base items?                  | remove vs hide-only                                      | **Hide only.** Removing a base item makes base evolution and reset ambiguous.                                                                                                     |
-| 3   | How does undo work?                           | (a) append an inverse patch, (b) append a `revert` entry | **(b)**. The history stays append-only and readable ("undid X"), and undo-of-reset comes free. `invert` is still used for in-memory preview and tests.                            |
-| 4   | How atomic is replay?                         | per patch vs per op                                      | **Authoring is per patch (strict). Replay is per op (tolerant).** A partially applicable old patch is better than losing all of it. Each skip is reported.                        |
-| 5   | Type system                                   | own DSL vs zod / valibot                                 | **Own small DSL.** The closed set _is_ the safety property, it has no dependencies, and it emits exactly the JSON Schema subset that structured outputs support.                  |
-| 6   | What does commit send?                        | the client sends the patch vs a server-held proposal ID  | **Proposal ID.** It cannot be tampered with, and what the user previewed is what gets stored.                                                                                     |
-| 7   | Does the model see view data?                 | none / labels only / sample rows                         | **Structure and host labels only.** This rules out data-borne injection and data leaking to the provider. Revisit only if evals show a real need (e.g. "hide the empty columns"). |
-| 8   | Clarifying questions                          | single-shot vs multi-turn                                | Keep **`clarify`** in the result type now and render it as a message in the UI. Multi-turn comes later.                                                                           |
-| 9   | History growth                                | unbounded vs compaction                                  | Compact after N (≈50) effective patches: `compose` them into a single snapshot entry and keep the prompts as an audit trail. Not needed for v1.                                   |
-| 10  | Tenant layer vs user overrides                | user always wins vs tenant locks                         | The user wins by default. Reserve a `locked` flag on tenant-layer ops for later. The schema and resolver already support layers.                                                  |
-| 11  | Retention of stored prompts (may contain PII) | keep forever vs a TTL                                    | `storage.redactPrompts(before)`, run from a host job, nulls old prompts. Default: keep.                                                                                           |
-| 12  | Default model                                 | Haiku 5.5 vs Sonnet 5.5                                  | Configurable. The adapter defaults to Opus 5.5 at low effort. Compare Haiku 5.5 and Sonnet 5.5 against it with the eval set before changing the default.                          |
-| 13  | Version numbers                               | semver strings vs integers                               | **Integers** for `baseVersion`. Migrations need a total order, and semver adds nothing here.                                                                                      |
-| 14  | Preview location                              | in place vs side-by-side                                 | **In place** (the live surface shows the proposal) with a change list. Simpler, and it shows the real result.                                                                     |
+| #   | Question                                      | Options                                                  | Recommendation                                                                                                                                                                                                                      |
+| --- | --------------------------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | How are columns modeled?                      | (a) child nodes, (b) keyed collections inside props      | **(b)**. Fewer registered components, and slots and columns share one mechanism.                                                                                                                                                    |
+| 2   | Can users remove base items?                  | remove vs hide-only                                      | **Hide only.** Removing a base item makes base evolution and reset ambiguous.                                                                                                                                                       |
+| 3   | How does undo work?                           | (a) append an inverse patch, (b) append a `revert` entry | **(b)**. The history stays append-only and readable ("undid X"), and undo-of-reset comes free. `invert` is still used for in-memory preview and tests.                                                                              |
+| 4   | How atomic is replay?                         | per patch vs per op                                      | **Authoring is per patch (strict). Replay is per op (tolerant).** A partially applicable old patch is better than losing all of it. Each skip is reported.                                                                          |
+| 5   | Type system                                   | own DSL vs zod / valibot                                 | **Own small DSL.** The closed set _is_ the safety property, it has no dependencies, and it emits exactly the JSON Schema subset that structured outputs support.                                                                    |
+| 6   | What does commit send?                        | the client sends the patch vs a server-held proposal ID  | **Proposal ID.** It cannot be tampered with, and what the user previewed is what gets stored.                                                                                                                                       |
+| 7   | Does the model see view data?                 | none / labels only / sample rows                         | **Structure and host labels only.** This rules out data-borne injection and data leaking to the provider. Revisit only if evals show a real need (e.g. "hide the empty columns").                                                   |
+| 8   | Clarifying questions                          | single-shot vs multi-turn                                | Keep **`clarify`** in the result type now and render it as a message in the UI. Multi-turn comes later.                                                                                                                             |
+| 9   | History growth                                | unbounded vs compaction                                  | Compact after N (≈50) effective patches: `compose` them into a single snapshot entry and keep the prompts as an audit trail. Not needed for v1.                                                                                     |
+| 10  | Tenant layer vs user overrides                | user always wins vs tenant locks                         | The user wins by default. Reserve a `locked` flag on tenant-layer ops for later. The schema and resolver already support layers.                                                                                                    |
+| 11  | Retention of stored prompts (may contain PII) | keep forever vs a TTL                                    | `storage.redactPrompts(before)`, run from a host job, nulls old prompts. Default: keep.                                                                                                                                             |
+| 12  | Default model                                 | Opus, Sonnet or Haiku, or a pair                         | **Decided:** Haiku 5.5 answers; Sonnet 5.5 takes the repair round-trip and any errors or safety declines (`withBackup`). It is the fastest and cheapest, and it scored 58/58 in 3 of 3 eval runs. Hosts can pick any model or pair. |
+| 13  | Version numbers                               | semver strings vs integers                               | **Integers** for `baseVersion`. Migrations need a total order, and semver adds nothing here.                                                                                                                                        |
+| 14  | Preview location                              | in place vs side-by-side                                 | **In place** (the live surface shows the proposal) with a change list. Simpler, and it shows the real result.                                                                                                                       |
 
 ### Keeping out-of-scope features unblocked
 

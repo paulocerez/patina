@@ -1,8 +1,9 @@
 /**
  * Runs the eval set against a model and prints a report.
  *
- *   pnpm eval                                # Claude (needs ANTHROPIC_API_KEY), default model
- *   pnpm eval --model claude-sonnet-5-5      # another Claude model
+ *   pnpm eval                                # the default: Haiku 5.5, with Sonnet 5.5 as backup
+ *   pnpm eval --model claude-sonnet-5-5      # a single model
+ *   pnpm eval --model claude-haiku-5-5 --backup claude-opus-5-5   # any pair
  *   pnpm eval --model offline                # the demo's keyword model (free; a baseline)
  *   pnpm eval --filter refuse --concurrency 2 --cases dashboard.jsonl
  *
@@ -28,6 +29,7 @@ const { values } = parseArgs({
     filter: { type: "string" },
     concurrency: { type: "string", default: "4" },
     effort: { type: "string" },
+    backup: { type: "string" },
   },
 });
 
@@ -39,7 +41,7 @@ async function pickModel(): Promise<ModelAdapter> {
   }
   const { anthropicModel } = await import("@patina-ui/server/anthropic");
   return anthropicModel({
-    ...(values.model ? { model: values.model } : {}),
+    ...(values.model ? { model: values.model, backupModel: values.backup ?? null } : {}),
     ...(values.effort ? { effort: values.effort as "low" } : {}),
   });
 }

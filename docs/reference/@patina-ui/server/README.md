@@ -48,6 +48,7 @@ Request handler and storage adapters.
 - [postgresStorage](functions/postgresStorage.md)
 - [renderInsightsMarkdown](functions/renderInsightsMarkdown.md)
 - [summarizeRequests](functions/summarizeRequests.md)
+- [withBackup](functions/withBackup.md)
 
 ## References
 
