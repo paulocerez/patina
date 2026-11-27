@@ -4,6 +4,7 @@ import {
   type Entry,
   type FollowUpLinks,
   type HistoryKey,
+  memoryProposals,
   type NewEntry,
   type Proposal,
   type RequestEvent,
@@ -19,8 +20,24 @@ export type QueryFn = (
   params?: unknown[],
 ) => Promise<{ rows: Record<string, unknown>[] }>;
 
-/** The schema. Run it once with `migratePostgres(query)`, or copy it into your own migrations. */
-export const POSTGRES_SCHEMA = `
+/** Which optional parts of Patina's storage you use. Everything is on by default. */
+export interface PostgresFeatures {
+  /**
+   * Where previews (proposals) live between "preview" and "apply": "postgres" (default) or
+   * "memory". Memory needs no table; with several server instances, an Apply that reaches
+   * another instance than the preview gets a 409 and the user asks again.
+   */
+  previews?: "postgres" | "memory";
+  /** The request log, for insights and follow-ups (table patina_requests). Default true. */
+  requestLog?: boolean;
+  /** Monthly quota counters (table patina_usage). Default true. */
+  usage?: boolean;
+  /** Shipped-follow-up notices (table patina_followups). Default true. */
+  followUps?: boolean;
+}
+
+const TABLES = {
+  history: `
 create table if not exists patina_history (
   id             text        primary key,
   tenant_id      text        not null default '',
@@ -39,7 +56,8 @@ create table if not exists patina_history (
   created_at     timestamptz not null default now(),
   unique (tenant_id, layer, subject_id, surface_id, seq)
 );
-
+`,
+  proposals: `
 create table if not exists patina_proposals (
   id          text        primary key,
   tenant_id   text        not null default '',
@@ -54,7 +72,8 @@ create table if not exists patina_proposals (
   expires_at  timestamptz not null
 );
 create index if not exists patina_proposals_expires_at on patina_proposals (expires_at);
-
+`,
+  requests: `
 create table if not exists patina_requests (
   id           text        primary key,
   created_at   timestamptz not null default now(),
@@ -73,7 +92,8 @@ create table if not exists patina_requests (
 );
 create index if not exists patina_requests_created_at on patina_requests (created_at);
 create index if not exists patina_requests_tenant on patina_requests (tenant_id, created_at);
-
+`,
+  usage: `
 create table if not exists patina_usage (
   tenant_id   text    not null default '',
   subject_id  text    not null,
@@ -81,7 +101,8 @@ create table if not exists patina_usage (
   count       integer not null default 0,
   primary key (tenant_id, subject_id, period)
 );
-
+`,
+  followups: `
 create table if not exists patina_followups (
   followup_key  text        not null,
   tenant_id     text        not null default '',
@@ -95,10 +116,36 @@ create table if not exists patina_followups (
   primary key (followup_key, tenant_id, user_id, surface_id)
 );
 create index if not exists patina_followups_user on patina_followups (tenant_id, user_id, surface_id) where shipped_at is not null and dismissed_at is null;
-`;
+`,
+} as const;
 
-export async function migratePostgres(query: QueryFn): Promise<void> {
-  for (const statement of POSTGRES_SCHEMA.split(";")
+export type PostgresTable = keyof typeof TABLES;
+
+/** The tables these features need: just ["history"] with every optional feature off. */
+export function postgresTables(f: PostgresFeatures = {}): PostgresTable[] {
+  return [
+    "history",
+    ...(f.previews === "memory" ? [] : ["proposals" as const]),
+    ...(f.requestLog === false ? [] : ["requests" as const]),
+    ...(f.usage === false ? [] : ["usage" as const]),
+    ...(f.followUps === false ? [] : ["followups" as const]),
+  ];
+}
+
+/** The SQL for these features. Copy it into your migrations, or run `migratePostgres`. */
+export function postgresSchema(f: PostgresFeatures = {}): string {
+  return postgresTables(f)
+    .map((t) => TABLES[t])
+    .join("\n");
+}
+
+/** The full schema (every feature). Run it with `migratePostgres(query)`, or copy it into your migrations. */
+export const POSTGRES_SCHEMA = postgresSchema();
+
+/** Creates the tables (if missing) for these features. Safe to run on every start. */
+export async function migratePostgres(query: QueryFn, features?: PostgresFeatures): Promise<void> {
+  for (const statement of postgresSchema(features)
+    .split(";")
     .map((s) => s.trim())
     .filter(Boolean)) {
     await query(statement);
@@ -131,16 +178,46 @@ function toEntry(r: Record<string, unknown>): Entry {
 
 const keyParams = (k: HistoryKey) => [k.tenantId ?? "", k.layer, k.subjectId, k.surfaceId];
 
-/**
- * Postgres storage. History is append-only; `append` uses the unique
- * `(tenant_id, layer, subject_id, surface_id, seq)` constraint for optimistic concurrency.
- */
-export function postgresStorage({ query }: { query: QueryFn }): StorageAdapter &
+type FullPostgresStorage = StorageAdapter &
   Required<Pick<StorageAdapter, "incrementUsage" | "logRequest" | "listRequests">> &
   FollowUpLinks & {
     /** Clears stored prompts older than `before` (prompt retention). Returns the number of rows changed. */
     redactPrompts(before: Date): Promise<number>;
-  } {
+  };
+
+/**
+ * Postgres storage. History is append-only; `append` uses the unique
+ * `(tenant_id, layer, subject_id, surface_id, seq)` constraint for optimistic concurrency.
+ *
+ * Pass features to use fewer tables, e.g. only saved customizations:
+ *
+ *   postgresStorage({ query, previews: "memory", requestLog: false, usage: false, followUps: false })
+ */
+export function postgresStorage(options: { query: QueryFn }): FullPostgresStorage;
+export function postgresStorage(
+  options: { query: QueryFn } & PostgresFeatures,
+): StorageAdapter & { redactPrompts(before: Date): Promise<number> };
+export function postgresStorage(
+  options: { query: QueryFn } & PostgresFeatures,
+): StorageAdapter & { redactPrompts(before: Date): Promise<number> } {
+  const full = fullPostgresStorage(options.query, options.requestLog !== false);
+  const storage: StorageAdapter & { redactPrompts(before: Date): Promise<number> } = { ...full };
+  if (options.previews === "memory") Object.assign(storage, memoryProposals());
+  if (options.requestLog === false) {
+    delete storage.logRequest;
+    delete storage.listRequests;
+  }
+  if (options.usage === false) delete storage.incrementUsage;
+  if (options.followUps === false) {
+    delete storage.linkFollowUp;
+    delete storage.shipFollowUp;
+    delete storage.listNotices;
+    delete storage.dismissNotice;
+  }
+  return storage;
+}
+
+function fullPostgresStorage(query: QueryFn, requestLog: boolean): FullPostgresStorage {
   return {
     async list(key) {
       const { rows } = await query(
@@ -343,10 +420,11 @@ export function postgresStorage({ query }: { query: QueryFn }): StorageAdapter &
       );
     },
     async redactPrompts(before) {
-      await query(
-        "update patina_requests set prompt = null where prompt is not null and created_at < $1",
-        [before.toISOString()],
-      );
+      if (requestLog)
+        await query(
+          "update patina_requests set prompt = null where prompt is not null and created_at < $1",
+          [before.toISOString()],
+        );
       const { rows } = await query(
         "update patina_history set prompt = null where prompt is not null and created_at < $1 returning id",
         [before.toISOString()],

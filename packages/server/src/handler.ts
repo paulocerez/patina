@@ -89,8 +89,8 @@ export interface PatinaHandlerOptions<Ctx extends PatinaContext> {
   availability?(ctx: NoInfer<Ctx>, surfaceId: string): AvailabilityRule | Promise<AvailabilityRule>;
   /**
    * The user's language for Patina's messages, previews and the model's replies. Default: the
-   * `x-patina-locale` header (sent by <PatinaProvider locale>), then Accept-Language, then
-   * English. Supported: en, de; host labels can be given per language.
+   * `locale` query parameter (sent by <PatinaProvider locale>), the `x-patina-locale` header,
+   * then Accept-Language, then English. Supported: en, de; host labels can be given per language.
    */
   locale?(ctx: NoInfer<Ctx>, request: Request): string | undefined | Promise<string | undefined>;
   limits?: {
@@ -178,18 +178,22 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
     request: Request,
   ): Promise<Availability> {
     const rule = (await options.availability?.(ctx, surfaceId)) ?? {};
-    const customize = rule.customize ?? true;
     const locale = pickLocale(
       (await options.locale?.(ctx, request)) ??
+        new URL(request.url).searchParams.get("locale") ??
         request.headers.get("x-patina-locale") ??
         request.headers.get("accept-language"),
     );
+    // A model that isn't set up (e.g. no API key in this environment) turns customizing off.
+    const modelReady = options.model.available?.() ?? true;
+    const customize = (rule.customize ?? true) && modelReady;
+    const message = rule.message ?? (modelReady ? undefined : msg(locale, "notConfigured"));
     return {
       locale,
       customize,
       dataViews: customize && (rule.dataViews ?? true),
       whenOff: rule.whenOff ?? "keep",
-      ...(rule.message ? { message: rule.message } : {}),
+      ...(message ? { message } : {}),
     };
   }
 
@@ -682,7 +686,9 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
       if (e instanceof HttpError) return json({ error: { message: e.message } }, e.status);
       options.onError?.(e);
       const locale = pickLocale(
-        request.headers.get("x-patina-locale") ?? request.headers.get("accept-language"),
+        new URL(request.url).searchParams.get("locale") ??
+          request.headers.get("x-patina-locale") ??
+          request.headers.get("accept-language"),
       );
       return json({ error: { message: msg(locale, "somethingWrong") } }, 500);
     }

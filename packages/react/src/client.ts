@@ -23,9 +23,19 @@ export interface PatinaClient {
 export interface ClientOptions {
   /** Where the server handler is mounted, e.g. "/api/patina". */
   endpoint: string;
-  /** Sent as `x-patina-locale`, so messages and previews come back in this language. */
+  /**
+   * Sent as the `locale` query parameter, so messages and previews come back in this language.
+   * (A query parameter, not a header, so cross-origin APIs need no CORS change.)
+   */
   locale?: string;
-  /** Custom fetch, e.g. to add auth headers. Defaults to the global fetch with cookies. */
+  /**
+   * Cookies: "same-origin" (default) or "include" when the API is on another origin
+   * (e.g. app.example.com calling api.example.com).
+   */
+  credentials?: RequestCredentials;
+  /** Extra query parameters on every request, e.g. `{ accountId }` for the server's getContext. */
+  params?: Record<string, string>;
+  /** Custom fetch, e.g. to add auth headers. Defaults to the global fetch. */
   fetch?: typeof fetch;
 }
 
@@ -33,16 +43,17 @@ export interface ClientOptions {
 export function createPatinaClient({
   endpoint,
   locale,
-  fetch: f = (i, init) => fetch(i, { credentials: "same-origin", ...init }),
+  credentials = "same-origin",
+  params,
+  fetch: f = (i, init) => fetch(i, init),
 }: ClientOptions): PatinaClient {
   const base = endpoint.replace(/\/$/, "");
+  const query = new URLSearchParams({ ...params, ...(locale ? { locale } : {}) }).toString();
   async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const res = await f(`${base}${path}`, {
+    const res = await f(`${base}${path}${query ? `?${query}` : ""}`, {
       method,
-      headers: {
-        ...(body === undefined ? {} : { "content-type": "application/json" }),
-        ...(locale ? { "x-patina-locale": locale } : {}),
-      },
+      credentials,
+      headers: body === undefined ? {} : { "content-type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const data = (await res.json().catch(() => null)) as T | ErrorBody | null;

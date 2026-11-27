@@ -14,6 +14,19 @@ e.g. "anthropic/claude-opus-5-5". Stored with each patch.
 
 ## Methods
 
+### available()?
+
+> `optional` **available**(): `boolean`
+
+False when the model can't be used here (e.g. no API key in this environment). The handler
+then turns customizing off with a short message instead of failing each request.
+
+#### Returns
+
+`boolean`
+
+***
+
 ### propose()
 
 > **propose**(`request`, `options?`): `Promise`\<`unknown`\>

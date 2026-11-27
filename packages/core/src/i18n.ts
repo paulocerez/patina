@@ -177,6 +177,7 @@ const en = {
   skippedMany: (p: P) => `${p.count} of your earlier changes no longer apply`,
   shipped: (p: P) => `You asked for “${p.title}”. That's now possible.`,
   dismiss: () => "Dismiss",
+  notConfigured: () => "Customizing isn't set up here yet.",
   loadError: (p: P) => `Couldn't load data (${p.status})`,
   // data blocks (labels users see in previews)
   blockTable: () => "Table",
@@ -323,6 +324,7 @@ const de: Catalog = {
   skippedMany: (p) => `${p.count} Ihrer früheren Änderungen gelten nicht mehr`,
   shipped: (p) => `Sie hatten sich „${p.title}“ gewünscht. Das ist jetzt möglich.`,
   dismiss: () => "Ausblenden",
+  notConfigured: () => "Das Anpassen ist hier noch nicht eingerichtet.",
   loadError: (p) => `Daten konnten nicht geladen werden (${p.status})`,
   blockTable: () => "Tabelle",
   blockChart: () => "Diagramm",

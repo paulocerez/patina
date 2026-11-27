@@ -9,7 +9,7 @@ interface PatinaContextValue {
   store(surfaceId: string): SurfaceStore;
 }
 
-const Ctx = createContext<PatinaContextValue | null>(null);
+export const Ctx = createContext<PatinaContextValue | null>(null);
 
 export interface PatinaProviderProps extends Partial<ClientOptions> {
   /** Use a custom client instead of `endpoint`/`fetch` (e.g. in tests). */
@@ -28,13 +28,25 @@ export interface PatinaProviderProps extends Partial<ClientOptions> {
 export function PatinaProvider({
   endpoint = "/api/patina",
   fetch,
+  credentials,
+  params,
   client,
   fetchSource = defaultFetchSource,
   locale = defaultLocale(),
   children,
 }: PatinaProviderProps) {
+  const paramsKey = JSON.stringify(params ?? {});
+  // biome-ignore lint/correctness/useExhaustiveDependencies: params by value (paramsKey), so an inline object doesn't reset state
   const value = useMemo(() => {
-    const c = client ?? createPatinaClient({ endpoint, locale, ...(fetch ? { fetch } : {}) });
+    const c =
+      client ??
+      createPatinaClient({
+        endpoint,
+        locale,
+        ...(credentials ? { credentials } : {}),
+        ...(params ? { params } : {}),
+        ...(fetch ? { fetch } : {}),
+      });
     const stores = new Map<string, SurfaceStore>();
     return {
       store(id: string) {
@@ -45,7 +57,7 @@ export function PatinaProvider({
         return created;
       },
     };
-  }, [endpoint, fetch, client, locale]);
+  }, [endpoint, fetch, client, locale, credentials, paramsKey]);
   const data = useMemo(() => ({ fetchSource, cache: new Map() }), [fetchSource]);
   return (
     <Ctx.Provider value={value}>

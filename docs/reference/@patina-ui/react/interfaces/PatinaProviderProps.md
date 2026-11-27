@@ -22,6 +22,19 @@ Use a custom client instead of `endpoint`/`fetch` (e.g. in tests).
 
 ***
 
+### credentials?
+
+> `optional` **credentials?**: `RequestCredentials`
+
+Cookies: "same-origin" (default) or "include" when the API is on another origin
+(e.g. app.example.com calling api.example.com).
+
+#### Inherited from
+
+[`ClientOptions`](ClientOptions.md).[`credentials`](ClientOptions.md#credentials)
+
+***
+
 ### endpoint?
 
 > `optional` **endpoint?**: `string`
@@ -38,7 +51,7 @@ Where the server handler is mounted, e.g. "/api/patina".
 
 > `optional` **fetch?**: \{(`input`, `init?`): `Promise`\<`Response`\>; (`input`, `init?`): `Promise`\<`Response`\>; \}
 
-Custom fetch, e.g. to add auth headers. Defaults to the global fetch with cookies.
+Custom fetch, e.g. to add auth headers. Defaults to the global fetch.
 
 #### Call Signature
 
@@ -104,3 +117,15 @@ replies. Default: the browser's language. Supported: en, de (others fall back to
 #### Overrides
 
 [`ClientOptions`](ClientOptions.md).[`locale`](ClientOptions.md#locale)
+
+***
+
+### params?
+
+> `optional` **params?**: `Record`\<`string`, `string`\>
+
+Extra query parameters on every request, e.g. `{ accountId }` for the server's getContext.
+
+#### Inherited from
+
+[`ClientOptions`](ClientOptions.md).[`params`](ClientOptions.md#params)

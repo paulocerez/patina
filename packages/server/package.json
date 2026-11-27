@@ -36,37 +36,118 @@
     "./testing": "./src/testing.ts",
     "./eval": "./src/eval.ts",
     "./followups": "./src/followups.ts",
-    "./integrations": "./src/integrations.ts"
+    "./integrations": "./src/integrations.ts",
+    "./drizzle": "./src/drizzle.ts"
   },
   "publishConfig": {
     "exports": {
       ".": {
-        "types": "./dist/index.d.ts",
-        "import": "./dist/index.js"
+        "import": {
+          "types": "./dist/index.d.ts",
+          "default": "./dist/index.js"
+        },
+        "require": {
+          "types": "./dist/cjs/index.d.ts",
+          "default": "./dist/index.cjs"
+        }
       },
       "./anthropic": {
-        "types": "./dist/anthropic.d.ts",
-        "import": "./dist/anthropic.js"
+        "import": {
+          "types": "./dist/anthropic.d.ts",
+          "default": "./dist/anthropic.js"
+        },
+        "require": {
+          "types": "./dist/cjs/anthropic.d.ts",
+          "default": "./dist/anthropic.cjs"
+        }
       },
       "./express": {
-        "types": "./dist/express.d.ts",
-        "import": "./dist/express.js"
+        "import": {
+          "types": "./dist/express.d.ts",
+          "default": "./dist/express.js"
+        },
+        "require": {
+          "types": "./dist/cjs/express.d.ts",
+          "default": "./dist/express.cjs"
+        }
       },
       "./testing": {
-        "types": "./dist/testing.d.ts",
-        "import": "./dist/testing.js"
+        "import": {
+          "types": "./dist/testing.d.ts",
+          "default": "./dist/testing.js"
+        },
+        "require": {
+          "types": "./dist/cjs/testing.d.ts",
+          "default": "./dist/testing.cjs"
+        }
       },
       "./eval": {
-        "types": "./dist/eval.d.ts",
-        "import": "./dist/eval.js"
+        "import": {
+          "types": "./dist/eval.d.ts",
+          "default": "./dist/eval.js"
+        },
+        "require": {
+          "types": "./dist/cjs/eval.d.ts",
+          "default": "./dist/eval.cjs"
+        }
       },
       "./followups": {
-        "types": "./dist/followups.d.ts",
-        "import": "./dist/followups.js"
+        "import": {
+          "types": "./dist/followups.d.ts",
+          "default": "./dist/followups.js"
+        },
+        "require": {
+          "types": "./dist/cjs/followups.d.ts",
+          "default": "./dist/followups.cjs"
+        }
       },
       "./integrations": {
-        "types": "./dist/integrations.d.ts",
-        "import": "./dist/integrations.js"
+        "import": {
+          "types": "./dist/integrations.d.ts",
+          "default": "./dist/integrations.js"
+        },
+        "require": {
+          "types": "./dist/cjs/integrations.d.ts",
+          "default": "./dist/integrations.cjs"
+        }
+      },
+      "./drizzle": {
+        "import": {
+          "types": "./dist/drizzle.d.ts",
+          "default": "./dist/drizzle.js"
+        },
+        "require": {
+          "types": "./dist/cjs/drizzle.d.ts",
+          "default": "./dist/drizzle.cjs"
+        }
+      }
+    },
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.js",
+    "types": "./dist/cjs/index.d.ts",
+    "typesVersions": {
+      "*": {
+        "anthropic": [
+          "./dist/cjs/anthropic.d.ts"
+        ],
+        "express": [
+          "./dist/cjs/express.d.ts"
+        ],
+        "testing": [
+          "./dist/cjs/testing.d.ts"
+        ],
+        "eval": [
+          "./dist/cjs/eval.d.ts"
+        ],
+        "followups": [
+          "./dist/cjs/followups.d.ts"
+        ],
+        "integrations": [
+          "./dist/cjs/integrations.d.ts"
+        ],
+        "drizzle": [
+          "./dist/cjs/drizzle.d.ts"
+        ]
       }
     },
     "access": "public"
@@ -78,7 +159,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsup src/index.ts src/anthropic.ts src/express.ts src/testing.ts src/eval.ts src/followups.ts src/integrations.ts --format esm --clean --external @patina-ui/core --external @anthropic-ai/sdk && tsc -p tsconfig.build.json",
+    "build": "tsup && tsc -p tsconfig.build.json && node ../../scripts/cjs-types.mjs",
     "test": "vitest run",
     "typecheck": "tsc -p ."
   },
@@ -86,10 +167,14 @@
     "@patina-ui/core": "workspace:^"
   },
   "peerDependencies": {
-    "@anthropic-ai/sdk": ">=1.0.0"
+    "@anthropic-ai/sdk": ">=0.90.0",
+    "drizzle-orm": ">=0.36.0"
   },
   "peerDependenciesMeta": {
     "@anthropic-ai/sdk": {
+      "optional": true
+    },
+    "drizzle-orm": {
       "optional": true
     }
   },
@@ -97,6 +182,8 @@
     "@anthropic-ai/sdk": "^1.14.0",
     "@electric-sql/pglite": "^0.6.0",
     "@types/pg": "^8.23.1",
+    "drizzle-kit": "^0.31.11",
+    "drizzle-orm": "^0.44.7",
     "pg": "^8.23.1"
   }
 }

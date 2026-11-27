@@ -4,6 +4,15 @@
 
 ## Properties
 
+### credentials?
+
+> `optional` **credentials?**: `RequestCredentials`
+
+Cookies: "same-origin" (default) or "include" when the API is on another origin
+(e.g. app.example.com calling api.example.com).
+
+***
+
 ### endpoint
 
 > **endpoint**: `string`
@@ -16,7 +25,7 @@ Where the server handler is mounted, e.g. "/api/patina".
 
 > `optional` **fetch?**: \{(`input`, `init?`): `Promise`\<`Response`\>; (`input`, `init?`): `Promise`\<`Response`\>; \}
 
-Custom fetch, e.g. to add auth headers. Defaults to the global fetch with cookies.
+Custom fetch, e.g. to add auth headers. Defaults to the global fetch.
 
 #### Call Signature
 
@@ -64,4 +73,13 @@ Custom fetch, e.g. to add auth headers. Defaults to the global fetch with cookie
 
 > `optional` **locale?**: `string`
 
-Sent as `x-patina-locale`, so messages and previews come back in this language.
+Sent as the `locale` query parameter, so messages and previews come back in this language.
+(A query parameter, not a header, so cross-origin APIs need no CORS change.)
+
+***
+
+### params?
+
+> `optional` **params?**: `Record`\<`string`, `string`\>
+
+Extra query parameters on every request, e.g. `{ accountId }` for the server's getContext.

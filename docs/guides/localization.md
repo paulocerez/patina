@@ -13,7 +13,8 @@ Per request, the first of these wins:
    ```ts
    createPatinaHandler({ locale: (ctx) => ctx.language, … });
    ```
-2. **The `x-patina-locale` header.** `<PatinaProvider locale>` sends it on every request:
+2. **The `locale` query parameter.** `<PatinaProvider locale>` sends it on every request (a
+   parameter rather than a header, so a cross-origin API needs no CORS change):
 
    ```tsx
    <PatinaProvider endpoint="/api/patina" locale={i18n.language}>

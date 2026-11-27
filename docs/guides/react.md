@@ -16,13 +16,49 @@ import { PatinaProvider, Surface, useSurface } from "@patina-ui/react";
 | Prop          |                                                                                                      |
 | ------------- | ---------------------------------------------------------------------------------------------------- |
 | `endpoint`    | Where the handler is mounted. Default `"/api/patina"`                                                |
-| `fetch`       | Custom fetch, e.g. to add an auth header. The default sends same-origin cookies                      |
+| `credentials` | `"include"` when the API is on another origin (sends cookies cross-site). Default `"same-origin"`    |
+| `params`      | Query parameters on every request, e.g. `{ accountId }` for your `getContext`                        |
+| `fetch`       | Custom fetch, e.g. to add an auth header                                                             |
 | `client`      | A ready-made `PatinaClient` (used in tests)                                                          |
 | `fetchSource` | How [data blocks](data-views.md) load catalog sources. The default is a same-origin GET with cookies |
 
 All `useSurface` calls and primitives for the same surface ID share one store, so they stay in
 sync. Pass `locale` (e.g. `i18n.language`) for German or English messages and defaults; it
 defaults to the browser's language. See [Localization](localization.md).
+
+## Existing pages: `useSlot`, `useCollection`, `useSurfaceProp`
+
+`<Surface>` draws the page from a map of components. For a page that already exists, it's
+usually simpler to keep its JSX and ask Patina only for the order, visibility and options:
+
+```tsx
+const SECTIONS = ["metrics", "callChart", "recentCalls"] as const;
+
+function Dashboard() {
+  const sections = useSlot("dashboard", "overview", "sections", SECTIONS);
+  const cards = useCollection("dashboard", "metrics", "cards", ["calls", "minutes"]);
+  const range = useSurfaceProp("dashboard", "overview", "defaultDateRange", "last30days");
+
+  const blocks = {
+    metrics: <MetricCards cards={cards.map((c) => c.key)} />, // your existing JSX, as before
+    callChart: <CallChart data={data} />,
+    recentCalls: <RecentCalls calls={calls} />,
+  };
+  return (
+    <>
+      {sections.map((key) => (
+        <Fragment key={key}>{blocks[key]}</Fragment>
+      ))}
+    </>
+  );
+}
+```
+
+- The last argument is your page's default. The hooks return it until the spec has loaded,
+  and when there's no `<PatinaProvider>` above, so a feature flag can simply leave the
+  provider out.
+- Only keys in that default are returned, so the page never renders something it doesn't know.
+- Previews show up in place, like with `<Surface>`.
 
 ## `<Surface>`
 
@@ -55,6 +91,7 @@ s.discard();
 s.undo();
 s.reset();
 s.reload();
+s.notices; // shipped follow-ups for this user; s.dismissNotice(key)
 ```
 
 ## Headless primitives

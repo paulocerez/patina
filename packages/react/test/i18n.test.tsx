@@ -53,7 +53,7 @@ it("sends the provider's locale and shows German defaults and previews", async (
     })),
     basePath: "/api",
     getContext: (req) => {
-      seen.push(req.headers.get("x-patina-locale") ?? "");
+      seen.push(new URL(req.url).searchParams.get("locale") ?? "");
       return { userId: "u", permissions: ["finance.read"] };
     },
   });

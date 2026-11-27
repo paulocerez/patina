@@ -29,10 +29,19 @@
   "publishConfig": {
     "exports": {
       ".": {
-        "types": "./dist/index.d.ts",
-        "import": "./dist/index.js"
+        "import": {
+          "types": "./dist/index.d.ts",
+          "default": "./dist/index.js"
+        },
+        "require": {
+          "types": "./dist/cjs/index.d.ts",
+          "default": "./dist/index.cjs"
+        }
       }
     },
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.js",
+    "types": "./dist/cjs/index.d.ts",
     "access": "public"
   },
   "files": [
@@ -42,7 +51,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsup && tsc -p tsconfig.build.json",
+    "build": "tsup && tsc -p tsconfig.build.json && node ../../scripts/cjs-types.mjs",
     "test": "vitest run",
     "typecheck": "tsc -p ."
   },

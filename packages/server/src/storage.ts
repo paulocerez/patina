@@ -148,6 +148,29 @@ export function keyString(k: HistoryKey): string {
   return JSON.stringify([k.tenantId ?? "", k.layer, k.subjectId, k.surfaceId]);
 }
 
+/**
+ * Previews held in this process's memory (expired ones are dropped as new ones arrive).
+ * For `postgresStorage({ previews: "memory" })` or your own adapter.
+ */
+export function memoryProposals(
+  now: () => number = Date.now,
+): Pick<StorageAdapter, "saveProposal" | "takeProposal"> {
+  const previews = new Map<string, Proposal>();
+  const expired = (p: Proposal) => Date.parse(p.expiresAt) <= now();
+  return {
+    async saveProposal(p) {
+      for (const [id, old] of previews) if (expired(old)) previews.delete(id);
+      previews.set(p.id, structuredClone(p));
+    },
+    async takeProposal(id, key) {
+      const p = previews.get(id);
+      if (!p || keyString(p.key) !== keyString(key)) return null;
+      previews.delete(id);
+      return expired(p) ? null : p;
+    },
+  };
+}
+
 /** In-process storage for tests, demos and prototypes. Data is lost on restart. */
 export function memoryStorage(): StorageAdapter &
   Required<Pick<StorageAdapter, "incrementUsage" | "logRequest" | "listRequests">> &

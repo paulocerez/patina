@@ -1165,7 +1165,7 @@ German uses the formal "Sie", as in vetpal and most German business software.
 
 **How the locale flows:**
 
-- Every request has a locale: the host's `locale` hook, else `x-patina-locale` (sent by
+- Every request has a locale: the host's `locale` hook, else the `locale` query parameter (sent by
   `<PatinaProvider locale>`), else `Accept-Language`, else English.
 - The handler localizes the manifest (`localizeManifest`), so validation messages, previews,
   value names and data-view titles come out in that language.

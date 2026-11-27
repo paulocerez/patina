@@ -50,9 +50,12 @@ React bindings and headless UX primitives.
 - [Surface](functions/Surface.md)
 - [SurfaceMessage](functions/SurfaceMessage.md)
 - [UndoButton](functions/UndoButton.md)
+- [useCollection](functions/useCollection.md)
 - [usePatinaText](functions/usePatinaText.md)
 - [useQuery](functions/useQuery.md)
+- [useSlot](functions/useSlot.md)
 - [useSurface](functions/useSurface.md)
+- [useSurfaceProp](functions/useSurfaceProp.md)
 
 ## References
 

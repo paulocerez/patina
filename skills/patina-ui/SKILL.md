@@ -60,6 +60,22 @@ npm i -D @patina-ui/cli
    - mark personal fields `sensitive: true`;
    - gate fields by permission with `requires`;
    - set `complete: true` only if the endpoint returns _all_ matching rows (no pagination).
+11. **Keep the footprint small.** Aim for a handful of files in a first integration:
+   - **Existing page: use the hooks, not `<Surface>`.** `useSlot` / `useCollection` /
+     `useSurfaceProp` keep the page's JSX and data flow. Don't split the page into components
+     or add a data context just for Patina.
+   - **Use the app's own values.** If the page already has a date filter (`"last7days"`),
+     declare `t.enum([...the app's values])` instead of `t.relativeDateRange`, so nothing needs
+     mapping.
+   - **Only the tables you need:** `postgresStorage({ query, previews: "memory", requestLog: false,
+     usage: false, followUps: false })` needs only `patina_history`. With Drizzle, re-export
+     `patinaHistory` from `@patina-ui/server/drizzle` instead of writing the table by hand.
+   - **No workarounds:** Patina works with CommonJS and `moduleResolution: node`, without an API key
+     (customizing is just off) and across origins (`credentials`, `params` on the provider; the
+     locale is a query parameter, so no CORS change). Don't add loaders, type shims, fake models or
+     custom storage wrappers.
+   - **Gate once, on the server** (`availability`). The client reads `useSurface(id).availability`
+     or simply leaves out `<PatinaProvider>` when a client-side flag is off.
 
 ## Step by step
 
@@ -147,9 +163,21 @@ export const orders = defineSurface<AppContext>({
 Props that aren't listed can't change. `defineSurface` throws at startup if the base and the
 manifest disagree. Read the error; it lists each problem.
 
-### 2. Adapt the host components to take what Patina passes
+### 2. Connect the page
 
-`<Surface>` renders each node as `<Component {...props} nodeId="…" />`:
+**An existing page (the usual case):** keep its JSX. Ask Patina for order, visibility and
+options, with the page's current values as defaults:
+
+```tsx
+const sections = useSlot("dashboard", "overview", "sections", ["metrics", "chart", "calls"]);
+const range = useSurfaceProp("dashboard", "overview", "defaultDateRange", "last30days");
+// render: sections.map((key) => <Fragment key={key}>{blocks[key]}</Fragment>)
+```
+
+The hooks return the defaults while loading and without a `<PatinaProvider>`, and drop keys
+the page doesn't know. Previews show in place.
+
+**A page built for Patina:** `<Surface>` renders each node as `<Component {...props} nodeId="…" />`:
 
 | Prop type      | What the component receives                                                                   |
 | -------------- | --------------------------------------------------------------------------------------------- |
@@ -168,11 +196,12 @@ import { createPatinaHandler, postgresStorage, migratePostgres } from "@patina-u
 import { anthropicModel } from "@patina-ui/server/anthropic";
 
 const query = (sql: string, params?: unknown[]) => pool.query(sql, params); // pg, PGlite, postgres.js shim
-await migratePostgres(query); // or copy POSTGRES_SCHEMA into the app's migrations
+const features = { previews: "memory", requestLog: false, usage: false, followUps: false } as const; // only patina_history
+await migratePostgres(query, features); // or: postgresSchema(features) into a migration, or Drizzle (@patina-ui/server/drizzle)
 
 export const patina = createPatinaHandler({
   surfaces: [orders],
-  storage: postgresStorage({ query }),
+  storage: postgresStorage({ query, ...features }),
   model: anthropicModel(), // ANTHROPIC_API_KEY; Claude Haiku 5.5 answers, Sonnet 5.5 is the backup
   basePath: "/api/patina",
   getContext: async (req: Request): Promise<AppContext | null> => {
@@ -189,7 +218,9 @@ export const patina = createPatinaHandler({
   likewise.
 - **`memoryStorage()` is for prototypes and tests.** Customizations survive page reloads but
   are lost when the server restarts.
-- **No API key yet?** Use a scripted model until one is set (answer format below):
+- **No API key in some environments?** Nothing to do: `anthropicModel()` reports itself
+  unavailable and customizing is off there. To try the flow locally without a key, use a
+  scripted model (answer format below):
 
   ```ts
   import { scriptedModel } from "@patina-ui/server/testing";
@@ -238,7 +269,7 @@ quotas and rate limits.
 ```tsx
 import { AvailabilityNotice, PatinaProvider, PromptInput, ProposalPreview, ResetButton, Surface, SurfaceMessage, UndoButton } from "@patina-ui/react";
 
-<PatinaProvider endpoint="/api/patina" locale={i18n.language}>
+<PatinaProvider endpoint="/api/patina" locale={i18n.language}> {/* API on another origin: credentials="include" params={{ accountId }} */}
   <AvailabilityNotice surfaceId="orders" />  {/* the host's message when customizing is off */}
   <PromptInput surfaceId="orders" />
   <SurfaceMessage surfaceId="orders" />      {/* refusals, clarifying questions, errors */}

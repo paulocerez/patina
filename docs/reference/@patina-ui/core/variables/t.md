@@ -45,7 +45,7 @@ field of a catalog source (fields missing from the base spec appear hidden by de
 
 ##### opts
 
-`Omit`\<[`CollectionDef`](../interfaces/CollectionDef.md), `"kind"` \| `"keys"` \| `"item"` \| `"reorder"` \| `"hide"` \| `"source"`\> & `Partial`\<`Pick`\<[`CollectionDef`](../interfaces/CollectionDef.md), `"keys"` \| `"item"` \| `"reorder"` \| `"hide"`\>\> & `object`
+`Omit`\<[`CollectionDef`](../interfaces/CollectionDef.md), `"kind"` \| `"source"` \| `"keys"` \| `"item"` \| `"reorder"` \| `"hide"`\> & `Partial`\<`Pick`\<[`CollectionDef`](../interfaces/CollectionDef.md), `"keys"` \| `"item"` \| `"reorder"` \| `"hide"`\>\> & `object`
 
 #### Returns
 
@@ -286,7 +286,7 @@ Short human name, used in previews and error messages ("Rows per page").
 
 ##### opts
 
-`Omit`\<[`SlotDef`](../interfaces/SlotDef.md), `"insert"` \| `"kind"` \| `"reorder"` \| `"hide"`\> & `Partial`\<`Pick`\<[`SlotDef`](../interfaces/SlotDef.md), `"insert"` \| `"reorder"` \| `"hide"`\>\>
+`Omit`\<[`SlotDef`](../interfaces/SlotDef.md), `"kind"` \| `"insert"` \| `"reorder"` \| `"hide"`\> & `Partial`\<`Pick`\<[`SlotDef`](../interfaces/SlotDef.md), `"insert"` \| `"reorder"` \| `"hide"`\>\>
 
 #### Returns
 

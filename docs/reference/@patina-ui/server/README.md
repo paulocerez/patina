@@ -19,6 +19,7 @@ Request handler and storage adapters.
 - [NoticeTarget](interfaces/NoticeTarget.md)
 - [PatinaContext](interfaces/PatinaContext.md)
 - [PatinaHandlerOptions](interfaces/PatinaHandlerOptions.md)
+- [PostgresFeatures](interfaces/PostgresFeatures.md)
 - [Proposal](interfaces/Proposal.md)
 - [ReasonCount](interfaces/ReasonCount.md)
 - [RequestEvent](interfaces/RequestEvent.md)
@@ -31,6 +32,7 @@ Request handler and storage adapters.
 
 - [Entry](type-aliases/Entry.md)
 - [NewEntry](type-aliases/NewEntry.md)
+- [PostgresTable](type-aliases/PostgresTable.md)
 - [QueryFn](type-aliases/QueryFn.md)
 - [RequestOutcome](type-aliases/RequestOutcome.md)
 
@@ -43,11 +45,14 @@ Request handler and storage adapters.
 
 - [createPatinaHandler](functions/createPatinaHandler.md)
 - [getInsights](functions/getInsights.md)
+- [memoryProposals](functions/memoryProposals.md)
 - [memoryStorage](functions/memoryStorage.md)
 - [migratePostgres](functions/migratePostgres.md)
 - [normalizePrompt](functions/normalizePrompt.md)
 - [parseSince](functions/parseSince.md)
+- [postgresSchema](functions/postgresSchema.md)
 - [postgresStorage](functions/postgresStorage.md)
+- [postgresTables](functions/postgresTables.md)
 - [renderInsightsMarkdown](functions/renderInsightsMarkdown.md)
 - [summarizeRequests](functions/summarizeRequests.md)
 - [withBackup](functions/withBackup.md)

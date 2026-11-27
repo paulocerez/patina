@@ -182,3 +182,36 @@ describe("withBackup", () => {
     ).rejects.toThrow("aborted");
   });
 });
+
+it("reports itself unavailable without credentials, so the handler turns customizing off", async () => {
+  const saved = { key: process.env.ANTHROPIC_API_KEY, token: process.env.ANTHROPIC_AUTH_TOKEN };
+  delete process.env.ANTHROPIC_API_KEY;
+  delete process.env.ANTHROPIC_AUTH_TOKEN;
+  try {
+    expect(anthropicModel().available?.()).toBe(false);
+    expect(anthropicModel({ apiKey: "sk-test" }).available?.()).toBe(true);
+    expect(anthropicModel({ client: fakeClient({}).client }).available?.()).toBe(true);
+
+    const { createPatinaHandler, memoryStorage } = await import("../src/index.js");
+    const handler = createPatinaHandler({
+      surfaces: [dashboard],
+      storage: memoryStorage(),
+      model: anthropicModel(),
+      basePath: "/api/patina",
+      getContext: () => ({ userId: "u", permissions: ["finance.read"] }),
+    });
+    const res = await handler(
+      new Request("http://x/api/patina/surfaces/clinic.dashboard?locale=de"),
+    );
+    const state = (await res.json()) as { availability: { customize: boolean; message?: string } };
+    expect(res.status).toBe(200);
+    expect(state.availability).toEqual({
+      customize: false,
+      dataViews: false,
+      message: "Das Anpassen ist hier noch nicht eingerichtet.",
+    });
+  } finally {
+    if (saved.key) process.env.ANTHROPIC_API_KEY = saved.key;
+    if (saved.token) process.env.ANTHROPIC_AUTH_TOKEN = saved.token;
+  }
+});

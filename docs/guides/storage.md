@@ -28,8 +28,39 @@ const storage = postgresStorage({ query });
 | PGlite      | `(sql, params) => db.query(sql, params)`                             |
 | postgres.js | `async (text, params) => ({ rows: await sql.unsafe(text, params) })` |
 
-If you manage migrations yourself, copy `POSTGRES_SCHEMA` (exported) into a migration
-instead of calling `migratePostgres`. It creates two tables:
+### Only the tables you use
+
+Every table but `patina_history` belongs to an optional feature. Turn off what you don't use,
+and pass the same options to `migratePostgres` (or `postgresSchema`) and `postgresStorage`:
+
+```ts
+const features = { previews: "memory", requestLog: false, usage: false, followUps: false } as const;
+await migratePostgres(query, features); // only patina_history
+const storage = postgresStorage({ query, ...features });
+```
+
+| Option               | Table              | What you lose without it                                                                         |
+| -------------------- | ------------------ | ------------------------------------------------------------------------------------------------ |
+| `previews: "memory"` | `patina_proposals` | Nothing on one server. With several, an Apply that reaches another one gets a 409 and is retried |
+| `requestLog: false`  | `patina_requests`  | [Insights](insights.md) and [follow-ups](follow-ups.md)                                          |
+| `usage: false`       | `patina_usage`     | Monthly [quotas](availability.md#quotas)                                                         |
+| `followUps: false`   | `patina_followups` | "It's now possible" notices for [shipped follow-ups](follow-ups.md#telling-users-when-it-ships)  |
+
+### In your own migrations
+
+`postgresSchema(features)` returns the SQL for those tables (`POSTGRES_SCHEMA` is all of
+them), to copy into a migration instead of calling `migratePostgres`.
+
+**With Drizzle**, re-export the tables from your schema file and let `drizzle-kit generate`
+write the migration. They create exactly what the SQL creates, constraint names included:
+
+```ts
+// db/schema.ts
+export { patinaHistory } from "@patina-ui/server/drizzle";
+// and patinaProposals, patinaRequests, patinaUsage, patinaFollowups for the features you use
+```
+
+The tables:
 
 - **`patina_history`**: append-only, one row per patch, undo (`revert`) or `reset`. Each patch
   row keeps the ops, the user's original prompt, the summary and the model ID. The unique

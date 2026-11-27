@@ -20,6 +20,13 @@ export const patina = createPatinaHandler({
 });
 ```
 
+Works with ESM and CommonJS (`require`), including TypeScript's older `moduleResolution: node`
+setting, and with `@anthropic-ai/sdk` 0.90 or newer.
+
+**No API key in this environment?** `anthropicModel()` doesn't throw: the page still renders,
+and customizing is off with a short message ("Customizing isn't set up here yet."). So you
+can deploy everywhere and set `ANTHROPIC_API_KEY` only where you want it.
+
 ## Who gets it
 
 `availability(ctx, surfaceId)` turns customizing and data views on or off per user, from
@@ -30,7 +37,7 @@ The view always renders, and users who lose access keep their saved changes by d
 ## Language
 
 Messages, previews and the model's replies follow the user's language: the `locale(ctx,
-request)` hook, else the `x-patina-locale` header, else `Accept-Language`. English and German
+request)` hook, else the `locale` query parameter (sent by `<PatinaProvider locale>`), else `Accept-Language`. English and German
 are built in. See [Localization](localization.md).
 
 ## What customers ask for

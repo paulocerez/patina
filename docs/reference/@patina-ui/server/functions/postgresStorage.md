@@ -2,19 +2,46 @@
 
 # Function: postgresStorage()
 
-> **postgresStorage**(`__namedParameters`): [`StorageAdapter`](../interfaces/StorageAdapter.md) & `Required`\<`Pick`\<[`StorageAdapter`](../interfaces/StorageAdapter.md), `"incrementUsage"` \| `"logRequest"` \| `"listRequests"`\>\> & [`FollowUpLinks`](../interfaces/FollowUpLinks.md) & `object`
+## Call Signature
+
+> **postgresStorage**(`options`): `FullPostgresStorage`
 
 Postgres storage. History is append-only; `append` uses the unique
 `(tenant_id, layer, subject_id, surface_id, seq)` constraint for optimistic concurrency.
 
-## Parameters
+Pass features to use fewer tables, e.g. only saved customizations:
 
-### \_\_namedParameters
+  postgresStorage({ query, previews: "memory", requestLog: false, usage: false, followUps: false })
 
-#### query
+### Parameters
+
+#### options
+
+##### query
 
 [`QueryFn`](../type-aliases/QueryFn.md)
 
-## Returns
+### Returns
 
-[`StorageAdapter`](../interfaces/StorageAdapter.md) & `Required`\<`Pick`\<[`StorageAdapter`](../interfaces/StorageAdapter.md), `"incrementUsage"` \| `"logRequest"` \| `"listRequests"`\>\> & [`FollowUpLinks`](../interfaces/FollowUpLinks.md) & `object`
+`FullPostgresStorage`
+
+## Call Signature
+
+> **postgresStorage**(`options`): [`StorageAdapter`](../interfaces/StorageAdapter.md) & `object`
+
+Postgres storage. History is append-only; `append` uses the unique
+`(tenant_id, layer, subject_id, surface_id, seq)` constraint for optimistic concurrency.
+
+Pass features to use fewer tables, e.g. only saved customizations:
+
+  postgresStorage({ query, previews: "memory", requestLog: false, usage: false, followUps: false })
+
+### Parameters
+
+#### options
+
+`object` & [`PostgresFeatures`](../interfaces/PostgresFeatures.md)
+
+### Returns
+
+[`StorageAdapter`](../interfaces/StorageAdapter.md) & `object`

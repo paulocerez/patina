@@ -48,15 +48,39 @@ const GRAMMAR_TOO_LARGE =
  * By default Claude Haiku 5.5 answers and Claude Sonnet 5.5 is the backup (see `backupModel`).
  */
 export function anthropicModel(options: AnthropicModelOptions = {}): ModelAdapter {
-  const client = options.client ?? new Anthropic(options.apiKey ? { apiKey: options.apiKey } : {});
+  const client = lazyClient(options);
   const primary = singleModel(client, options.model ?? "claude-haiku-5-5", options);
   const backupId = options.backupModel === undefined ? "claude-sonnet-5-5" : options.backupModel;
   if (!backupId || backupId === (options.model ?? "claude-haiku-5-5")) return primary;
   return withBackup(primary, singleModel(client, backupId, options));
 }
 
+/**
+ * The client is created on first use, so an environment without ANTHROPIC_API_KEY can still
+ * start: the adapter reports `available() === false` and the handler turns customizing off.
+ */
+function lazyClient(options: { client?: Anthropic; apiKey?: string }) {
+  let client: Anthropic | null = options.client ?? null;
+  return {
+    get(): Anthropic {
+      client ??= new Anthropic(options.apiKey ? { apiKey: options.apiKey } : {});
+      return client;
+    },
+    /** A client you passed counts as ready; otherwise it needs an API key or auth token. */
+    available(): boolean {
+      if (options.client || options.apiKey) return true;
+      try {
+        const c = this.get() as unknown as { apiKey?: string | null; authToken?: string | null };
+        return Boolean(c.apiKey || c.authToken);
+      } catch {
+        return false;
+      }
+    },
+  };
+}
+
 function singleModel(
-  client: Anthropic,
+  client: ReturnType<typeof lazyClient>,
   model: string,
   options: AnthropicModelOptions,
 ): ModelAdapter {
@@ -72,7 +96,7 @@ function singleModel(
     schema: Record<string, unknown>,
     signal?: AbortSignal,
   ) {
-    return client.beta.messages.create(
+    return client.get().beta.messages.create(
       {
         model,
         max_tokens: options.maxTokens ?? 4096,
@@ -93,6 +117,7 @@ function singleModel(
 
   return {
     id: `anthropic/${model}`,
+    available: () => client.available(),
     async propose(request: ModelRequest, opts) {
       const key = JSON.stringify(request.outputSchema).length.toString();
       const compact = mode === "compact" || (mode === "auto" && tooLarge.has(key));
@@ -171,7 +196,7 @@ const GROUPS_SCHEMA = {
  * Only the redacted request texts, counts and reason codes are sent.
  */
 export function anthropicGrouper(options: AnthropicGrouperOptions = {}): FollowUpGrouper {
-  const client = options.client ?? new Anthropic(options.apiKey ? { apiKey: options.apiKey } : {});
+  const client = lazyClient(options);
   const language = options.language ?? "English";
   return async (clusters, known) => {
     const system = `You group product feature requests. Users of a web app typed requests to customize a page; the app couldn't do them. Each numbered request below is one wording, with how often it was asked and why it failed.
@@ -191,7 +216,7 @@ ${known.map((k) => `${k.key}: ${k.title}`).join("\n") || "(none)"}
 <requests>
 ${clusters.map((c, i) => `${i}. [${c.count}× by ${c.customers} customer(s); ${c.reasons.join(", ")}] ${JSON.stringify(c.prompt)}`).join("\n")}
 </requests>`;
-    const response = await client.beta.messages.create({
+    const response = await client.get().beta.messages.create({
       model: options.model ?? "claude-sonnet-5-5",
       max_tokens: 8000,
       system,

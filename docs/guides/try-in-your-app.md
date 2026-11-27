@@ -126,6 +126,10 @@ import {
 </PatinaProvider>;
 ```
 
+**An existing page?** Keep its JSX and use `useSlot` / `useCollection` / `useSurfaceProp`
+instead of `<Surface>` (see [React](react.md#existing-pages-useslot-usecollection-usesurfaceprop)).
+**API on another origin?** `<PatinaProvider credentials="include" params={{ accountId }}>`.
+
 In Next.js, the `@patina-ui/react` bundle is already marked `"use client"`, so you can import
 it from a client component.
 
@@ -165,10 +169,14 @@ import { migratePostgres, postgresStorage } from "@patina-ui/server";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const query = (sql: string, params?: unknown[]) => pool.query(sql, params);
-await migratePostgres(query); // creates patina_history and patina_proposals if missing
+await migratePostgres(query); // creates Patina's tables if missing
 
 const storage = postgresStorage({ query });
 ```
+
+Only want saved customizations? `postgresStorage({ query, previews: "memory", requestLog: false, usage: false, followUps: false })`
+needs just `patina_history`. With Drizzle, `export { patinaHistory } from "@patina-ui/server/drizzle"`
+in your schema file and generate the migration.
 
 See [Storage](storage.md).
 

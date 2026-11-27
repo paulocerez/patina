@@ -161,8 +161,8 @@ Return the caller's identity from the host session, or null if not signed in (â†
 > `optional` **locale**(`ctx`, `request`): `string` \| `Promise`\<`string` \| `undefined`\> \| `undefined`
 
 The user's language for Patina's messages, previews and the model's replies. Default: the
-`x-patina-locale` header (sent by <PatinaProvider locale>), then Accept-Language, then
-English. Supported: en, de; host labels can be given per language.
+`locale` query parameter (sent by <PatinaProvider locale>), the `x-patina-locale` header,
+then Accept-Language, then English. Supported: en, de; host labels can be given per language.
 
 #### Parameters
 

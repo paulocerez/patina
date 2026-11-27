@@ -12,6 +12,11 @@ export interface ModelAdapter {
     request: ModelRequest,
     options?: { signal?: AbortSignal; attempt?: number },
   ): Promise<unknown>;
+  /**
+   * False when the model can't be used here (e.g. no API key in this environment). The handler
+   * then turns customizing off with a short message instead of failing each request.
+   */
+  available?(): boolean;
 }
 
 /**
@@ -22,6 +27,7 @@ export interface ModelAdapter {
 export function withBackup(primary: ModelAdapter, backup: ModelAdapter): ModelAdapter {
   return {
     id: `${primary.id}+${backup.id}`,
+    available: () => (primary.available?.() ?? true) || (backup.available?.() ?? true),
     async propose(request, options) {
       if ((options?.attempt ?? 0) > 0) return backup.propose(request, options);
       try {

@@ -17,8 +17,14 @@ export {
 } from "./insights.js";
 export type { ModelAdapter } from "./model.js";
 export { ModelRefusal, withBackup } from "./model.js";
-export type { QueryFn } from "./postgres.js";
-export { migratePostgres, POSTGRES_SCHEMA, postgresStorage } from "./postgres.js";
+export type { PostgresFeatures, PostgresTable, QueryFn } from "./postgres.js";
+export {
+  migratePostgres,
+  POSTGRES_SCHEMA,
+  postgresSchema,
+  postgresStorage,
+  postgresTables,
+} from "./postgres.js";
 export type {
   Entry,
   FollowUpLinks,
@@ -32,4 +38,4 @@ export type {
   StorageAdapter,
   UsageKey,
 } from "./storage.js";
-export { ConflictError, memoryStorage } from "./storage.js";
+export { ConflictError, memoryProposals, memoryStorage } from "./storage.js";
