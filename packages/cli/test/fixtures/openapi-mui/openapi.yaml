@@ -1,0 +1,37 @@
+openapi: 3.1.0
+info: { title: Billing, version: "1" }
+paths:
+  /api/invoices:
+    get:
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+        - $ref: "#/components/parameters/Page"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/Invoice" } }
+                  next: { type: string }
+  /api/invoices/{id}:
+    get:
+      responses: { "200": { description: one } }
+  /api/invoices/export:
+    post:
+      responses: { "200": { description: write } }
+components:
+  parameters:
+    Page: { name: page, in: query, schema: { type: integer } }
+  schemas:
+    Invoice:
+      type: object
+      required: [id, amount, status, issuedOn]
+      properties:
+        id: { type: string }
+        amount: { type: number }
+        status: { type: string, enum: [draft, sent, paid] }
+        issuedOn: { type: string, format: date }
+        customerEmail: { type: string }
+        overdue: { type: boolean }

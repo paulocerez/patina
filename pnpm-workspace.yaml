@@ -1,0 +1,8 @@
+packages:
+  - packages/*
+  - examples/*
+  - evals
+  - tools/*
+allowBuilds:
+  esbuild: true
+  fsevents: false

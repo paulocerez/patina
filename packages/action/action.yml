@@ -1,0 +1,32 @@
+name: Patina check
+description: Checks pull requests for API and design changes that affect Patina's data catalog and data blocks, and comments on the PR.
+author: Patina
+branding:
+  icon: layers
+  color: green
+inputs:
+  working-directory:
+    description: Where the app lives, relative to the repository root (for monorepos).
+    default: "."
+  patina-dir:
+    description: Directory with scan.json and catalog.ts, relative to working-directory.
+    default: patina
+  fail-on:
+    description: "Fail the check at this severity or above: breaking | changed | info | never."
+    default: breaking
+  comment:
+    description: Keep one comment on the PR up to date with the findings ("true" or "false").
+    default: "true"
+  github-token:
+    description: Token used to comment. Needs pull-requests write permission.
+    default: ${{ github.token }}
+outputs:
+  breaking:
+    description: Number of breaking findings.
+  changed:
+    description: Number of findings to review.
+  info:
+    description: Number of notes.
+runs:
+  using: node24
+  main: dist/index.cjs

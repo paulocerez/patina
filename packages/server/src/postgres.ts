@@ -1,0 +1,192 @@
+import type { Op } from "@patina/core";
+import {
+  ConflictError,
+  type Entry,
+  type HistoryKey,
+  type NewEntry,
+  type Proposal,
+  type StorageAdapter,
+} from "./storage.js";
+
+/**
+ * Any function that runs a parameterized query and returns rows: `pg`'s `pool.query`,
+ * PGlite's `db.query`, or a two-line shim around postgres.js. Patina imports no driver.
+ */
+export type QueryFn = (
+  sql: string,
+  params?: unknown[],
+) => Promise<{ rows: Record<string, unknown>[] }>;
+
+/** The schema. Run it once with `migratePostgres(query)`, or copy it into your own migrations. */
+export const POSTGRES_SCHEMA = `
+create table if not exists patina_history (
+  id             text        primary key,
+  tenant_id      text        not null default '',
+  layer          text        not null check (layer in ('user', 'tenant')),
+  subject_id     text        not null,
+  surface_id     text        not null,
+  seq            integer     not null,
+  kind           text        not null check (kind in ('patch', 'revert', 'reset')),
+  target_id      text        null references patina_history(id),
+  schema_version integer     null,
+  base_version   integer     null,
+  ops            jsonb       null,
+  prompt         text        null,
+  summary        text        null,
+  model          text        null,
+  created_at     timestamptz not null default now(),
+  unique (tenant_id, layer, subject_id, surface_id, seq)
+);
+
+create table if not exists patina_proposals (
+  id          text        primary key,
+  tenant_id   text        not null default '',
+  layer       text        not null,
+  subject_id  text        not null,
+  surface_id  text        not null,
+  base_seq    integer     not null,
+  ops         jsonb       not null,
+  summary     text        not null,
+  prompt      text        not null,
+  model       text        not null,
+  expires_at  timestamptz not null
+);
+create index if not exists patina_proposals_expires_at on patina_proposals (expires_at);
+`;
+
+export async function migratePostgres(query: QueryFn): Promise<void> {
+  for (const statement of POSTGRES_SCHEMA.split(";")
+    .map((s) => s.trim())
+    .filter(Boolean)) {
+    await query(statement);
+  }
+}
+
+const iso = (v: unknown) =>
+  v instanceof Date ? v.toISOString() : new Date(String(v)).toISOString();
+const json = (v: unknown) => (typeof v === "string" ? JSON.parse(v) : v);
+
+function toEntry(r: Record<string, unknown>): Entry {
+  const common = { id: r.id as string, seq: Number(r.seq), createdAt: iso(r.created_at) };
+  if (r.kind === "revert") return { ...common, kind: "revert", targetId: r.target_id as string };
+  if (r.kind === "reset") return { ...common, kind: "reset" };
+  return {
+    ...common,
+    kind: "patch",
+    patch: {
+      id: r.id as string,
+      schemaVersion: Number(r.schema_version) as 1,
+      baseVersion: Number(r.base_version),
+      ops: json(r.ops) as Op[],
+      ...(r.summary ? { summary: r.summary as string } : {}),
+    },
+    prompt: (r.prompt as string | null) ?? null,
+    summary: (r.summary as string | null) ?? null,
+    model: (r.model as string | null) ?? null,
+  };
+}
+
+const keyParams = (k: HistoryKey) => [k.tenantId ?? "", k.layer, k.subjectId, k.surfaceId];
+
+/**
+ * Postgres storage. History is append-only; `append` uses the unique
+ * `(tenant_id, layer, subject_id, surface_id, seq)` constraint for optimistic concurrency.
+ */
+export function postgresStorage({ query }: { query: QueryFn }): StorageAdapter & {
+  /** Clears stored prompts older than `before` (prompt retention). Returns the number of rows changed. */
+  redactPrompts(before: Date): Promise<number>;
+} {
+  return {
+    async list(key) {
+      const { rows } = await query(
+        `select * from patina_history
+         where tenant_id = $1 and layer = $2 and subject_id = $3 and surface_id = $4
+         order by seq`,
+        keyParams(key),
+      );
+      return rows.map(toEntry);
+    },
+
+    async append(key, entry: NewEntry, expectedSeq) {
+      const patch = entry.kind === "patch" ? entry.patch : null;
+      try {
+        const { rows } = await query(
+          `insert into patina_history
+             (id, tenant_id, layer, subject_id, surface_id, seq, kind, target_id,
+              schema_version, base_version, ops, prompt, summary, model)
+           select $1, $2, $3, $4, $5, $6::integer + 1, $7, $8, $9, $10, $11::jsonb, $12, $13, $14
+           where (select coalesce(max(seq), 0) from patina_history
+                  where tenant_id = $2 and layer = $3 and subject_id = $4 and surface_id = $5) = $6::integer
+           returning *`,
+          [
+            entry.id,
+            ...keyParams(key),
+            expectedSeq,
+            entry.kind,
+            entry.kind === "revert" ? entry.targetId : null,
+            patch?.schemaVersion ?? null,
+            patch?.baseVersion ?? null,
+            patch ? JSON.stringify(patch.ops) : null,
+            entry.kind === "patch" ? (entry.prompt ?? null) : null,
+            entry.kind === "patch" ? (entry.summary ?? patch?.summary ?? null) : null,
+            entry.kind === "patch" ? (entry.model ?? null) : null,
+          ],
+        );
+        if (!rows[0]) throw new ConflictError();
+        return toEntry(rows[0]);
+      } catch (e) {
+        // 23505 = unique_violation: another writer took this seq first.
+        if ((e as { code?: string }).code === "23505") throw new ConflictError();
+        throw e;
+      }
+    },
+
+    async saveProposal(p: Proposal) {
+      await query("delete from patina_proposals where expires_at < now()");
+      await query(
+        `insert into patina_proposals
+           (id, tenant_id, layer, subject_id, surface_id, base_seq, ops, summary, prompt, model, expires_at)
+         values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11)`,
+        [
+          p.id,
+          ...keyParams(p.key),
+          p.baseSeq,
+          JSON.stringify(p.ops),
+          p.summary,
+          p.prompt,
+          p.model,
+          p.expiresAt,
+        ],
+      );
+    },
+
+    async takeProposal(id, key) {
+      const { rows } = await query(
+        `delete from patina_proposals
+         where id = $1 and tenant_id = $2 and layer = $3 and subject_id = $4 and surface_id = $5
+         returning *, expires_at > now() as live`,
+        [id, ...keyParams(key)],
+      );
+      const r = rows[0];
+      if (!r?.live) return null;
+      return {
+        id: r.id as string,
+        key,
+        baseSeq: Number(r.base_seq),
+        ops: json(r.ops) as Op[],
+        summary: r.summary as string,
+        prompt: r.prompt as string,
+        model: r.model as string,
+        expiresAt: iso(r.expires_at),
+      };
+    },
+
+    async redactPrompts(before) {
+      const { rows } = await query(
+        "update patina_history set prompt = null where prompt is not null and created_at < $1 returning id",
+        [before.toISOString()],
+      );
+      return rows.length;
+    },
+  };
+}

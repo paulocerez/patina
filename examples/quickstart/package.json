@@ -1,0 +1,29 @@
+{
+  "name": "quickstart",
+  "private": true,
+  "description": "The README quick start as a runnable app. Type-checked in CI so the README can't drift.",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k \"tsx server.ts\" \"vite\"",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.14.0",
+    "@patina/core": "workspace:*",
+    "@patina/react": "workspace:*",
+    "@patina/server": "workspace:*",
+    "express": "^5.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.11",
+    "@types/react": "^19.3.3",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "concurrently": "^10.0.7",
+    "tsx": "^4.23.15",
+    "vite": "^8.4.0"
+  }
+}

@@ -1,0 +1,10 @@
+import { defineConfig } from "tsup";
+
+export default defineConfig({
+  entry: ["src/index.ts"],
+  format: ["esm"],
+  clean: true,
+  external: ["react", "@patina/core"],
+  // Hooks and components: mark the bundle as client-only for React Server Components (Next.js).
+  banner: { js: '"use client";' },
+});

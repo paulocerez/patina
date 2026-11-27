@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "stack": {
+    "frameworks": ["express", "vite"],
+    "ui": "css",
+    "tailwind": false,
+    "charts": "recharts",
+    "tables": "@tanstack/react-table"
+  },
+  "design": {
+    "cssVariables": {
+      "bg": "#f6f5f3",
+      "card": "#ffffff",
+      "ink": "#1c1917",
+      "muted": "#78716c",
+      "line": "#e7e5e4",
+      "accent": "#0f766e",
+      "accent-soft": "#ccfbf1",
+      "warn": "#b45309"
+    },
+    "classes": ["badge", "card", "chip", "empty", "muted", "stat-label", "stat-value"],
+    "components": []
+  },
+  "sources": {
+    "appointments": {
+      "endpoint": {
+        "path": "/api/data/appointments",
+        "method": "GET"
+      },
+      "params": ["range", "status"],
+      "fields": {
+        "id": {
+          "kind": "string"
+        },
+        "date": {
+          "kind": "date"
+        },
+        "time": {
+          "kind": "string"
+        },
+        "patient": {
+          "kind": "string"
+        },
+        "species": {
+          "kind": "string"
+        },
+        "vet": {
+          "kind": "string"
+        },
+        "owner": {
+          "kind": "string"
+        },
+        "ownerPhone": {
+          "kind": "string",
+          "sensitive": true
+        },
+        "status": {
+          "kind": "enum",
+          "values": ["scheduled", "completed", "cancelled", "noShow"]
+        },
+        "revenue": {
+          "kind": "currency",
+          "optional": true
+        }
+      },
+      "evidence": ["server/data.ts#Appointment", "server/index.ts:43"]
+    },
+    "metrics": {
+      "endpoint": {
+        "path": "/api/data/metrics",
+        "method": "GET"
+      },
+      "params": ["groupBy", "range", "status"],
+      "fields": {
+        "visits": {
+          "kind": "number"
+        },
+        "noShows": {
+          "kind": "number"
+        },
+        "revenue": {
+          "kind": "currency",
+          "optional": true
+        },
+        "avgRevenue": {
+          "kind": "currency",
+          "optional": true
+        }
+      },
+      "evidence": ["server/index.ts:49", "src/data.tsx#Metrics"]
+    },
+    "me": {
+      "endpoint": {
+        "path": "/api/me",
+        "method": "GET"
+      },
+      "params": [],
+      "fields": {},
+      "evidence": ["server/index.ts:34"]
+    }
+  }
+}

@@ -1,0 +1,8 @@
+node_modules
+dist
+.context
+*.log
+.env
+evals/results
+.packs
+!packages/action/dist

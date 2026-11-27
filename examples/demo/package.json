@@ -1,0 +1,32 @@
+{
+  "name": "demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n server,web \"tsx watch server/index.ts\" \"vite\"",
+    "server": "tsx server/index.ts",
+    "build": "vite build",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.14.0",
+    "@patina/core": "workspace:*",
+    "@patina/react": "workspace:*",
+    "@patina/server": "workspace:*",
+    "@tanstack/react-table": "^9.3.1",
+    "express": "^5.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "recharts": "^3.11.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.11",
+    "@types/react": "^19.3.3",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "concurrently": "^10.0.7",
+    "tsx": "^4.23.15",
+    "vite": "^8.3.8"
+  }
+}

@@ -1,0 +1,15 @@
+enum OrderStatus {
+  PENDING
+  PAID
+  REFUNDED
+}
+model Order {
+  id        String      @id
+  createdAt DateTime    @default(now())
+  total     Decimal
+  status    OrderStatus
+  customer  Customer    @relation(fields: [customerId], references: [id])
+  customerId String
+  items     Item[]
+  @@index([customerId])
+}

@@ -1,0 +1,1 @@
+{ "name": "fixture-mui", "dependencies": { "@mui/material": "7.0.0", "express": "5.0.0", "react": "19.0.0" } }

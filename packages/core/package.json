@@ -1,0 +1,27 @@
+{
+  "name": "@patina/core",
+  "version": "0.0.0",
+  "description": "Spec, capability manifest and patch engine for prompt-driven UI customization. No framework dependencies.",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --clean --external @patina/core && tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p ."
+  }
+}
