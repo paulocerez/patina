@@ -70,7 +70,8 @@ jobs:
           git push origin --tags
           version=$(node -p "require('./packages/core/package.json').version")
           if [ -z "$(git ls-remote --tags origin "refs/tags/action-v$version")" ] && \
-             [ "$(npm view "@patina-ui/core@$version" version 2>/dev/null)" = "$version" ]; then
+             git rev-parse -q --verify "refs/tags/@patina-ui/core@$version" >/dev/null; then
+            # changeset publish creates that tag only after publishing (npm itself can lag minutes).
             major="v${version%%.*}"
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
