@@ -1,5 +1,14 @@
 # @patina-ui/cli
 
+## 0.4.1
+
+### Patch Changes
+
+- [`e87777d`](https://github.com/paulocerez/patina/commit/e87777d5e2a8e3feae964e71e796c0fdc3770b79) Thanks [@paulocerez](https://github.com/paulocerez)! - Published with npm provenance: npm now shows that each version was built by this repository's release workflow, from a specific commit.
+- Updated dependencies [[`e87777d`](https://github.com/paulocerez/patina/commit/e87777d5e2a8e3feae964e71e796c0fdc3770b79)]:
+  - @patina-ui/core@0.4.1
+  - @patina-ui/server@0.4.1
+
 ## 0.4.0
 
 ### Patch Changes
