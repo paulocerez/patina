@@ -38,8 +38,10 @@ export interface AnthropicModelOptions {
   schema?: "auto" | "precise" | "compact";
 }
 
+// "too many parameters with union types": the precise schema grows with every data source
+// and every data block a user added (each query brings nullable parts), past the API's limit.
 const GRAMMAR_TOO_LARGE =
-  /grammar is too large|schema is too (large|complex)|too many (strict )?(tools|schemas)/i;
+  /grammar is too large|schema is too (large|complex)|too many (strict )?(tools|schemas)|too many parameters with union types/i;
 
 /**
  * Anthropic implementation of `ModelAdapter`, using structured outputs with the JSON Schema
