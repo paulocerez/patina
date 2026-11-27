@@ -47,10 +47,26 @@ jobs:
       # runner's user config (where setup-node put the token), never into the repository.
       - name: Enable npm provenance (public repository)
         if: env.NPM_TOKEN != '' && github.event.repository.visibility == 'public'
-        run: echo "provenance=true" >> "$NPM_CONFIG_USERCONFIG"
+        run: |
+          # changesets/action writes ~/.npmrc for the token; pnpm may read either file.
+          echo "provenance=true" >> "$NPM_CONFIG_USERCONFIG"
+          echo "provenance=true" >> "$HOME/.npmrc"
+          echo "npm_config_provenance=true" >> "$GITHUB_ENV"
+
+      # npm can take minutes to show a new version. A push right after a release would otherwise
+      # see the packages as unpublished and try (and fail) to publish them again.
+      - id: released
+        if: env.NPM_TOKEN != ''
+        run: |
+          version=$(node -p "require('./packages/core/package.json').version")
+          pending=$(ls .changeset/*.md 2>/dev/null | grep -v README.md | wc -l)
+          if [ "$pending" = "0" ] && [ -n "$(git ls-remote --tags origin "refs/tags/@patina-ui/core@$version")" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::$version is already released and no changesets are pending."
+          fi
 
       - id: changesets
-        if: env.NPM_TOKEN != ''
+        if: env.NPM_TOKEN != '' && steps.released.outputs.skip != 'true'
         uses: changesets/action@v1
         with:
           version: pnpm version-packages
@@ -65,7 +81,7 @@ jobs:
       # (`action-v<version>`, and move the `v<major>` tag users pin) once per version.
       # Both steps are idempotent, so they don't depend on detecting what was published.
       - name: Push release tags
-        if: env.NPM_TOKEN != ''
+        if: env.NPM_TOKEN != '' && steps.released.outputs.skip != 'true'
         run: |
           git push origin --tags
           version=$(node -p "require('./packages/core/package.json').version")
