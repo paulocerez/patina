@@ -5,7 +5,9 @@
 #   `v0` tag (and adds `action-v<version>`) so `uses: …/packages/action@v0` gets the update.
 #
 # Needs the NPM_TOKEN secret (a granular npm token with publish rights on @patina-ui).
-# Provenance is turned on automatically once the repository is public.
+# Publishes with npm provenance (`pnpm release:ci` passes --provenance; needs id-token: write).
+# It's a flag on purpose: pnpm 11+ ignores provenance in .npmrc and npm_config_* variables,
+# and `changeset publish` calls `pnpm publish` with fixed flags.
 name: Release
 
 on:
@@ -43,16 +45,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
         if: env.NPM_TOKEN != ''
 
-      # pnpm reads provenance from npm config, not from NPM_CONFIG_PROVENANCE. Write it to the
-      # runner's user config (where setup-node put the token), never into the repository.
-      - name: Enable npm provenance (public repository)
-        if: env.NPM_TOKEN != '' && github.event.repository.visibility == 'public'
-        run: |
-          # changesets/action writes ~/.npmrc for the token; pnpm may read either file.
-          echo "provenance=true" >> "$NPM_CONFIG_USERCONFIG"
-          echo "provenance=true" >> "$HOME/.npmrc"
-          echo "npm_config_provenance=true" >> "$GITHUB_ENV"
-
       # npm can take minutes to show a new version. A push right after a release would otherwise
       # see the packages as unpublished and try (and fail) to publish them again.
       - id: released
@@ -70,7 +62,7 @@ jobs:
         uses: changesets/action@v1
         with:
           version: pnpm version-packages
-          publish: pnpm release
+          publish: pnpm release:ci
           title: "Version Packages"
           commit: "Version Packages"
         env:

@@ -18,7 +18,8 @@
     "pack:local": "bash scripts/pack-local.sh",
     "changeset": "changeset",
     "version-packages": "changeset version && pnpm install --lockfile-only",
-    "release": "pnpm build && changeset publish"
+    "release": "pnpm build && pnpm -r publish --access public --no-git-checks && changeset git-tag",
+    "release:ci": "pnpm build && pnpm -r publish --access public --no-git-checks --provenance && changeset git-tag"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.9",

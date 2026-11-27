@@ -54,8 +54,10 @@ don't need one.
 2. Review that PR and merge it.
 3. The workflow then:
    - builds the packages;
-   - runs `changeset publish`, which uses `pnpm publish` so `workspace:^` dependencies become
-     real version ranges;
+   - publishes every package whose version isn't on npm yet with
+     `pnpm -r publish --provenance` (so `workspace:^` dependencies become real version ranges,
+     and npm shows each version was built here, from this commit), then tags them with
+     `changeset git-tag`;
    - pushes the git tags;
    - moves the Action's `v0` tag and adds `action-v<version>`.
 
@@ -94,7 +96,14 @@ was, so existing users aren't moved onto breaking changes.
 ## Provenance
 
 Releases built by the workflow from this public repo get npm provenance: a signed link from
-each package version to the commit and workflow run that built it. The workflow turns it on
-by writing `provenance=true` to the runner's user-level npm config (never to the repository). pnpm doesn't read the `NPM_CONFIG_PROVENANCE`
-variable, which is why 0.1.0 shipped without provenance. Later versions will have it. Local
-`pnpm release` runs don't get provenance.
+each package version to the commit and workflow run that built it. The workflow runs
+`pnpm release:ci`, which passes `--provenance` to `pnpm -r publish`; GitHub's OIDC token
+(`id-token: write`) signs it.
+
+It has to be the flag. pnpm 11 and later read settings only from `pnpm-workspace.yaml`, their
+own config and `PNPM_CONFIG_*` variables (`.npmrc` is for credentials only), and
+`changeset publish` calls `pnpm publish` with fixed flags. Setting `provenance=true` in an
+`.npmrc` or `npm_config_provenance` did nothing, which is why 0.1.0 to 0.4.0 have no
+provenance.
+
+Local `pnpm release` runs don't get provenance (there's no OIDC token outside CI).
