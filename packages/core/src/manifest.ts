@@ -34,6 +34,12 @@ export interface Restriction {
   sources?: string[];
   /** Catalog fields to remove, as "source.field". */
   fields?: string[];
+  /**
+   * This tenant's values for text fields, as "source.field" → values. The field becomes an
+   * enum for this request, so views can filter on it ("calls of the Emergency task") and the
+   * model knows the values. Use it for values each tenant names itself.
+   */
+  values?: Record<string, string[]>;
 }
 
 export interface SurfaceDefinition<Ctx = unknown> {
@@ -48,7 +54,7 @@ export interface SurfaceDefinition<Ctx = unknown> {
   components: Record<string, ComponentDef>;
   presets?: Record<string, PresetDef>;
   /** Narrows the manifest for one request. Called with the host's request context. */
-  restrict?(ctx: Ctx): Restriction;
+  restrict?(ctx: Ctx): Restriction | Promise<Restriction>;
   /** Ops authored before `version` N pass through `migrations[N]`. */
   migrations?: Record<number, Migration[]>;
   /** Data sources users may compose into new views (see `defineCatalog`). */
@@ -58,7 +64,7 @@ export interface SurfaceDefinition<Ctx = unknown> {
 export interface Manifest<Ctx = unknown>
   extends Required<Omit<SurfaceDefinition<Ctx>, "restrict" | "catalog">> {
   catalog?: Catalog;
-  restrict?(ctx: Ctx): Restriction;
+  restrict?(ctx: Ctx): Restriction | Promise<Restriction>;
   /** Set on manifests returned by `restrictManifest`. */
   restriction?: Restriction;
   /** The locale texts are shown in (see `localizeManifest`). Default English. */
@@ -206,6 +212,7 @@ export function restrictManifest<Ctx>(m: Manifest<Ctx>, restriction: Restriction
         sources: restriction.sources ?? [],
         fields: restriction.fields ?? [],
         keys: restriction.keys ?? [],
+        values: restriction.values ?? {},
       })
     : undefined;
   const nothing =

@@ -4,7 +4,7 @@
  *
  * Nothing here imports an LLM SDK.
  */
-import { offerableFields } from "./catalog.js";
+import { choiceParams, offerableFields } from "./catalog.js";
 import { msg, pickLocale, type Text, tx } from "./i18n.js";
 
 const LANGUAGE_NAMES: Record<string, string> = {
@@ -470,6 +470,23 @@ export function describeSources(m: Manifest<unknown>): unknown {
         label: tx(src.label, m.locale),
         ...(src.description ? { description: tx(src.description, "en") } : {}),
         canAggregate: !!src.complete,
+        ...(Object.keys(choiceParams(src)).length
+          ? {
+              perViewParams: Object.fromEntries(
+                Object.entries(choiceParams(src)).map(([pid, p]) => [
+                  pid,
+                  {
+                    label: tx(p.label, m.locale) ?? pid,
+                    choices: p.choices.map((c) => ({
+                      value: c,
+                      label: tx(p.choiceLabels?.[c], m.locale) ?? c,
+                    })),
+                    default: p.from ? `the page's ${p.from} setting` : (p.value ?? null),
+                  },
+                ]),
+              ),
+            }
+          : {}),
         fields: Object.fromEntries(
           Object.entries(offerableFields(src)).map(([fid, fd]) => [
             fid,

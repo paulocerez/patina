@@ -128,6 +128,71 @@ Go through the draft and check each of these:
 `defineCatalog` throws at startup on anything unsafe: non-GET methods, absolute or `..`
 paths, enums without values, and so on.
 
+### Answer the questions users actually ask
+
+Most refused requests aren't about data you don't have. They ask for a **dimension** the rows
+don't carry as such ("calls by weekday", "short vs. long calls", "emergencies"), a **filter**
+on a value each customer names themselves ("calls of our Emergency task"), or a **different
+period** for one card ("no-shows this week"). Three catalog features cover these, without new
+endpoints:
+
+**Derived fields** are computed in the browser from another field of the same row.
+They are declarative, so the host writes no code and Patina evaluates them:
+
+```ts
+fields: {
+  startedAt: f.date({ label: "Date" }),
+  duration: f.number({ label: "Duration (s)" }),
+  task: f.string({ label: "Task" }),
+  weekday: f.weekday("startedAt", { label: "Weekday", timeZone: "Europe/Berlin" }),
+  hour: f.hour("startedAt", { label: "Hour" }),
+  length: f.ranges("duration", [
+    { value: "short", below: 30 },
+    { value: "normal", below: 300 },
+    { value: "long" },
+  ], { label: "Length", valueLabels: { short: "Short (under 30 s)" } }),
+  emergency: f.contains("task", ["emergency", "urgent"], { label: "Emergency" }),
+},
+```
+
+`weekday`, `hour` and `ranges` are enums and `contains` is a yes/no field, so they can be
+grouped, filtered and shown like any other field. Charts keep their natural order (Monday
+first, short before long). A derived field can't read a sensitive field: what it reads would
+leak into views.
+
+**Values per tenant.** A text field can be filtered only if its values are known. When each
+tenant names its own (task types, locations, vets), return them from `restrict`. It may be
+async:
+
+```ts
+restrict: async (ctx) => ({
+  values: { "calls.task": await taskNames(ctx.tenantId) },
+}),
+```
+
+For that request the field becomes an enum of those values: views can filter on it and the
+model knows the names.
+
+**Per-view params.** Give a param `choices`, and a single view may pick its own value instead
+of the page's. Your `fetchSource` receives it as usual:
+
+```ts
+params: {
+  range: {
+    from: "filters.dateRange", // the default
+    label: "Date range",
+    choices: ["today", "thisWeek", "thisMonth", "last30days"],
+    choiceLabels: { thisWeek: "This week", thisMonth: "This month" },
+  },
+},
+```
+
+A card of _"no-shows this week"_ then carries `params: { range: "thisWeek" }`, and its title
+says so.
+
+Check the request log ([Insights](insights.md)) for what users ask for: it shows which of
+these to add next.
+
 ## 3. Register the blocks
 
 ```ts

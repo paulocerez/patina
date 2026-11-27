@@ -63,8 +63,8 @@ it("resolves base → tenant → user", () => {
   expect(r.spec.nodes.filters?.props.dateRange).toEqual({ relative: "thisWeek" });
 });
 
-it("applies the restriction before user patches, so restricted things never come back", () => {
-  const m = restrictManifest(dashboard, dashboard.restrict?.({ permissions: [] }) ?? {});
+it("applies the restriction before user patches, so restricted things never come back", async () => {
+  const m = restrictManifest(dashboard, (await dashboard.restrict?.({ permissions: [] })) ?? {});
   const r = resolve(m, [
     { name: "user", entries: [{ kind: "patch", id: "u", seq: 1, patch: briefPatch }] },
   ]);

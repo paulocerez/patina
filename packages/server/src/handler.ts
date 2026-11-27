@@ -263,7 +263,7 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
 
   async function load(manifest: Manifest<Ctx>, ctx: Ctx, av: Availability) {
     const m = restrictManifest(localizeManifest(manifest, av.locale), {
-      ...(manifest.restrict?.(ctx) ?? {}),
+      ...((await manifest.restrict?.(ctx)) ?? {}),
       permissions: ctx.permissions ?? [],
     });
     const key = keyFor(ctx, manifest.id);
