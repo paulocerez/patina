@@ -1,5 +1,21 @@
 # @patina-ui/server
 
+## 0.5.0
+
+### Minor Changes
+
+- [`d12a1e0`](https://github.com/paulocerez/patina/commit/d12a1e00cccf71637cb7e3442aa8e54e9568823a) Thanks [@paulocerez](https://github.com/paulocerez)! - Data views on pages that render themselves, and users can see what they can ask for.
+  
+  - **Data views with the hooks:** `useSlotItems` returns a slot's own sections plus the blocks users added (`{ kind: "host", key } | { kind: "block", key, node }`), and `<PatinaBlock>` renders a block with the data context `useQuery` needs, so tables, charts and numbers work without `<Surface>`. Previews show new blocks in place; unknown host keys are still dropped. `<SurfaceScope>` gives your own components the same context. `useSlot` is unchanged.
+  - **What you can ask for:** every `SurfaceState` carries `capabilities` (what can be rearranged, hidden or added, settings with their values, and data sources with their fields), built from the user's restricted manifest and public catalog in their language. Sensitive fields never appear. React: `useCapabilities(surfaceId)` and the headless `<Capabilities>` (a list, or example prompts via its render prop). Core: `capabilities`, `capabilityLines`, `capabilityHint`, `capabilityExamples`.
+  - **Better refusals:** `data_access` and `not_on_page` refusals end with what is available, from the same data (not written by the model): the data sources and fields when there is a catalog, otherwise the parts of the page that can change.
+  - **German replies use "Sie":** the model is told to address German-speaking users formally, matching Patina's own German texts.
+
+### Patch Changes
+
+- Updated dependencies [[`d12a1e0`](https://github.com/paulocerez/patina/commit/d12a1e00cccf71637cb7e3442aa8e54e9568823a)]:
+  - @patina-ui/core@0.5.0
+
 ## 0.4.1
 
 ### Patch Changes
