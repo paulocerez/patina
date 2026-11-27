@@ -6,6 +6,7 @@
       "!**/node_modules",
       "!.context",
       "!.packs",
+      "!docs/assets",
       "!docs/reference",
       "!evals/results",
       "!packages/cli/test/fixtures",
