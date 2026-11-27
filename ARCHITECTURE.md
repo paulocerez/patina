@@ -620,6 +620,13 @@ merely rejected. If validation still fails, the adapter makes **one repair round
 sending the validator's issues back to the model. After that, the request becomes a refusal
 with the validator's message.
 
+**Measured (2026-11-27).** For the demo dashboard, the API refused to compile the precise
+schema ("compiled grammar is too large"). The adapter therefore also has a **compact**
+schema: a single op shape, node and prop as enums, values as JSON text, with each prop's
+allowed values written into the system prompt. It falls back to it automatically. With the
+compact schema, the eval set scores 58/58 (Opus 5.5 and Sonnet 5.5) and 57/58 (Haiku 5.5),
+at a p50 latency of 1.4–1.8 s (see docs/guides/model-and-evals.md).
+
 **Prompt construction**
 
 - The model sees the restricted manifest, the **structural** spec (IDs, keys, host labels,

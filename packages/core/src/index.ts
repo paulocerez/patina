@@ -62,9 +62,11 @@ export type { Migration } from "./migrate.js";
 export { migratePatch, migrations } from "./migrate.js";
 export type { ModelRequest, ModelResult, RefusalCategory } from "./model.js";
 export {
+  buildCompactSchema,
   buildModelRequest,
   buildOutputSchema,
   describeSources,
+  describeType,
   describeView,
   fromModelOutput,
   REFUSAL_CATEGORIES,

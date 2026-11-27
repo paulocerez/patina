@@ -94,6 +94,8 @@ it("every case in the shipped eval set is valid against the demo surface", () =>
     const m = restrictManifest(demo, { ...(demo.restrict?.(u) ?? {}), permissions: u.permissions });
     let spec = resolve(m, []).spec;
     for (const ops of c.history ?? []) spec = apply(m, spec, ops).spec;
-    if (c.expect.kind === "patch") expect(apply(m, spec, c.expect.ops).skipped, c.id).toEqual([]);
+    if (c.expect.kind === "patch")
+      for (const ops of [c.expect.ops, ...(c.expect.alternatives ?? [])])
+        expect(apply(m, spec, ops).skipped, c.id).toEqual([]);
   }
 });

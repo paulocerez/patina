@@ -33,7 +33,17 @@ export interface EvalCase {
   /** Patches already saved for the user before the prompt, oldest first. */
   history?: Op[][];
   /** For "patch": ops whose *result* the model's patch must reproduce. */
-  expect: { kind: "patch"; ops: Op[] } | { kind: "refusal" } | { kind: "clarify" };
+  expect:
+    | {
+        kind: "patch";
+        ops: Op[];
+        /** Other op lists that are also correct (e.g. using an existing preset instead). */
+        alternatives?: Op[][];
+      }
+    | { kind: "refusal" }
+    | { kind: "clarify" };
+  /** Compare the result without caring about the order of items (when the prompt doesn't say where). */
+  ignoreOrder?: boolean;
   /** Other outcomes that also count as a pass (e.g. refusal for an ambiguous prompt). */
   accept?: EvalKind[];
   note?: string;
@@ -120,6 +130,7 @@ async function runCase<Ctx extends PatinaContext>(
   }
 
   let calls = 0;
+  let cause: string | null = null;
   const counted: ModelAdapter = {
     id: o.model.id,
     propose: (req, opts) => {
@@ -132,6 +143,10 @@ async function runCase<Ctx extends PatinaContext>(
     storage,
     model: counted,
     getContext: () => ctx,
+    // Keep the real cause of model failures for the report (the user only sees a generic message).
+    onError: (e) => {
+      cause = e instanceof Error ? e.message.slice(0, 300) : String(e);
+    },
     limits: { proposalsPerMinute: 0 },
   });
   const call = async <T>(method: string, path: string, body?: unknown) => {
@@ -176,29 +191,61 @@ async function runCase<Ctx extends PatinaContext>(
       ...(o.surface.restrict?.(ctx) ?? {}),
       permissions: ctx.permissions ?? [],
     });
-    const expected = apply(m, before.spec, c.expect.ops, "strict");
-    if (expected.skipped.length) {
-      return {
-        ...base,
-        got,
-        pass: false,
-        detail: `bad eval case: ${expected.skipped[0]?.message}`,
-        calls,
-        ms,
-      };
+    const norm = (spec: SurfaceSpec) =>
+      c.ignoreOrder ? sortLists(normalize(spec)) : normalize(spec);
+    const actual = norm(r.previewSpec);
+    let pass = false;
+    for (const ops of [c.expect.ops, ...(c.expect.alternatives ?? [])]) {
+      const expected = apply(m, before.spec, ops, "strict");
+      if (expected.skipped.length) {
+        return {
+          ...base,
+          got,
+          pass: false,
+          detail: `bad eval case: ${expected.skipped[0]?.message}`,
+          calls,
+          ms,
+        };
+      }
+      if (deepEqual(actual, norm(expected.spec))) pass = true;
     }
-    const pass = deepEqual(normalize(r.previewSpec), normalize(expected.spec));
     return { ...base, got, pass, detail: pass ? said : `wrong result: ${said}`, calls, ms };
   } catch (e) {
     return {
       ...base,
       got: "error",
       pass: false,
-      detail: e instanceof Error ? e.message : String(e),
+      detail: `${e instanceof Error ? e.message : String(e)}${cause ? ` (cause: ${cause})` : ""}`,
       calls,
       ms: Math.round(performance.now() - started),
     };
   }
+}
+
+/** Sorts every keyed list (slots, collections) by key, for order-insensitive comparison. */
+function sortLists(spec: SurfaceSpec): SurfaceSpec {
+  const nodes = Object.fromEntries(
+    Object.entries(spec.nodes).map(([id, n]) => [
+      id,
+      {
+        ...n,
+        props: Object.fromEntries(
+          Object.entries(n.props).map(([k, v]) => [
+            k,
+            Array.isArray(v) &&
+            v.every((it) => it && typeof it === "object" && "key" in (it as object))
+              ? [...v].sort((a, b) =>
+                  String((a as { key: string }).key).localeCompare(
+                    String((b as { key: string }).key),
+                  ),
+                )
+              : v,
+          ]),
+        ),
+      },
+    ]),
+  );
+  return { ...spec, nodes };
 }
 
 /** Renames user-inserted keys (random) to stable ones, in document order, so specs compare. */

@@ -77,3 +77,49 @@ it("turns a safety refusal into a user-facing refusal and rejects truncated outp
     /max_tokens/,
   );
 });
+
+it("falls back to the compact schema when the API can't compile the precise one, and remembers", async () => {
+  const sent: unknown[] = [];
+  let calls = 0;
+  const client = {
+    beta: {
+      messages: {
+        create: async (params: { output_config: { format: { schema: unknown } } }) => {
+          calls++;
+          sent.push(params.output_config.format.schema);
+          if (params.output_config.format.schema === request.outputSchema)
+            throw Object.assign(
+              new Error(
+                '400 {"error":{"message":"The compiled grammar is too large, which would cause performance issues."}}',
+              ),
+              { status: 400 },
+            );
+          return {
+            stop_reason: "end_turn",
+            content: [{ type: "text", text: '{"kind":"clarify","message":"?","ops":[]}' }],
+          };
+        },
+      },
+    },
+  };
+  const model = anthropicModel({ client: client as unknown as Anthropic });
+  expect(await model.propose(request)).toMatchObject({ kind: "clarify" });
+  expect(sent).toEqual([request.outputSchema, request.compactSchema]);
+  await model.propose(request);
+  expect(calls).toBe(3); // the second request went straight to the compact schema
+  expect(sent[2]).toBe(request.compactSchema);
+});
+
+it("doesn't hide other API errors behind the fallback", async () => {
+  const client = {
+    beta: {
+      messages: {
+        create: async () =>
+          Promise.reject(Object.assign(new Error("401 invalid x-api-key"), { status: 401 })),
+      },
+    },
+  };
+  await expect(
+    anthropicModel({ client: client as unknown as Anthropic }).propose(request),
+  ).rejects.toThrow(/401/);
+});

@@ -73,6 +73,7 @@ Spec, manifest and patch engine. No framework or LLM dependencies.
 
 - [aggregate](functions/aggregate.md)
 - [apply](functions/apply.md)
+- [buildCompactSchema](functions/buildCompactSchema.md)
 - [buildModelRequest](functions/buildModelRequest.md)
 - [buildOutputSchema](functions/buildOutputSchema.md)
 - [checkQuery](functions/checkQuery.md)
@@ -87,6 +88,7 @@ Spec, manifest and patch engine. No framework or LLM dependencies.
 - [describe](functions/describe.md)
 - [describeQuery](functions/describeQuery.md)
 - [describeSources](functions/describeSources.md)
+- [describeType](functions/describeType.md)
 - [describeView](functions/describeView.md)
 - [diffProps](functions/diffProps.md)
 - [effectivePatches](functions/effectivePatches.md)

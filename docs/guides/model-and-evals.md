@@ -28,7 +28,34 @@ anthropicModel({ model: "claude-sonnet-5-5" });
 anthropicModel({ model: "claude-haiku-5-5" }); // cheapest and fastest; check its refusal accuracy
 ```
 
-Other providers: implement `ModelAdapter` (see [Server setup](server-setup.md#the-model)).
+### Results (2026-11-27)
+
+These are the full eval set (58 cases on the demo surface), effort `low`, compact schema:
+
+| Model               | Accuracy | Refusal precision / recall | p50 / p95 latency |
+| ------------------- | -------- | -------------------------- | ----------------- |
+| `claude-opus-5-5`   | 58/58    | 100% / 100%                | 1.7 s / 2.8 s     |
+| `claude-sonnet-5-5` | 58/58    | 100% / 100%                | 1.8 s / 2.7 s     |
+| `claude-haiku-5-5`  | 57/58    | 100% / 100%                | 1.4 s / 3.4 s     |
+
+Haiku's only miss: asked to _remove_ a card the user had added, it hid it instead.
+
+This is one surface with 58 cases, so it tells you all three are viable, not which is best for
+yours. Run the eval set on your own surfaces before choosing. By list price per million tokens
+(input/output), Haiku is $0.10/$0.50, Sonnet $2/$10 and Opus $4/$20.
+
+### Output schemas
+
+The adapter first sends a **precise** schema, which enumerates every valid op and value for
+this user. Some surfaces, including the demo dashboard, make it too large for the API to
+compile (`400 … compiled grammar is too large`). The adapter then switches to a **compact**
+schema and remembers that for the surface. The compact schema has one op shape and passes
+values as JSON text, and the system prompt spells out what each prop accepts. Patina's
+validator and its one repair round-trip guard correctness either way. Force one with
+`anthropicModel({ schema: "compact" | "precise" })`.
+
+Other providers: implement `ModelAdapter` (see [Server setup](server-setup.md#the-model)). Use
+`request.compactSchema` if the provider limits schema size.
 
 ## The eval set
 

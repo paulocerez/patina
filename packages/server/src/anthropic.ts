@@ -22,7 +22,15 @@ export interface AnthropicModelOptions {
    * models that support it (not Haiku). Set to false on Bedrock, Vertex and Foundry.
    */
   fallbacks?: boolean;
+  /**
+   * Which output schema to send. "auto" (default) sends the precise schema and switches to the
+   * compact one if the API can't compile it (large surfaces); "precise" or "compact" force one.
+   */
+  schema?: "auto" | "precise" | "compact";
 }
+
+const GRAMMAR_TOO_LARGE =
+  /grammar is too large|schema is too (large|complex)|too many (strict )?(tools|schemas)/i;
 
 /**
  * Anthropic implementation of `ModelAdapter`, using structured outputs with the JSON Schema
@@ -33,26 +41,59 @@ export function anthropicModel(options: AnthropicModelOptions = {}): ModelAdapte
   const model = options.model ?? "claude-opus-5-5";
   const useFallbacks = options.fallbacks ?? !model.includes("haiku");
 
+  // Surfaces whose precise schema the API couldn't compile (keyed by the schema's size and
+  // node list, cheap and stable): they go straight to the compact schema next time.
+  const tooLarge = new Set<string>();
+  const mode = options.schema ?? "auto";
+
+  async function call(
+    request: ModelRequest,
+    schema: Record<string, unknown>,
+    signal?: AbortSignal,
+  ) {
+    return client.beta.messages.create(
+      {
+        model,
+        max_tokens: options.maxTokens ?? 4096,
+        // The system prompt (rules + manifest) is identical across users of a surface.
+        system: [{ type: "text", text: request.system, cache_control: { type: "ephemeral" } }],
+        messages: [{ role: "user", content: request.user }],
+        output_config: {
+          effort: options.effort ?? "low",
+          format: { type: "json_schema", schema },
+        },
+        ...(useFallbacks
+          ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const }
+          : {}),
+      },
+      { signal },
+    );
+  }
+
   return {
     id: `anthropic/${model}`,
     async propose(request: ModelRequest, opts) {
-      const response = await client.beta.messages.create(
-        {
-          model,
-          max_tokens: options.maxTokens ?? 4096,
-          // The system prompt (rules + manifest) is identical across users of a surface.
-          system: [{ type: "text", text: request.system, cache_control: { type: "ephemeral" } }],
-          messages: [{ role: "user", content: request.user }],
-          output_config: {
-            effort: options.effort ?? "low",
-            format: { type: "json_schema", schema: request.outputSchema },
-          },
-          ...(useFallbacks
-            ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const }
-            : {}),
-        },
-        { signal: opts?.signal },
-      );
+      const key = JSON.stringify(request.outputSchema).length.toString();
+      const compact = mode === "compact" || (mode === "auto" && tooLarge.has(key));
+      let response: Awaited<ReturnType<typeof call>>;
+      try {
+        response = await call(
+          request,
+          compact ? request.compactSchema : request.outputSchema,
+          opts?.signal,
+        );
+      } catch (e) {
+        const status = (e as { status?: number }).status;
+        if (
+          mode !== "auto" ||
+          compact ||
+          status !== 400 ||
+          !GRAMMAR_TOO_LARGE.test(String((e as Error).message))
+        )
+          throw e;
+        tooLarge.add(key);
+        response = await call(request, request.compactSchema, opts?.signal);
+      }
 
       if (response.stop_reason === "refusal") {
         throw new ModelRefusal("I can't help with that request here.");

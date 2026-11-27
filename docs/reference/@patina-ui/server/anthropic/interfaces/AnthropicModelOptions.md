@@ -48,3 +48,12 @@ Default 4096.
 > `optional` **model?**: `string`
 
 Default "claude-opus-5-5". Use the eval set to compare models for your surfaces.
+
+***
+
+### schema?
+
+> `optional` **schema?**: `"auto"` \| `"precise"` \| `"compact"`
+
+Which output schema to send. "auto" (default) sends the precise schema and switches to the
+compact one if the API can't compile it (large surfaces); "precise" or "compact" force one.

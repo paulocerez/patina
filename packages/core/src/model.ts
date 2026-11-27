@@ -40,8 +40,13 @@ export interface ModelRequest {
   system: string;
   /** The user turn: current view (as data) plus the user's request. */
   user: string;
-  /** JSON Schema the response must follow. */
+  /** JSON Schema the response must follow: precise (enumerates every valid op). */
   outputSchema: Record<string, unknown>;
+  /**
+   * A much smaller schema for large surfaces: one op shape, values as JSON strings. Use it when
+   * a provider can't compile the precise one. Patina validates the answer either way.
+   */
+  compactSchema: Record<string, unknown>;
 }
 
 type Json = Record<string, unknown>;
@@ -161,6 +166,106 @@ export function buildOutputSchema(m: Manifest<unknown>, spec: SurfaceSpec): Json
   });
 }
 
+/**
+ * A compact output schema: a single op shape with node and prop as enums, everything else as
+ * strings, and values as JSON text. Small enough for any surface; the allowed values per prop
+ * are spelled out in the system prompt instead.
+ */
+export function buildCompactSchema(m: Manifest<unknown>, spec: SurfaceSpec): Json {
+  const obj = (properties: Json): Json => ({
+    type: "object",
+    properties,
+    required: Object.keys(properties),
+    additionalProperties: false,
+  });
+  const nodes = Object.keys(spec.nodes);
+  const props = [
+    ...new Set(
+      Object.values(spec.nodes).flatMap((n) => Object.keys(m.components[n.component]?.props ?? {})),
+    ),
+  ];
+  const presets = Object.keys(m.presets);
+  const op = obj({
+    op: { type: "string", enum: ["set", "setItem", "move", "insert", "remove"] },
+    node: { type: "string", enum: nodes.length ? nodes : [""] },
+    prop: { type: "string", enum: props.length ? props : [""] },
+    key: { type: "string", description: 'setItem/move/remove: the item key. "" otherwise.' },
+    field: { type: "string", description: 'setItem: the item field, e.g. "hidden". "" otherwise.' },
+    preset: {
+      type: "string",
+      enum: [...presets, ""],
+      description: 'insert: the preset to add. "" otherwise.',
+    },
+    position: {
+      type: "string",
+      enum: ["before", "after", "start", "end", ""],
+      description: 'move/insert. "" otherwise.',
+    },
+    anchor: {
+      type: "string",
+      description: 'move/insert with before/after: the sibling key. "" otherwise.',
+    },
+    value_json: {
+      type: "string",
+      description:
+        'set/setItem: the new value as JSON text, e.g. "true", "25", "\\"compact\\"", "{\\"relative\\":\\"thisWeek\\"}". "" otherwise.',
+    },
+    props_json: {
+      type: "string",
+      description:
+        'insert: the new item\'s settings as a JSON object text, e.g. {"query":{...}}. "" if none.',
+    },
+  });
+  return obj({
+    kind: { type: "string", enum: ["patch", "refusal", "clarify"] },
+    message: {
+      type: "string",
+      description:
+        "patch: one-sentence summary of the change. refusal: short, friendly explanation for the user. clarify: one question.",
+    },
+    category: {
+      type: "string",
+      enum: [...REFUSAL_CATEGORIES, ""],
+      description: 'refusal only: why it can\'t be done. "" otherwise.',
+    },
+    ops: { type: "array", items: op },
+  });
+}
+
+/** One line telling the model what a prop accepts (needed with the compact schema). */
+export function describeType(def: TypeDef): string {
+  switch (def.kind) {
+    case "enum":
+      return `one of ${def.values.map((v) => JSON.stringify(v)).join(", ")}`;
+    case "int":
+      return `whole number from ${def.min} to ${def.max}`;
+    case "bool":
+      return "true or false";
+    case "label":
+      return `plain text, at most ${def.maxLen} characters`;
+    case "relativeDateRange":
+      return `{"relative": one of ${def.allowed.map((v) => JSON.stringify(v)).join(", ")}}`;
+    case "sort":
+      return `{"key": one of ${def.keys.map((v) => JSON.stringify(v)).join(", ")}, "dir": "asc" or "desc"}`;
+    case "object":
+      return `{ ${Object.entries(def.fields)
+        .map(([k, f]) => `"${k}": ${describeType(f)}`)
+        .join(", ")} }`;
+    case "collection": {
+      const fields = Object.entries(def.item).map(([k, f]) => `${k} (${describeType(f)})`);
+      return `list of items with keys ${def.keys.map((k) => JSON.stringify(k)).join(", ")}${def.reorder ? "; reorder with move" : ""}${def.hide ? '; hide/show with setItem field "hidden"' : ""}${fields.length ? `; setItem fields: ${fields.join(", ")}` : ""}`;
+    }
+    case "slot":
+      return `child sections (keys are node ids)${def.reorder ? "; reorder with move" : ""}${def.hide ? '; hide/show with setItem field "hidden"' : ""}${def.insert.length ? `; insert presets: ${def.insert.join(", ")}` : ""}`;
+    case "query":
+      return def.shape === "rows"
+        ? '{"source", "fields": [field, ...], "sort"?: {"field", "dir"}, "limit"?: n, "where"?: [{"field", "value"}]}'
+        : def.shape === "series"
+          ? '{"source", "groupBy": {"field", "bucket"?: "day"|"week"|"month" (dates only)}, "metric": {"op": "count"|"sum"|"avg"|"min"|"max", "field"?: number field}, "where"?: [{"field", "value"}]} (sources in <data_sources>)'
+          : '{"source", "metric": {"op": "count"|"sum"|"avg"|"min"|"max", "field"?: number field}, "where"?: [{"field", "value"}]} (sources in <data_sources>)';
+  }
+}
+
 function currentKeys(value: Value | undefined): string[] {
   return Array.isArray(value) ? (value as unknown as CollectionItem[]).map((it) => it.key) : [];
 }
@@ -187,6 +292,16 @@ export function fromModelOutput(raw: unknown, newKey: () => string = randomUserK
     const x = (r ?? {}) as Record<string, unknown>;
     const node = String(x.node ?? "");
     const prop = String(x.prop ?? "");
+    // Compact answers carry values as JSON text ("value_json"); precise ones as JSON.
+    const value = (): Value | undefined => {
+      if ("value" in x) return (x.value ?? null) as Value;
+      if (typeof x.value_json !== "string" || x.value_json === "") return null;
+      try {
+        return JSON.parse(x.value_json) as Value;
+      } catch {
+        return undefined; // invalid: the validator rejects the op and the model can repair it
+      }
+    };
     const to = (): Anchor => {
       const pos = x.position;
       const a = String(x.anchor ?? "");
@@ -196,23 +311,31 @@ export function fromModelOutput(raw: unknown, newKey: () => string = randomUserK
     };
     switch (x.op) {
       case "set":
-        ops.push({ op: "set", node, path: [prop], value: cleanQuery(x.value ?? null) as Value });
+        ops.push({ op: "set", node, path: [prop], value: cleanQuery(value()) as Value });
         break;
       case "setItem":
         ops.push({
           op: "set",
           node,
           path: [prop, String(x.key), String(x.field)],
-          value: (x.value ?? null) as Value,
+          value: value() as Value,
         });
         break;
       case "move":
         ops.push({ op: "move", node, prop, key: String(x.key), to: to() });
         break;
       case "insert": {
+        let rawProps: unknown = x.props;
+        if (rawProps === undefined && typeof x.props_json === "string" && x.props_json) {
+          try {
+            rawProps = JSON.parse(x.props_json);
+          } catch {
+            rawProps = undefined;
+          }
+        }
         const props =
-          x.props && typeof x.props === "object"
-            ? (cleanQuery(x.props) as Record<string, Value>)
+          rawProps && typeof rawProps === "object" && !Array.isArray(rawProps)
+            ? (cleanQuery(rawProps) as Record<string, Value>)
             : undefined;
         ops.push({
           op: "insert",
@@ -276,8 +399,10 @@ export function buildModelRequest(
   lines.push("", "Components:");
   for (const [name, comp] of Object.entries(m.components)) {
     lines.push(`- ${name}${comp.description ? `: ${comp.description}` : ""}`);
-    for (const [prop, def] of Object.entries(comp.props))
-      if (def.description || def.label) lines.push(`  - ${prop}: ${def.description ?? def.label}`);
+    for (const [prop, def] of Object.entries(comp.props)) {
+      const about = def.description ?? def.label;
+      lines.push(`  - ${prop}${about ? ` (${about})` : ""}: ${describeType(def)}`);
+    }
   }
   const presets = Object.entries(m.presets);
   if (presets.length) {
@@ -299,7 +424,12 @@ export function buildModelRequest(
     "</request>",
   ].join("\n");
 
-  return { system, user, outputSchema: buildOutputSchema(m, spec) };
+  return {
+    system,
+    user,
+    outputSchema: buildOutputSchema(m, spec),
+    compactSchema: buildCompactSchema(m, spec),
+  };
 }
 
 /** The catalog as the model sees it: labels, field kinds and enum values. No endpoints, no data. */
