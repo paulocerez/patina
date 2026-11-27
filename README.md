@@ -1,7 +1,9 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-wordmark-dark.svg">
-  <img src="docs/assets/logo-wordmark.svg" height="40" alt="Patina">
-</picture>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-wordmark-dark.svg">
+    <img src="docs/assets/logo-wordmark.svg" height="40" alt="Patina">
+  </picture>
+</p>
 
 # Patina UI
 
