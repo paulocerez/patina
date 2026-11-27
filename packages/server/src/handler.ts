@@ -3,6 +3,7 @@ import {
   buildModelRequest,
   dataPresetIds,
   describe,
+  effectivePatches,
   fromModelOutput,
   headSeq,
   type Issue,
@@ -438,7 +439,8 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
 
   async function commit(manifest: Manifest<Ctx>, ctx: Ctx, av: Availability, proposalId: string) {
     const proposal = await options.storage.takeProposal(proposalId, keyFor(ctx, manifest.id));
-    if (!proposal) throw new HttpError(409, "This preview has expired. Please ask again.");
+    if (!proposal)
+      throw new HttpError(409, "This preview is no longer available. Please ask again.");
     let stale = false;
     const after = await appendWithRetry(manifest, ctx, av, (loaded) => {
       if (validate(loaded.me, loaded.resolved.spec, proposal.ops).length > 0) {
@@ -489,9 +491,8 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
 
   async function reset(manifest: Manifest<Ctx>, ctx: Ctx, av: Availability) {
     const after = await appendWithRetry(manifest, ctx, av, (loaded) =>
-      loaded.resolved.patchCount > 0 || loaded.userEntries.length > 0
-        ? { kind: "reset", id: newId("x") }
-        : null,
+      // Only when the user's own layer changes anything: resetting a default view is a no-op.
+      effectivePatches(loaded.userEntries).length > 0 ? { kind: "reset", id: newId("x") } : null,
     );
     return state(manifest, after, av);
   }

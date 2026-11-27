@@ -9,6 +9,7 @@ npx patina scan          # find your GET endpoints, row types and design system 
 npx patina scan --ai     # optional: Claude refines the drafts (needs ANTHROPIC_API_KEY)
 npx patina check         # report API/design changes that affect the catalog
 npx patina init-action   # add the GitHub Action that checks every PR
+npx patina init-agent    # install the Patina UI skill for coding agents (Claude Code; --agents-md for others)
 npx patina insights --database-url $DATABASE_URL   # what customers asked for (needs pg)
 ```
 

@@ -1,0 +1,32 @@
+# Patina UI
+
+> Let your users customize your app's views in plain language. The model returns validated, declarative patches against a schema you declare, never code. TypeScript packages: @patina-ui/core (manifest, patch engine), @patina-ui/server (handler, Anthropic adapter, storage), @patina-ui/react (renderer, headless UI), @patina-ui/cli (patina scan/check/insights/init-action/init-agent), plus a GitHub Action.
+
+Coding agents integrating Patina UI into an app should follow the skill first: it has the rules, the step-by-step integration and the verification checklist.
+
+## For coding agents
+
+- [Agent skill: integrating Patina UI](https://raw.githubusercontent.com/paulocerez/patina/main/skills/patina-ui/SKILL.md): rules, steps, code, verification, common mistakes
+
+## Docs
+
+- [README and quick start](https://github.com/paulocerez/patina/blob/main/README.md)
+- [Getting started](https://github.com/paulocerez/patina/blob/main/docs/getting-started.md): the demo app, step by step
+- [Trying Patina in your app](https://github.com/paulocerez/patina/blob/main/docs/guides/try-in-your-app.md)
+- [Defining a surface](https://github.com/paulocerez/patina/blob/main/docs/guides/define-a-surface.md)
+- [Type reference](https://github.com/paulocerez/patina/blob/main/docs/guides/types.md)
+- [Server setup](https://github.com/paulocerez/patina/blob/main/docs/guides/server-setup.md)
+- [React](https://github.com/paulocerez/patina/blob/main/docs/guides/react.md)
+- [Data views](https://github.com/paulocerez/patina/blob/main/docs/guides/data-views.md): patina scan, catalog, data blocks
+- [Availability](https://github.com/paulocerez/patina/blob/main/docs/guides/availability.md): feature flags, plans, quotas
+- [Insights](https://github.com/paulocerez/patina/blob/main/docs/guides/insights.md): request log and reports
+- [Permissions and safety](https://github.com/paulocerez/patina/blob/main/docs/guides/permissions-and-safety.md)
+- [Storage](https://github.com/paulocerez/patina/blob/main/docs/guides/storage.md)
+- [Evolving base views](https://github.com/paulocerez/patina/blob/main/docs/guides/evolving-base-views.md)
+- [Model and evals](https://github.com/paulocerez/patina/blob/main/docs/guides/model-and-evals.md)
+- [GitHub Action](https://github.com/paulocerez/patina/blob/main/docs/guides/github-action.md)
+
+## Optional
+
+- [Architecture](https://github.com/paulocerez/patina/blob/main/ARCHITECTURE.md): design decisions and tradeoffs
+- [API reference](https://github.com/paulocerez/patina/blob/main/docs/reference/README.md)

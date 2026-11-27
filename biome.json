@@ -9,7 +9,8 @@
       "!docs/reference",
       "!evals/results",
       "!packages/cli/test/fixtures",
-      "!packages/action/dist"
+      "!packages/action/dist",
+      "!skills"
     ]
   },
   "formatter": {

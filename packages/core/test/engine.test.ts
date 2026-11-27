@@ -192,7 +192,7 @@ group("describe", () => {
     expect(describe(dashboard, baseSpec, briefPatch).map((c) => c.text)).toEqual([
       "Hide “Revenue” in Appointments table",
       "Move Appointments table before Revenue chart",
-      "Set Date range of Filters to This week",
+      "Set date range to This week in Filters",
     ]);
   });
 });

@@ -6,3 +6,4 @@ dist
 evals/results
 .packs
 !packages/action/dist
+packages/cli/skill

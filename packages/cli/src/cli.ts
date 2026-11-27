@@ -1,5 +1,6 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import {
   getInsights,
@@ -32,9 +33,24 @@ Usage:
       What customers asked for, what was applied, and what couldn't be done and why, from the
       request log in your Postgres database (needs the pg package).
 
+  patina init-agent [--root .] [--agents-md] [--force]
+      Install the Patina UI skill for coding agents: .claude/skills/patina-ui/SKILL.md
+      (Claude Code). --agents-md also adds a pointer to AGENTS.md (Codex, Cursor and others).
+
   patina init-action [--root .] [--fail-on breaking] [--action paulocerez/patina/packages/action@v0]
       Write .github/workflows/patina.yml so every PR is checked.
 `;
+
+/** The agent skill: bundled with the published package, or read from the repo in development. */
+export function skillText(): string | null {
+  const here = dirname(fileURLToPath(import.meta.url));
+  for (const candidate of [
+    join(here, "../../../skills/patina-ui/SKILL.md"), // the canonical copy, in this repo
+    join(here, "../skill/SKILL.md"), // bundled with the published package
+  ])
+    if (existsSync(candidate)) return readFileSync(candidate, "utf8");
+  return null;
+}
 
 function write(file: string, text: string) {
   mkdirSync(dirname(file), { recursive: true });
@@ -60,6 +76,7 @@ export async function main(
       "fail-on": { type: "string", default: "breaking" },
       action: { type: "string", default: "paulocerez/patina/packages/action@v0" },
       "database-url": { type: "string" },
+      "agents-md": { type: "boolean", default: false },
       since: { type: "string", default: "30d" },
       until: { type: "string" },
       tenant: { type: "string" },
@@ -177,6 +194,32 @@ with dataBlocks(catalog), and commit ${out}/. See docs/guides/data-views.md.`);
     } finally {
       await close();
     }
+  }
+
+  if (command === "init-agent") {
+    const skill = skillText();
+    if (!skill) {
+      console.error("Couldn't find the bundled SKILL.md.");
+      return 1;
+    }
+    const file = join(root, ".claude/skills/patina-ui/SKILL.md");
+    if (existsSync(file) && !values.force) {
+      console.error(`${file} already exists (use --force to update it).`);
+      return 1;
+    }
+    write(file, skill);
+    console.log(`Wrote ${file}. Claude Code loads it when you work on Patina UI.`);
+    if (values["agents-md"]) {
+      const agents = join(root, "AGENTS.md");
+      const pointer = `\n## Patina UI\n\nThis app uses Patina UI (@patina-ui/*) for prompt-driven view customization. Before changing\nanything Patina-related (surfaces, manifests, the /api/patina handler, <Surface>, patina/ catalog),\nread and follow .claude/skills/patina-ui/SKILL.md.\n`;
+      const current = existsSync(agents) ? readFileSync(agents, "utf8") : "# Agent instructions\n";
+      if (current.includes("## Patina UI")) console.log("AGENTS.md already points to the skill.");
+      else {
+        writeFileSync(agents, current.trimEnd() + "\n" + pointer);
+        console.log(`Added a Patina UI section to ${agents}.`);
+      }
+    }
+    return 0;
   }
 
   if (command === "init-action") {

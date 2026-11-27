@@ -619,11 +619,11 @@ function describeOne(m: Manifest<unknown>, spec: SurfaceSpec, op: Op): string {
   switch (op.op) {
     case "set": {
       if (op.path.length === 1)
-        return `Set ${def?.label ?? humanize(prop)} of ${name} to ${formatValue(def, op.value)}`;
+        return `Set ${lowerFirst(def?.label ?? humanize(prop))} to ${formatValue(def, op.value)} in ${name}`;
       const [, key, field] = op.path;
       if (field === "hidden") return `${op.value === true ? "Hide" : "Show"} ${item(key)}${inName}`;
       const fdef = list?.kind === "collection" ? list.item[field] : undefined;
-      return `Set ${fdef?.label ?? humanize(field)} of ${item(key)}${inName} to ${formatValue(fdef, op.value)}`;
+      return `Set ${lowerFirst(fdef?.label ?? humanize(field))} of ${item(key)} to ${formatValue(fdef, op.value)}${inName}`;
     }
     case "move":
       return `Move ${item(op.key)} ${place(op.to)}${inName}`;
@@ -642,6 +642,11 @@ function describeOne(m: Manifest<unknown>, spec: SurfaceSpec, op: Op): string {
 }
 
 // ───────────────────────────────── utils ──────────────────────────────────
+
+/** "Rows per page" → "rows per page", but leaves acronyms ("URL", "KPI") alone. */
+function lowerFirst(label: string): string {
+  return /^[A-Z][A-Z]/.test(label) ? label : label.charAt(0).toLowerCase() + label.slice(1);
+}
 
 export function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;

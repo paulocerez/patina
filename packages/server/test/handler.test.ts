@@ -378,3 +378,18 @@ describe("toExpress", () => {
     }
   });
 });
+
+describe("reset", () => {
+  it("does nothing on a view that's already the default", async () => {
+    const s = await call<SurfaceState>("alice", "POST", "/reset");
+    expect(s.body.canUndo).toBe(false);
+    expect(
+      await storage.list({
+        tenantId: "clinic-1",
+        layer: "user",
+        subjectId: "alice",
+        surfaceId: "clinic.dashboard",
+      }),
+    ).toEqual([]);
+  });
+});

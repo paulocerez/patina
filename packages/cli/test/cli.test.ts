@@ -299,3 +299,20 @@ describe("insights", () => {
     if (before) process.env.DATABASE_URL = before;
   });
 });
+
+describe("init-agent", () => {
+  it("installs the skill for Claude Code and, optionally, a pointer in AGENTS.md", async () => {
+    const dir = copy("openapi-mui");
+    quiet();
+    expect(await main(["init-agent", "--root", dir, "--agents-md"])).toBe(0);
+    const skill = readFileSync(join(dir, ".claude/skills/patina-ui/SKILL.md"), "utf8");
+    expect(skill).toMatch(/^---\nname: patina-ui\n/);
+    expect(skill).toContain("## Non-negotiable rules");
+    const agents = readFileSync(join(dir, "AGENTS.md"), "utf8");
+    expect(agents).toContain("read and follow .claude/skills/patina-ui/SKILL.md");
+    expect(await main(["init-agent", "--root", dir, "--agents-md", "--force"])).toBe(0);
+    expect(readFileSync(join(dir, "AGENTS.md"), "utf8").match(/## Patina UI/g)).toHaveLength(1); // no duplicates
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await main(["init-agent", "--root", dir])).toBe(1); // won't overwrite without --force
+  });
+});

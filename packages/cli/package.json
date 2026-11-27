@@ -40,13 +40,14 @@
   },
   "files": [
     "dist",
-    "bin"
+    "bin",
+    "skill"
   ],
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsup src/index.ts src/cli.ts --format esm --clean --external @patina-ui/core --external @anthropic-ai/sdk --external @patina-ui/server --external pg && tsc -p tsconfig.build.json",
+    "build": "node scripts/copy-skill.mjs && tsup src/index.ts src/cli.ts --format esm --clean --external @patina-ui/core --external @anthropic-ai/sdk --external @patina-ui/server --external pg && tsc -p tsconfig.build.json",
     "test": "vitest run",
     "typecheck": "tsc -p ."
   },

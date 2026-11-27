@@ -188,6 +188,8 @@ view or in the model's prompt.
   - [Availability](docs/guides/availability.md): who may customize, from feature flags, plans and quotas
   - [Insights](docs/guides/insights.md): what customers asked for, what couldn't be done, and why
 - [API reference](docs/reference/README.md) (generated with `pnpm docs:api`)
+- [A prompt for coding agents](docs/agent-prompt.md): `npx patina init-agent` installs the skill
+  ([`skills/patina-ui/SKILL.md`](skills/patina-ui/SKILL.md)); [`llms.txt`](llms.txt) indexes the docs
 - [Releasing](docs/releasing.md): npm publishing with Changesets
 - [ARCHITECTURE.md](ARCHITECTURE.md): the design and its tradeoffs
 
