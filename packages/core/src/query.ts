@@ -10,6 +10,7 @@ import {
   offerableFields,
   type SourceDef,
 } from "./catalog.js";
+import { type MessageKey, msg, type Text, tx } from "./i18n.js";
 
 export type AggOp = "count" | "sum" | "avg" | "min" | "max";
 export type Bucket = "day" | "week" | "month";
@@ -35,8 +36,8 @@ export interface QueryDef {
   catalog: Catalog;
   shape: QueryShape;
   aggregations: AggOp[];
-  label?: string;
-  description?: string;
+  label?: Text;
+  description?: Text;
 }
 
 const NUMERIC = new Set(["number", "currency"]);
@@ -53,54 +54,62 @@ const isObj = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 
 /** Returns a user-readable problem with a query, or null if it is valid. */
-export function checkQuery(def: QueryDef, value: unknown): string | null {
-  if (!isObj(value)) return "must describe which data to show";
+export function checkQuery(def: QueryDef, value: unknown, locale?: string): string | null {
+  const L = locale;
+  if (!isObj(value)) return msg(L, "queryMustDescribe");
   for (const k of Object.keys(value))
-    if (!KEYS[def.shape].includes(k)) return `can't use “${k}” here`;
+    if (!KEYS[def.shape].includes(k)) return msg(L, "queryCantUse", { key: k });
   const sourceId = value.source;
   const source = typeof sourceId === "string" ? def.catalog.sources[sourceId] : undefined;
   if (!source) {
-    const names = Object.values(def.catalog.sources).map((s) => s.label);
-    return names.length ? `can only show data from ${names.join(", ")}` : "has no data available";
+    const names = Object.values(def.catalog.sources).map((s) => tx(s.label, L) as string);
+    return names.length
+      ? msg(L, "queryOnlyFrom", { sources: names.join(", ") })
+      : msg(L, "queryNoData");
   }
   const fields = offerableFields(source);
   const fieldErr = (f: unknown, kinds?: Set<string>): string | null => {
     if (typeof f !== "string" || !fields[f])
-      return `can't use “${String(f)}”: it isn't available to you in ${source.label}`;
+      return msg(L, "queryFieldUnavailable", {
+        field: String(f),
+        source: tx(source.label, L) as string,
+      });
     if (kinds && !kinds.has((fields[f] as FieldDef).kind))
-      return `can't use ${fieldLabel(source, f)} that way`;
+      return msg(L, "queryFieldWrongWay", { field: fieldLabel(source, f, L) });
     return null;
   };
 
   if (value.where !== undefined) {
-    if (!Array.isArray(value.where) || value.where.length > 3) return "can have at most 3 filters";
+    if (!Array.isArray(value.where) || value.where.length > 3) return msg(L, "queryMaxFilters");
     for (const w of value.where) {
-      if (!isObj(w) || Object.keys(w).length !== 2) return "has a malformed filter";
+      if (!isObj(w) || Object.keys(w).length !== 2) return msg(L, "queryBadFilter");
       const e = fieldErr(w.field, new Set(["enum", "bool"]));
       if (e) return e;
       const fd = fields[w.field as string] as FieldDef;
       if (
         fd.kind === "enum" ? !fd.values?.includes(w.value as string) : typeof w.value !== "boolean"
       )
-        return `can't filter ${fieldLabel(source, w.field as string)} by “${String(w.value)}”`;
+        return msg(L, "queryCantFilter", {
+          field: fieldLabel(source, w.field as string, L),
+          value: String(w.value),
+        });
     }
   }
 
   if (def.shape === "rows") {
     const fs = value.fields;
     if (!Array.isArray(fs) || fs.length === 0 || fs.length > MAX_FIELDS)
-      return `needs 1 to ${MAX_FIELDS} fields`;
-    if (new Set(fs).size !== fs.length) return "lists a field twice";
+      return msg(L, "queryFieldCount", { max: MAX_FIELDS });
+    if (new Set(fs).size !== fs.length) return msg(L, "queryFieldTwice");
     for (const fld of fs) {
       const e = fieldErr(fld);
       if (e) return e;
     }
     if (value.sort !== undefined) {
-      if (!isObj(value.sort) || Object.keys(value.sort).length !== 2) return "has a malformed sort";
+      if (!isObj(value.sort) || Object.keys(value.sort).length !== 2) return msg(L, "queryBadSort");
       const e = fieldErr(value.sort.field);
       if (e) return e;
-      if (value.sort.dir !== "asc" && value.sort.dir !== "desc")
-        return "must sort ascending or descending";
+      if (value.sort.dir !== "asc" && value.sort.dir !== "desc") return msg(L, "querySortDir");
     }
     if (
       value.limit !== undefined &&
@@ -110,38 +119,38 @@ export function checkQuery(def: QueryDef, value: unknown): string | null {
         (value.limit as number) <= MAX_LIMIT
       )
     )
-      return `can show at most ${MAX_LIMIT} rows`;
+      return msg(L, "queryMaxRows", { max: MAX_LIMIT });
     return null;
   }
 
   if (!source.complete)
-    return `${source.label} can't be summarized (the app doesn't return all of it at once)`;
+    return msg(L, "queryNotComplete", { source: tx(source.label, L) as string });
   const m = value.metric;
   if (!isObj(m) || typeof m.op !== "string" || !def.aggregations.includes(m.op as AggOp))
-    return `must compute one of: ${def.aggregations.join(", ")}`;
+    return msg(L, "queryMetricOneOf", { ops: def.aggregations.join(", ") });
   const mKeys = Object.keys(m).filter((k) => m[k] !== undefined);
   if (m.op === "count") {
-    if (mKeys.length !== 1) return "counts rows, not a field";
+    if (mKeys.length !== 1) return msg(L, "queryCountRows");
   } else {
-    if (mKeys.length !== 2) return `needs a number field to ${m.op}`;
+    if (mKeys.length !== 2) return msg(L, "queryNeedsNumber", { op: String(m.op) });
     const e = fieldErr(m.field, NUMERIC);
     if (e) return e;
   }
 
   if (def.shape === "series") {
     const g = value.groupBy;
-    if (!isObj(g)) return "needs something to group by";
+    if (!isObj(g)) return msg(L, "queryNeedsGroup");
     const e = fieldErr(g.field);
     if (e) return e;
     const kind = (fields[g.field as string] as FieldDef).kind;
     if (kind === "date") {
-      if (!["day", "week", "month"].includes(g.bucket as string))
-        return "must group dates by day, week or month";
-      if (Object.keys(g).length !== 2) return "has a malformed grouping";
+      if (!["day", "week", "month"].includes(g.bucket as string)) return msg(L, "queryDateBucket");
+      if (Object.keys(g).length !== 2) return msg(L, "queryBadGroup");
     } else {
-      if (!GROUPABLE.has(kind)) return `can't group by ${fieldLabel(source, g.field as string)}`;
+      if (!GROUPABLE.has(kind))
+        return msg(L, "queryCantGroup", { field: fieldLabel(source, g.field as string, L) });
       if (Object.keys(g).filter((k) => g[k] !== undefined).length !== 1)
-        return "only groups dates by day, week or month";
+        return msg(L, "queryOnlyDatesBucket");
     }
   }
   return null;
@@ -210,7 +219,7 @@ export function querySchema(def: QueryDef): Record<string, unknown> {
       variants.push(obj(shapeProps));
     }
   }
-  const description = [def.description, describeShape(def)].filter(Boolean).join(" ");
+  const description = [tx(def.description, "en"), describeShape(def)].filter(Boolean).join(" ");
   return variants.length === 1
     ? { ...(variants[0] as object), description }
     : { anyOf: variants, description };
@@ -232,37 +241,63 @@ export function cleanQuery(v: unknown): unknown {
   return out;
 }
 
-const OP_LABEL: Record<AggOp, string> = {
-  count: "Number of",
-  sum: "Total",
-  avg: "Average",
-  min: "Lowest",
-  max: "Highest",
+const OP_KEY: Record<AggOp, MessageKey> = {
+  count: "opCount",
+  sum: "opSum",
+  avg: "opAvg",
+  min: "opMin",
+  max: "opMax",
+};
+const BUCKET_KEY: Record<Bucket, MessageKey> = {
+  day: "bucketDay",
+  week: "bucketWeek",
+  month: "bucketMonth",
 };
 
+const isGerman = (locale?: string) => !!locale?.toLowerCase().startsWith("de");
+/** English lowercases labels mid-sentence ("Total revenue"); German keeps noun capitals. */
+const inSentence = (label: string, locale?: string) =>
+  isGerman(locale) ? label : label.toLowerCase();
+
 /** "Total revenue", but "Sum of total" rather than "Total total". */
-function metricLabel(op: AggOp, field: string): string {
-  const word = OP_LABEL[op];
-  return field.startsWith(word.toLowerCase())
-    ? `${op === "sum" ? "Sum" : word} of ${field}`
+function metricLabel(op: AggOp, field: string, locale?: string): string {
+  const word = msg(locale, OP_KEY[op]);
+  return field.toLowerCase().startsWith(word.toLowerCase())
+    ? `${op === "sum" ? msg(locale, "opSumOf") : word} ${field}`
     : `${word} ${field}`;
 }
 
-/** "Total Revenue by Vet", "Number of Appointments where Status is No-show", "Appointments: Date, Vet". */
-export function describeQuery(catalog: Catalog, q: Query): string {
+function valueText(
+  s: SourceDef | undefined,
+  field: string,
+  value: string | boolean,
+  locale?: string,
+): string {
+  if (typeof value === "boolean") return value ? msg(locale, "yes") : msg(locale, "no");
+  return tx(s?.fields[field]?.valueLabels?.[value] as Text | undefined, locale) ?? value;
+}
+
+/**
+ * A title for a query, in `locale`: "Total revenue by vet", "Number of appointments where
+ * Status is No-show", "Appointments: Date, Vet"; German "Summe Umsatz nach Tierarzt".
+ */
+export function describeQuery(catalog: Catalog, q: Query, locale?: string): string {
+  const L = locale;
   const s = catalog.sources[q.source];
-  const name = s?.label ?? q.source;
+  const name = tx(s?.label, L) ?? q.source;
   const where = q.where?.length
-    ? ` where ${q.where.map((w) => `${fieldLabel(s, w.field)} is ${typeof w.value === "string" ? (s?.fields[w.field]?.valueLabels?.[w.value] ?? w.value) : w.value ? "yes" : "no"}`).join(" and ")}`
+    ? isGerman(L)
+      ? ` (${q.where.map((w) => `${fieldLabel(s, w.field, L)}: ${valueText(s, w.field, w.value, L)}`).join(", ")})`
+      : ` ${msg(L, "where")} ${q.where.map((w) => `${fieldLabel(s, w.field, L)} ${msg(L, "is")} ${valueText(s, w.field, w.value, L)}`).join(` ${msg(L, "and")} `)}`
     : "";
-  if (q.fields) return `${name}: ${q.fields.map((x) => fieldLabel(s, x)).join(", ")}${where}`;
+  if (q.fields) return `${name}: ${q.fields.map((x) => fieldLabel(s, x, L)).join(", ")}${where}`;
   const metric = q.metric
     ? q.metric.op === "count"
-      ? `${OP_LABEL.count} ${name.toLowerCase()}`
-      : metricLabel(q.metric.op, fieldLabel(s, q.metric.field ?? "").toLowerCase())
+      ? `${msg(L, "opCount")} ${inSentence(name, L)}`
+      : metricLabel(q.metric.op, inSentence(fieldLabel(s, q.metric.field ?? "", L), L), L)
     : name;
   const by = q.groupBy
-    ? ` by ${q.groupBy.bucket ? `${q.groupBy.bucket} (${fieldLabel(s, q.groupBy.field).toLowerCase()})` : fieldLabel(s, q.groupBy.field).toLowerCase()}`
+    ? ` ${msg(L, "by")} ${q.groupBy.bucket ? `${msg(L, BUCKET_KEY[q.groupBy.bucket])} (${inSentence(fieldLabel(s, q.groupBy.field, L), L)})` : inSentence(fieldLabel(s, q.groupBy.field, L), L)}`
     : "";
   return `${metric}${by}${where}`;
 }
@@ -318,7 +353,7 @@ export function aggregate(op: AggOp, rows: Record<string, unknown>[], field?: st
 }
 
 /** Evaluates a (validated) query over rows the endpoint returned. Pure and deterministic. */
-export function runQuery(catalog: Catalog, q: Query, input: unknown): QueryResult {
+export function runQuery(catalog: Catalog, q: Query, input: unknown, locale?: string): QueryResult {
   const s = catalog.sources[q.source] as SourceDef;
   let rows = (Array.isArray(input) ? input : []).filter(isObj);
   for (const w of q.where ?? []) rows = rows.filter((r) => r[w.field] === w.value);
@@ -334,10 +369,10 @@ export function runQuery(catalog: Catalog, q: Query, input: unknown): QueryResul
     const limited = sorted.slice(0, q.limit ?? MAX_LIMIT);
     return {
       shape: "rows",
-      label: s?.label ?? q.source,
+      label: tx(s?.label, locale) ?? q.source,
       columns: q.fields.map((field) => ({
         field,
-        label: fieldLabel(s, field),
+        label: fieldLabel(s, field, locale),
         def: s.fields[field] as FieldDef,
       })),
       rows: limited.map((r) =>
@@ -351,12 +386,16 @@ export function runQuery(catalog: Catalog, q: Query, input: unknown): QueryResul
 
   const metric = q.metric ?? { op: "count" as const };
   const valueDef = metric.field ? (s.fields[metric.field] ?? null) : null;
-  const label = describeQuery(catalog, {
-    source: q.source,
-    metric,
-    ...(q.groupBy ? { groupBy: q.groupBy } : {}),
-    ...(q.where ? { where: q.where } : {}),
-  });
+  const label = describeQuery(
+    catalog,
+    {
+      source: q.source,
+      metric,
+      ...(q.groupBy ? { groupBy: q.groupBy } : {}),
+      ...(q.where ? { where: q.where } : {}),
+    },
+    locale,
+  );
   if (!q.groupBy)
     return { shape: "single", label, valueDef, value: aggregate(metric.op, rows, metric.field) };
 
@@ -376,13 +415,9 @@ export function runQuery(catalog: Catalog, q: Query, input: unknown): QueryResul
   const points = [...groups.entries()].map(([key, rs]) => ({
     key,
     label:
-      fd?.kind === "enum"
-        ? (fd.valueLabels?.[key] ?? key)
-        : fd?.kind === "bool"
-          ? key === "true"
-            ? "Yes"
-            : "No"
-          : key,
+      fd?.kind === "enum" || fd?.kind === "bool"
+        ? valueText(s, field, fd.kind === "bool" ? key === "true" : key, locale)
+        : key,
     value: aggregate(metric.op, rs, metric.field),
   }));
   points.sort(

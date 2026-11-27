@@ -1,3 +1,4 @@
+import { type Text, tx } from "./i18n.js";
 /**
  * The data catalog: read-only data sources the host already exposes, which users may compose
  * into new views. Generated as a draft by `patina scan`, reviewed and committed by developers.
@@ -11,12 +12,12 @@ export type FieldKind = "string" | "number" | "currency" | "date" | "enum" | "bo
 
 export interface FieldDef {
   kind: FieldKind;
-  label?: string;
-  description?: string;
+  label?: Text;
+  description?: Text;
   /** For enums. */
   values?: string[];
   /** Human names for enum values. */
-  valueLabels?: Record<string, string>;
+  valueLabels?: Record<string, Text>;
   /** ISO 4217 code, for currency fields. */
   currency?: string;
   /** Permission the user needs (checked against `ctx.permissions`) to be offered this field. */
@@ -33,8 +34,8 @@ export interface ParamBinding {
 }
 
 export interface SourceDef {
-  label: string;
-  description?: string;
+  label: Text;
+  description?: Text;
   /** Only GET. The path is relative to the app's origin; the model never sees it. */
   endpoint: { path: string; method: "GET" };
   params?: Record<string, ParamBinding>;
@@ -136,23 +137,38 @@ export function offerableFields(s: SourceDef): Record<string, FieldDef> {
 /** What the browser needs to fetch and format block data. No sensitive fields, no descriptions. */
 export type PublicCatalog = Catalog;
 
-export function publicCatalog(c: Catalog): PublicCatalog {
+/** The catalog for the browser, with labels resolved to `locale`. */
+export function publicCatalog(c: Catalog, locale?: string): PublicCatalog {
   const sources: Record<string, SourceDef> = {};
   for (const [id, s] of Object.entries(c.sources)) {
     const { description: _d, requires: _r, ...rest } = s;
     const fields = Object.fromEntries(
       Object.entries(offerableFields(s)).map(
-        ([fid, { description: _fd, requires: _fr, ...fd }]) => [fid, fd],
+        ([fid, { description: _fd, requires: _fr, ...fd }]) => [
+          fid,
+          {
+            ...fd,
+            ...(fd.label !== undefined ? { label: tx(fd.label, locale) as string } : {}),
+            ...(fd.valueLabels
+              ? {
+                  valueLabels: Object.fromEntries(
+                    Object.entries(fd.valueLabels).map(([k, v]) => [k, tx(v, locale) as string]),
+                  ),
+                }
+              : {}),
+          },
+        ],
       ),
     );
-    sources[id] = { ...rest, fields };
+    sources[id] = { ...rest, label: tx(rest.label, locale) as string, fields };
   }
   return { sources };
 }
 
-export function fieldLabel(s: SourceDef | undefined, field: string): string {
+export function fieldLabel(s: SourceDef | undefined, field: string, locale?: string): string {
   const fd = s?.fields[field];
-  if (fd?.label) return fd.label;
+  const label = tx(fd?.label, locale);
+  if (label) return label;
   const spaced = field
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/[_-]+/g, " ")

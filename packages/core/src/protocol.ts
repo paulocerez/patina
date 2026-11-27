@@ -14,6 +14,8 @@ export interface SurfaceState {
   render: { slots: Record<string, string[]>; collections: Record<string, string[]> };
   /** The user's data sources (restricted, no sensitive fields), for data blocks. */
   catalog?: PublicCatalog;
+  /** The locale messages and previews are in (en, de). */
+  locale?: string;
   /** What this user may do here (from the host's `availability` hook). */
   availability: {
     /** May change this view at all (prompt, apply, undo, reset). */

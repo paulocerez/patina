@@ -7530,10 +7530,21 @@ function scanTsTypes(repo, files, types) {
     const src = repo.read(file);
     if (!src || !/interface|type\s/.test(src)) continue;
     for (const m of src.matchAll(
-      /export\s+(?:interface\s+(\w+)(?:\s+extends\s+[\w<>,\s]+)?|type\s+(\w+)\s*=)\s*\{([\s\S]*?)\n\}/g
+      /export\s+(?:interface\s+(\w+)(?:\s+extends\s+[\w<>,\s]+)?|type\s+(\w+)\s*=)\s*\{/g
     )) {
       const name = m[1] ?? m[2];
-      const fields = parseTsBody(m[3]);
+      const open = (m.index ?? 0) + m[0].length - 1;
+      let depth = 0;
+      let end = -1;
+      for (let i = open; i < src.length && i < open + 2e4; i++) {
+        if (src[i] === "{") depth++;
+        else if (src[i] === "}" && --depth === 0) {
+          end = i;
+          break;
+        }
+      }
+      if (end < 0) continue;
+      const fields = parseTsBody(src.slice(open + 1, end));
       if (Object.keys(fields).length >= 2 && !types.has(name))
         types.set(name, { fields, evidence: `${file}#${name}` });
     }
@@ -7631,23 +7642,28 @@ function scanRoutes(repo, files) {
     ))
       returnTypes.set(m[1], m[2]);
   }
+  const mounts = scanMounts(repo, files);
   const routes = [];
   for (const file of files) {
     const src = repo.read(file);
     if (!src) continue;
-    for (const m of src.matchAll(/\b\w+\.get\(\s*["'`](\/[^"'`]*)["'`]/g)) {
-      const path = m[1];
-      if (/[:*]|\{/.test(path) || path === "/") continue;
+    for (const m of src.matchAll(/\b(\w+)\.get\(\s*["'`](\/[^"'`]*)["'`]/g)) {
+      const receiver = m[1];
+      const local = m[2];
       const start = m.index ?? 0;
       const after = start + m[0].length;
       const nextRoute = src.slice(after, start + 1200).search(/\b\w+\.(get|post|put|patch|delete|use|all|route|listen)\(/);
       const snippet = src.slice(start, nextRoute >= 0 ? after + nextRoute : start + 1200);
-      routes.push({
-        path,
-        params: paramsIn(snippet),
-        evidence: file,
-        typeHints: hintsIn(snippet, returnTypes)
-      });
+      for (const prefix of mounts.prefixesFor(file, receiver)) {
+        const path = joinPath(prefix, local);
+        if (/[:*]|\{/.test(path) || path === "/") continue;
+        routes.push({
+          path,
+          params: paramsIn(snippet),
+          evidence: file,
+          typeHints: hintsIn(snippet, returnTypes)
+        });
+      }
     }
     const next = /(?:^|\/)app\/(.*)\/route\.[jt]sx?$/.exec(file);
     if (next && /export\s+(?:async\s+)?(?:function\s+GET|const\s+GET)/.test(src)) {
@@ -7673,6 +7689,111 @@ function scanRoutes(repo, files) {
     }
   }
   return routes;
+}
+function joinPath(prefix, path) {
+  const joined = `${prefix.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`.replace(/\/+/g, "/");
+  return joined.length > 1 ? joined.replace(/\/$/, "") : joined;
+}
+function resolveImport(repo, fromFile, spec, known) {
+  if (!spec.startsWith(".")) return null;
+  const dir = fromFile.split("/").slice(0, -1);
+  const parts = [...dir];
+  for (const seg of spec.split("/")) {
+    if (seg === "..") parts.pop();
+    else if (seg !== ".") parts.push(seg);
+  }
+  const base = parts.join("/");
+  const noJs = base.replace(/\.(c|m)?js$/, "");
+  for (const c of [
+    base,
+    `${noJs}.ts`,
+    `${noJs}.tsx`,
+    `${noJs}.js`,
+    `${noJs}.mjs`,
+    `${noJs}/index.ts`,
+    `${noJs}/index.js`
+  ])
+    if (known.has(c)) return c;
+  void repo;
+  return null;
+}
+function callArgs(src, openParen) {
+  let depth = 0;
+  for (let i = openParen; i < src.length && i < openParen + 2e3; i++) {
+    const c = src[i];
+    if (c === "(") depth++;
+    else if (c === ")" && --depth === 0) return src.slice(openParen + 1, i);
+  }
+  return "";
+}
+function scanMounts(repo, files) {
+  const known = new Set(repo.files);
+  const defaultExport = /* @__PURE__ */ new Map();
+  const mounts = [];
+  for (const file of files) {
+    const src = repo.read(file) ?? "";
+    const def = /export\s+default\s+(\w+)\s*;?/.exec(src) ?? /module\.exports\s*=\s*(\w+)\s*;?/.exec(src);
+    if (def) defaultExport.set(file, def[1]);
+  }
+  for (const file of files) {
+    let addNamed2 = function(part, target) {
+      const [orig, alias] = part.trim().split(/\s+as\s+/);
+      if (target && orig && /^\w+$/.test(orig))
+        imports.set((alias ?? orig).trim(), [target, orig.trim()]);
+    };
+    var addNamed = addNamed2;
+    const src = repo.read(file);
+    if (!src || !/\.(use|route)\(/.test(src)) continue;
+    const imports = /* @__PURE__ */ new Map();
+    for (const m of src.matchAll(
+      /import\s+(\w+)\s*(?:,\s*\{([^}]*)\})?\s*from\s*["'`]([^"'`]+)["'`]/g
+    )) {
+      const target = resolveImport(repo, file, m[3], known);
+      if (target) imports.set(m[1], [target, "default"]);
+      for (const part of (m[2] ?? "").split(",")) addNamed2(part, target);
+    }
+    for (const m of src.matchAll(/import\s*\{([^}]*)\}\s*from\s*["'`]([^"'`]+)["'`]/g)) {
+      const target = resolveImport(repo, file, m[2], known);
+      for (const part of (m[1] ?? "").split(",")) addNamed2(part, target);
+    }
+    for (const m of src.matchAll(
+      /(?:const|let|var)\s+(\w+)\s*=\s*require\(\s*["'`]([^"'`]+)["'`]\s*\)/g
+    )) {
+      const target = resolveImport(repo, file, m[2], known);
+      if (target) imports.set(m[1], [target, "default"]);
+    }
+    for (const m of src.matchAll(/\b(\w+)\.(?:use|route)\(\s*["'`](\/[^"'`]*)["'`]\s*,/g)) {
+      const args = callArgs(src, (m.index ?? 0) + m[0].indexOf("("));
+      const last = /(\w+)\s*,?\s*$/.exec(args.trim())?.[1];
+      if (!last) continue;
+      const imported = imports.get(last);
+      const [childFile, childVarRaw] = imported ?? [file, last];
+      const childVar = childVarRaw === "default" ? defaultExport.get(childFile) ?? "default" : childVarRaw;
+      mounts.push({
+        parentFile: file,
+        parentVar: m[1],
+        prefix: m[2],
+        childFile,
+        childVar
+      });
+    }
+  }
+  const memo = /* @__PURE__ */ new Map();
+  function prefixesFor(file, variable, depth = 0) {
+    const key = `${file}#${variable}`;
+    const cached = memo.get(key);
+    if (cached) return cached;
+    const own = mounts.filter((m) => m.childFile === file && m.childVar === variable);
+    if (own.length === 0 || depth > 6) return [""];
+    const out = /* @__PURE__ */ new Set();
+    for (const m of own)
+      for (const parent of prefixesFor(m.parentFile, m.parentVar, depth + 1))
+        out.add(joinPath(parent, m.prefix));
+    const list = [...out];
+    memo.set(key, list);
+    return list;
+  }
+  return { prefixesFor, mounts };
 }
 function scanOpenApi(repo) {
   const out = /* @__PURE__ */ new Map();

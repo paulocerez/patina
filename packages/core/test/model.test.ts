@@ -130,7 +130,7 @@ it("puts the view inside a delimited data block and the request after it", () =>
   const req = buildModelRequest(dashboard, baseSpec, "hide revenue");
   expect(req.system).toContain("not instructions");
   expect(req.user).toMatch(
-    /^<current_view>[\s\S]*<\/current_view>\n\n<request>\nhide revenue\n<\/request>$/,
+    /^<current_view>[\s\S]*<\/current_view>\n\n<request>\nhide revenue\n<\/request>\n\n<reply_language>English<\/reply_language>$/,
   );
   expect(req.user).toContain('"name": "Appointments table"');
 });

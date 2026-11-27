@@ -20,7 +20,7 @@
 
 ##### description?
 
-> `readonly` `optional` **description?**: `string`
+> `readonly` `optional` **description?**: [`Text`](../type-aliases/Text.md)
 
 Written for the model: what this prop does.
 
@@ -30,7 +30,7 @@ Written for the model: what this prop does.
 
 ##### label?
 
-> `readonly` `optional` **label?**: `string`
+> `readonly` `optional` **label?**: [`Text`](../type-aliases/Text.md)
 
 Short human name, used in previews and error messages ("Rows per page").
 
@@ -69,7 +69,7 @@ field of a catalog source (fields missing from the base spec appear hidden by de
 
 ##### description?
 
-> `readonly` `optional` **description?**: `string`
+> `readonly` `optional` **description?**: [`Text`](../type-aliases/Text.md)
 
 Written for the model: what this prop does.
 
@@ -79,13 +79,13 @@ Written for the model: what this prop does.
 
 ##### label?
 
-> `readonly` `optional` **label?**: `string`
+> `readonly` `optional` **label?**: [`Text`](../type-aliases/Text.md)
 
 Short human name, used in previews and error messages ("Rows per page").
 
 ##### labels?
 
-> `readonly` `optional` **labels?**: `Record`\<`string`, `string`\>
+> `readonly` `optional` **labels?**: `Record`\<`string`, [`Text`](../type-aliases/Text.md)\>
 
 ##### values
 
@@ -115,7 +115,7 @@ Short human name, used in previews and error messages ("Rows per page").
 
 ##### description?
 
-> `readonly` `optional` **description?**: `string`
+> `readonly` `optional` **description?**: [`Text`](../type-aliases/Text.md)
 
 Written for the model: what this prop does.
 
@@ -125,7 +125,7 @@ Written for the model: what this prop does.
 
 ##### label?
 
-> `readonly` `optional` **label?**: `string`
+> `readonly` `optional` **label?**: [`Text`](../type-aliases/Text.md)
 
 Short human name, used in previews and error messages ("Rows per page").
 
@@ -157,7 +157,7 @@ Short human name, used in previews and error messages ("Rows per page").
 
 ##### description?
 
-> `readonly` `optional` **description?**: `string`
+> `readonly` `optional` **description?**: [`Text`](../type-aliases/Text.md)
 
 Written for the model: what this prop does.
 
@@ -167,7 +167,7 @@ Written for the model: what this prop does.
 
 ##### label?
 
-> `readonly` `optional` **label?**: `string`
+> `readonly` `optional` **label?**: [`Text`](../type-aliases/Text.md)
 
 Short human name, used in previews and error messages ("Rows per page").
 
@@ -193,7 +193,7 @@ Short human name, used in previews and error messages ("Rows per page").
 
 ##### description?
 
-> `readonly` `optional` **description?**: `string`
+> `readonly` `optional` **description?**: [`Text`](../type-aliases/Text.md)
 
 Written for the model: what this prop does.
 
@@ -207,7 +207,7 @@ Written for the model: what this prop does.
 
 ##### label?
 
-> `readonly` `optional` **label?**: `string`
+> `readonly` `optional` **label?**: [`Text`](../type-aliases/Text.md)
 
 Short human name, used in previews and error messages ("Rows per page").
 
@@ -264,7 +264,7 @@ A view over a catalog source, for data blocks. `shape` is "rows" (pick fields),
 
 ##### description?
 
-> `readonly` `optional` **description?**: `string`
+> `readonly` `optional` **description?**: [`Text`](../type-aliases/Text.md)
 
 Written for the model: what this prop does.
 
@@ -274,7 +274,7 @@ Written for the model: what this prop does.
 
 ##### label?
 
-> `readonly` `optional` **label?**: `string`
+> `readonly` `optional` **label?**: [`Text`](../type-aliases/Text.md)
 
 Short human name, used in previews and error messages ("Rows per page").
 
@@ -310,7 +310,7 @@ Short human name, used in previews and error messages ("Rows per page").
 
 ##### description?
 
-> `readonly` `optional` **description?**: `string`
+> `readonly` `optional` **description?**: [`Text`](../type-aliases/Text.md)
 
 Written for the model: what this prop does.
 
@@ -324,6 +324,6 @@ Written for the model: what this prop does.
 
 ##### label?
 
-> `readonly` `optional` **label?**: `string`
+> `readonly` `optional` **label?**: [`Text`](../type-aliases/Text.md)
 
 Short human name, used in previews and error messages ("Rows per page").

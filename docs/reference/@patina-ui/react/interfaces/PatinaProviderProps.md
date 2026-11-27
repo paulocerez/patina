@@ -91,3 +91,16 @@ Custom fetch, e.g. to add auth headers. Defaults to the global fetch with cookie
 > `optional` **fetchSource?**: [`FetchSource`](../type-aliases/FetchSource.md)
 
 How data blocks load catalog sources. Defaults to a same-origin GET with cookies.
+
+***
+
+### locale?
+
+> `optional` **locale?**: `string`
+
+The user's language ("de", "de-DE", "en"…) for Patina's messages, previews and the model's
+replies. Default: the browser's language. Supported: en, de (others fall back to English).
+
+#### Overrides
+
+[`ClientOptions`](ClientOptions.md).[`locale`](ClientOptions.md#locale)

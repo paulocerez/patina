@@ -1,6 +1,6 @@
 import type { Change } from "@patina-ui/core";
 import { type ButtonHTMLAttributes, type FormEvent, type ReactNode, useId, useState } from "react";
-import { useSurface } from "./context.js";
+import { usePatinaText, useSurface } from "./context.js";
 
 /* All primitives are unstyled. Pass className/style, or use the render-prop form for full control. */
 
@@ -33,14 +33,15 @@ export interface PromptInputProps {
 /** A text box that sends the user's request. Clears itself when a preview arrives. */
 export function PromptInput({
   surfaceId,
-  placeholder = "Describe a change, e.g. “hide the revenue column”",
-  label = "Customize this view",
-  submitLabel = "Preview",
+  placeholder,
+  label,
+  submitLabel,
   className,
   maxLength = 500,
   children,
 }: PromptInputProps) {
   const s = useSurface(surfaceId);
+  const { t } = usePatinaText();
   const [value, setValue] = useState("");
   const id = useId();
   const submit = () => {
@@ -66,16 +67,20 @@ export function PromptInput({
       onChange: (e) => setValue(e.target.value),
       disabled: s.busy,
       maxLength,
-      "aria-label": label,
+      "aria-label": label ?? t("promptLabel"),
     },
   };
   if (!s.availability.customize) return null;
   if (children) return <>{children(props)}</>;
   return (
     <form className={className} data-patina="prompt" {...props.formProps}>
-      <input type="text" placeholder={placeholder} {...props.inputProps} />
+      <input
+        type="text"
+        placeholder={placeholder ?? t("promptPlaceholder")}
+        {...props.inputProps}
+      />
       <button type="submit" disabled={s.busy || !value.trim()}>
-        {s.status === "proposing" ? "Thinking…" : submitLabel}
+        {s.status === "proposing" ? t("thinking") : (submitLabel ?? t("preview"))}
       </button>
     </form>
   );
@@ -104,11 +109,12 @@ export interface ProposalPreviewProps {
 export function ProposalPreview({
   surfaceId,
   className,
-  applyLabel = "Apply",
-  discardLabel = "Discard",
+  applyLabel,
+  discardLabel,
   children,
 }: ProposalPreviewProps) {
   const s = useSurface(surfaceId);
+  const { t } = usePatinaText();
   if (!s.proposal) return null;
   const props: ProposalPreviewRenderProps = {
     changes: s.proposal.changes,
@@ -122,7 +128,7 @@ export function ProposalPreview({
     <section
       className={className}
       data-patina="preview"
-      aria-label="Proposed changes"
+      aria-label={t("proposedChanges")}
       aria-live="polite"
     >
       <ul>
@@ -131,10 +137,10 @@ export function ProposalPreview({
         ))}
       </ul>
       <button type="button" onClick={props.commit} disabled={props.busy}>
-        {applyLabel}
+        {applyLabel ?? t("apply")}
       </button>
       <button type="button" onClick={props.discard} disabled={props.busy}>
-        {discardLabel}
+        {discardLabel ?? t("discard")}
       </button>
     </section>
   );
@@ -166,8 +172,9 @@ export function SurfaceMessage({ surfaceId, className, children }: SurfaceMessag
 type ButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick"> & { surfaceId: string };
 
 /** Undoes the last saved change (or the last reset). */
-export function UndoButton({ surfaceId, children = "Undo", disabled, ...rest }: ButtonProps) {
+export function UndoButton({ surfaceId, children, disabled, ...rest }: ButtonProps) {
   const s = useSurface(surfaceId);
+  const { t } = usePatinaText();
   if (!s.availability.customize) return null;
   return (
     <button
@@ -177,19 +184,15 @@ export function UndoButton({ surfaceId, children = "Undo", disabled, ...rest }: 
       disabled={disabled || s.busy || !s.canUndo}
       onClick={() => void s.undo()}
     >
-      {children}
+      {children ?? t("undo")}
     </button>
   );
 }
 
 /** Returns the view to its default. Can itself be undone. */
-export function ResetButton({
-  surfaceId,
-  children = "Reset to default",
-  disabled,
-  ...rest
-}: ButtonProps) {
+export function ResetButton({ surfaceId, children, disabled, ...rest }: ButtonProps) {
   const s = useSurface(surfaceId);
+  const { t } = usePatinaText();
   if (!s.availability.customize) return null;
   return (
     <button
@@ -199,7 +202,7 @@ export function ResetButton({
       disabled={disabled || s.busy || !s.isCustomized}
       onClick={() => void s.reset()}
     >
-      {children}
+      {children ?? t("reset")}
     </button>
   );
 }
@@ -213,14 +216,13 @@ export interface SkippedNoticeProps {
 /** Tells the user when some of their earlier changes no longer apply (after a base view update). */
 export function SkippedNotice({ surfaceId, className, children }: SkippedNoticeProps) {
   const skipped = useSurface(surfaceId).state?.skipped ?? [];
+  const { t } = usePatinaText();
   if (skipped.length === 0) return null;
   if (children) return <>{children(skipped)}</>;
   return (
     <details className={className} data-patina="skipped">
       <summary>
-        {skipped.length === 1
-          ? "1 of your earlier changes no longer applies"
-          : `${skipped.length} of your earlier changes no longer apply`}
+        {skipped.length === 1 ? t("skippedOne") : t("skippedMany", { count: skipped.length })}
       </summary>
       <ul>
         {skipped.map((s, i) => (

@@ -205,6 +205,7 @@ view or in the model's prompt.
   - [GitHub Action](docs/guides/github-action.md): check every PR
   - [Availability](docs/guides/availability.md): who may customize, from feature flags, plans and quotas
   - [Insights](docs/guides/insights.md): what customers asked for, what couldn't be done, and why
+  - [Localization](docs/guides/localization.md): English and German, labels per language
 - [API reference](docs/reference/README.md) (generated with `pnpm docs:api`)
 - [A prompt for coding agents](docs/agent-prompt.md): `npx patina init-agent` installs the skill
   ([`skills/patina-ui/SKILL.md`](skills/patina-ui/SKILL.md)); [`llms.txt`](llms.txt) indexes the docs

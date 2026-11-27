@@ -44,6 +44,8 @@ export interface EvalCase {
     | { kind: "clarify" };
   /** Compare the result without caring about the order of items (when the prompt doesn't say where). */
   ignoreOrder?: boolean;
+  /** The user's language (sent as x-patina-locale), e.g. "de". */
+  locale?: string;
   /** Other outcomes that also count as a pass (e.g. refusal for an ambiguous prompt). */
   accept?: EvalKind[];
   note?: string;
@@ -153,7 +155,10 @@ async function runCase<Ctx extends PatinaContext>(
     const res = await handler(
       new Request(`http://eval/surfaces/${encodeURIComponent(o.surface.id)}${path}`, {
         method,
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...(c.locale ? { "x-patina-locale": c.locale } : {}),
+        },
         body: body === undefined ? undefined : JSON.stringify(body),
       }),
     );

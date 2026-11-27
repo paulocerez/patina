@@ -50,6 +50,17 @@ export {
 } from "./engine.js";
 export type { HistoryEntry, Layer, Resolved } from "./history.js";
 export { effectivePatches, headSeq, resolve, undoTarget } from "./history.js";
+export type { Locale, MessageKey, Text } from "./i18n.js";
+export {
+  DEFAULT_LOCALE,
+  listOr,
+  msg,
+  msgText,
+  pickLocale,
+  RELATIVE_RANGE_TEXT,
+  SUPPORTED_LOCALES,
+  tx,
+} from "./i18n.js";
 export type {
   ComponentDef,
   Manifest,
@@ -57,7 +68,13 @@ export type {
   Restriction,
   SurfaceDefinition,
 } from "./manifest.js";
-export { defineSurface, nodeLabel, restrictManifest, restrictSpec } from "./manifest.js";
+export {
+  defineSurface,
+  localizeManifest,
+  nodeLabel,
+  restrictManifest,
+  restrictSpec,
+} from "./manifest.js";
 export type { Migration } from "./migrate.js";
 export { migratePatch, migrations } from "./migrate.js";
 export type { ModelRequest, ModelResult, RefusalCategory } from "./model.js";

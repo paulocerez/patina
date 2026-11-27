@@ -2,13 +2,19 @@
 
 # Function: publicCatalog()
 
-> **publicCatalog**(`c`): [`Catalog`](../interfaces/Catalog.md)
+> **publicCatalog**(`c`, `locale?`): [`Catalog`](../interfaces/Catalog.md)
+
+The catalog for the browser, with labels resolved to `locale`.
 
 ## Parameters
 
 ### c
 
 [`Catalog`](../interfaces/Catalog.md)
+
+### locale?
+
+`string`
 
 ## Returns
 

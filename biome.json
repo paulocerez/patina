@@ -10,7 +10,8 @@
       "!evals/results",
       "!packages/cli/test/fixtures",
       "!packages/action/dist",
-      "!skills"
+      "!skills",
+      "!packages/cli/skill"
     ]
   },
   "formatter": {

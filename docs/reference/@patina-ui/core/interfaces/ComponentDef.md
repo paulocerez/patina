@@ -6,7 +6,7 @@
 
 ### description?
 
-> `optional` **description?**: `string`
+> `optional` **description?**: [`Text`](../type-aliases/Text.md)
 
 Written for the model.
 
@@ -14,7 +14,7 @@ Written for the model.
 
 ### label?
 
-> `optional` **label?**: `string`
+> `optional` **label?**: [`Text`](../type-aliases/Text.md)
 
 Human name used in previews ("Table").
 

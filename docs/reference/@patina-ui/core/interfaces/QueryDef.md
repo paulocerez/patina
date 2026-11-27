@@ -18,7 +18,7 @@
 
 ### description?
 
-> `optional` **description?**: `string`
+> `optional` **description?**: [`Text`](../type-aliases/Text.md)
 
 ***
 
@@ -30,7 +30,7 @@
 
 ### label?
 
-> `optional` **label?**: `string`
+> `optional` **label?**: [`Text`](../type-aliases/Text.md)
 
 ***
 

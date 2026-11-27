@@ -1,6 +1,8 @@
+import { type MessageKey, msg } from "@patina-ui/core";
 import { createContext, type ReactNode, useContext, useMemo, useSyncExternalStore } from "react";
 import { type ClientOptions, createPatinaClient, type PatinaClient } from "./client.js";
 import { DataContext, defaultFetchSource, type FetchSource } from "./data.js";
+import { LocaleContext } from "./locale.js";
 import { type SurfaceSnapshot, SurfaceStore } from "./store.js";
 
 interface PatinaContextValue {
@@ -14,6 +16,11 @@ export interface PatinaProviderProps extends Partial<ClientOptions> {
   client?: PatinaClient;
   /** How data blocks load catalog sources. Defaults to a same-origin GET with cookies. */
   fetchSource?: FetchSource;
+  /**
+   * The user's language ("de", "de-DE", "en"…) for Patina's messages, previews and the model's
+   * replies. Default: the browser's language. Supported: en, de (others fall back to English).
+   */
+  locale?: string;
   children: ReactNode;
 }
 
@@ -23,10 +30,11 @@ export function PatinaProvider({
   fetch,
   client,
   fetchSource = defaultFetchSource,
+  locale = defaultLocale(),
   children,
 }: PatinaProviderProps) {
   const value = useMemo(() => {
-    const c = client ?? createPatinaClient({ endpoint, ...(fetch ? { fetch } : {}) });
+    const c = client ?? createPatinaClient({ endpoint, locale, ...(fetch ? { fetch } : {}) });
     const stores = new Map<string, SurfaceStore>();
     return {
       store(id: string) {
@@ -37,11 +45,13 @@ export function PatinaProvider({
         return created;
       },
     };
-  }, [endpoint, fetch, client]);
+  }, [endpoint, fetch, client, locale]);
   const data = useMemo(() => ({ fetchSource, cache: new Map() }), [fetchSource]);
   return (
     <Ctx.Provider value={value}>
-      <DataContext.Provider value={data}>{children}</DataContext.Provider>
+      <LocaleContext.Provider value={locale}>
+        <DataContext.Provider value={data}>{children}</DataContext.Provider>
+      </LocaleContext.Provider>
     </Ctx.Provider>
   );
 }
@@ -82,4 +92,20 @@ export function useSurface(surfaceId: string): UseSurface {
     availability: snap.state?.availability ?? { customize: true, dataViews: true },
     busy: snap.status === "loading" || snap.status === "proposing" || snap.status === "committing",
   };
+}
+
+function defaultLocale(): string {
+  return typeof navigator !== "undefined" && navigator.language ? navigator.language : "en";
+}
+
+/**
+ * The provider's locale and Patina's own texts in it, for your components and generated
+ * blocks: `const { locale, t } = usePatinaText(); t("loading")`.
+ */
+export function usePatinaText(): {
+  locale: string;
+  t: (key: MessageKey, params?: Record<string, string | number>) => string;
+} {
+  const locale = useContext(LocaleContext);
+  return { locale, t: (key, params) => msg(locale, key, params) };
 }

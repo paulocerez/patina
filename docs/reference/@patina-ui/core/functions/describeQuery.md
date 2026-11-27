@@ -2,9 +2,10 @@
 
 # Function: describeQuery()
 
-> **describeQuery**(`catalog`, `q`): `string`
+> **describeQuery**(`catalog`, `q`, `locale?`): `string`
 
-"Total Revenue by Vet", "Number of Appointments where Status is No-show", "Appointments: Date, Vet".
+A title for a query, in `locale`: "Total revenue by vet", "Number of appointments where
+Status is No-show", "Appointments: Date, Vet"; German "Summe Umsatz nach Tierarzt".
 
 ## Parameters
 
@@ -15,6 +16,10 @@
 ### q
 
 [`Query`](../interfaces/Query.md)
+
+### locale?
+
+`string`
 
 ## Returns
 

@@ -58,7 +58,7 @@ function kitFor(scan: ScanResult): Kit {
         `import { Card, CardContent, Skeleton, Table, TableBody, TableCell, TableHead, TableRow, Typography } from "@mui/material";`,
       ],
       frame: `<Card variant="outlined"><CardContent><Typography variant="subtitle2" gutterBottom>{title}</Typography>{children}</CardContent></Card>`,
-      table: `<Table size="small"><TableHead><TableRow>{columns.map((c) => <TableCell key={c.field}>{c.label}</TableCell>)}</TableRow></TableHead><TableBody>{rows.map((r, i) => <TableRow key={rowKey(r, i)}>{columns.map((c) => <TableCell key={c.field}>{formatField(c.def, r[c.field])}</TableCell>)}</TableRow>)}</TableBody></Table>`,
+      table: `<Table size="small"><TableHead><TableRow>{columns.map((c) => <TableCell key={c.field}>{c.label}</TableCell>)}</TableRow></TableHead><TableBody>{rows.map((r, i) => <TableRow key={rowKey(r, i)}>{columns.map((c) => <TableCell key={c.field}>{formatField(c.def, r[c.field], locale)}</TableCell>)}</TableRow>)}</TableBody></Table>`,
       stat: `<Typography variant="h4" component="p">{value}</Typography>`,
       muted: `<Typography variant="body2" color="text.secondary">{text}</Typography>`,
       color: "var(--mui-palette-primary-main, #1976d2)",
@@ -69,7 +69,7 @@ function kitFor(scan: ScanResult): Kit {
       name: "Chakra UI",
       imports: [`import { Box, Heading, Text } from "@chakra-ui/react";`],
       frame: `<Box borderWidth="1px" borderRadius="lg" p={4}><Heading size="sm" mb={3}>{title}</Heading>{children}</Box>`,
-      table: `<Box as="table" width="100%" fontSize="sm"><thead><tr>{columns.map((c) => <Box as="th" key={c.field} textAlign="left" py={2}>{c.label}</Box>)}</tr></thead><tbody>{rows.map((r, i) => <tr key={rowKey(r, i)}>{columns.map((c) => <Box as="td" key={c.field} py={2} borderTopWidth="1px">{formatField(c.def, r[c.field])}</Box>)}</tr>)}</tbody></Box>`,
+      table: `<Box as="table" width="100%" fontSize="sm"><thead><tr>{columns.map((c) => <Box as="th" key={c.field} textAlign="left" py={2}>{c.label}</Box>)}</tr></thead><tbody>{rows.map((r, i) => <tr key={rowKey(r, i)}>{columns.map((c) => <Box as="td" key={c.field} py={2} borderTopWidth="1px">{formatField(c.def, r[c.field], locale)}</Box>)}</tr>)}</tbody></Box>`,
       stat: `<Text fontSize="3xl" fontWeight="semibold">{value}</Text>`,
       muted: `<Text fontSize="sm" color="gray.500">{text}</Text>`,
       color: "var(--chakra-colors-blue-500, #3182ce)",
@@ -80,7 +80,7 @@ function kitFor(scan: ScanResult): Kit {
       name: "Ant Design",
       imports: [`import { Card, Statistic, Table, Typography } from "antd";`],
       frame: `<Card size="small" title={title}>{children}</Card>`,
-      table: `<Table size="small" pagination={false} rowKey={(r) => String(rowKey(r, 0))} dataSource={rows} columns={columns.map((c) => ({ key: c.field, dataIndex: c.field, title: c.label, render: (v: unknown) => formatField(c.def, v) }))} />`,
+      table: `<Table size="small" pagination={false} rowKey={(r) => String(rowKey(r, 0))} dataSource={rows} columns={columns.map((c) => ({ key: c.field, dataIndex: c.field, title: c.label, render: (v: unknown) => formatField(c.def, v, locale) }))} />`,
       stat: `<Statistic value={value} />`,
       muted: `<Typography.Text type="secondary">{text}</Typography.Text>`,
       color: "var(--ant-color-primary, #1677ff)",
@@ -91,7 +91,7 @@ function kitFor(scan: ScanResult): Kit {
       name: "Mantine",
       imports: [`import { Card, Table, Text, Title } from "@mantine/core";`],
       frame: `<Card withBorder radius="md" padding="md"><Title order={5} mb="sm">{title}</Title>{children}</Card>`,
-      table: `<Table><thead><tr>{columns.map((c) => <th key={c.field}>{c.label}</th>)}</tr></thead><tbody>{rows.map((r, i) => <tr key={rowKey(r, i)}>{columns.map((c) => <td key={c.field}>{formatField(c.def, r[c.field])}</td>)}</tr>)}</tbody></Table>`,
+      table: `<Table><thead><tr>{columns.map((c) => <th key={c.field}>{c.label}</th>)}</tr></thead><tbody>{rows.map((r, i) => <tr key={rowKey(r, i)}>{columns.map((c) => <td key={c.field}>{formatField(c.def, r[c.field], locale)}</td>)}</tr>)}</tbody></Table>`,
       stat: `<Text size="xl" fw={700}>{value}</Text>`,
       muted: `<Text size="sm" c="dimmed">{text}</Text>`,
       color: "var(--mantine-color-blue-filled, #228be6)",
@@ -124,9 +124,9 @@ function kitFor(scan: ScanResult): Kit {
       imports.push(
         `import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ${JSON.stringify((table[0] as { importPath: string }).importPath)};`,
       );
-      tableJsx = `<Table><TableHeader><TableRow>{columns.map((c) => <TableHead key={c.field}>{c.label}</TableHead>)}</TableRow></TableHeader><TableBody>{rows.map((r, i) => <TableRow key={rowKey(r, i)}>{columns.map((c) => <TableCell key={c.field}>{formatField(c.def, r[c.field])}</TableCell>)}</TableRow>)}</TableBody></Table>`;
+      tableJsx = `<Table><TableHeader><TableRow>{columns.map((c) => <TableHead key={c.field}>{c.label}</TableHead>)}</TableRow></TableHeader><TableBody>{rows.map((r, i) => <TableRow key={rowKey(r, i)}>{columns.map((c) => <TableCell key={c.field}>{formatField(c.def, r[c.field], locale)}</TableCell>)}</TableRow>)}</TableBody></Table>`;
     } else {
-      tableJsx = `<table className="w-full text-sm"><thead><tr className="border-b">{columns.map((c) => <th key={c.field} className="py-2 text-left font-medium text-muted-foreground">{c.label}</th>)}</tr></thead><tbody>{rows.map((r, i) => <tr key={rowKey(r, i)} className="border-b last:border-0">{columns.map((c) => <td key={c.field} className="py-2">{formatField(c.def, r[c.field])}</td>)}</tr>)}</tbody></table>`;
+      tableJsx = `<table className="w-full text-sm"><thead><tr className="border-b">{columns.map((c) => <th key={c.field} className="py-2 text-left font-medium text-muted-foreground">{c.label}</th>)}</tr></thead><tbody>{rows.map((r, i) => <tr key={rowKey(r, i)} className="border-b last:border-0">{columns.map((c) => <td key={c.field} className="py-2">{formatField(c.def, r[c.field], locale)}</td>)}</tr>)}</tbody></table>`;
     }
     return {
       name: ui === "shadcn" ? "shadcn/ui" : "Tailwind",
@@ -157,7 +157,7 @@ function kitFor(scan: ScanResult): Kit {
     name: "your CSS",
     imports: [],
     frame: `<section ${cardStyle}><h2${statLabel ? "" : ` style={{ fontSize: 14, margin: "0 0 12px" }}`}>{title}</h2>{children}</section>`,
-    table: `<table style={{ width: "100%", borderCollapse: "collapse" }}><thead><tr>{columns.map((c) => <th key={c.field} style={{ textAlign: "left", padding: "8px 10px", borderBottom: "1px solid ${border}", color: "${muted}", fontSize: 12 }}>{c.label}</th>)}</tr></thead><tbody>{rows.map((r, i) => <tr key={rowKey(r, i)}>{columns.map((c) => <td key={c.field} style={{ padding: "8px 10px", borderBottom: "1px solid ${border}" }}>{formatField(c.def, r[c.field])}</td>)}</tr>)}</tbody></table>`,
+    table: `<table style={{ width: "100%", borderCollapse: "collapse" }}><thead><tr>{columns.map((c) => <th key={c.field} style={{ textAlign: "left", padding: "8px 10px", borderBottom: "1px solid ${border}", color: "${muted}", fontSize: 12 }}>{c.label}</th>)}</tr></thead><tbody>{rows.map((r, i) => <tr key={rowKey(r, i)}>{columns.map((c) => <td key={c.field} style={{ padding: "8px 10px", borderBottom: "1px solid ${border}" }}>{formatField(c.def, r[c.field], locale)}</td>)}</tr>)}</tbody></table>`,
     stat: classes.includes("stat-value")
       ? `<div className="stat-value">{value}</div>`
       : `<div style={{ fontSize: 28, fontWeight: 650 }}>{value}</div>`,
@@ -214,7 +214,7 @@ export function renderBlocks(scan: ScanResult): string {
   const chart = chartJsx(scan);
   const usesSvg = chart.imports.length === 0;
   const imports = [
-    `import { formatField, type Query, type QueryState, useQuery } from "@patina-ui/react";`,
+    `import { formatField, type Query, type QueryState, usePatinaText, useQuery } from "@patina-ui/react";`,
     `import type { ReactNode } from "react";`,
     ...kit.imports,
     ...chart.imports,
@@ -234,10 +234,12 @@ function Muted({ text }: { text: string }) {
   return ${kit.muted};
 }
 
-function placeholder(state: QueryState): string {
-  if (state.status === "loading") return "Loading…";
+type T = ReturnType<typeof usePatinaText>["t"];
+
+function placeholder(state: QueryState, t: T): string {
+  if (state.status === "loading") return t("loading");
   if (state.status === "error") return state.error;
-  return "This data isn't available to you.";
+  return t("unavailable");
 }
 
 function rowKey(row: Record<string, unknown>, index: number): string | number {
@@ -248,16 +250,17 @@ function rowKey(row: Record<string, unknown>, index: number): string | number {
 /** A table of rows from one data source. */
 export function PatinaTable({ query }: { query?: Query }) {
   const state = useQuery(query);
+  const { t, locale } = usePatinaText();
   if (state.status !== "ready" || state.result.shape !== "rows")
     return (
-      <Frame title="Table">
-        <Muted text={placeholder(state)} />
+      <Frame title={t("blockTable")}>
+        <Muted text={placeholder(state, t)} />
       </Frame>
     );
   const { label: title, columns, rows } = state.result;
   return (
     <Frame title={title}>
-      {rows.length === 0 ? <Muted text="Nothing to show." /> : ${kit.table}}
+      {rows.length === 0 ? <Muted text={t("nothingToShow")} /> : ${kit.table}}
     </Frame>
   );
 }
@@ -265,17 +268,18 @@ export function PatinaTable({ query }: { query?: Query }) {
 /** One number per group, as bars or a line. */
 export function PatinaChart({ kind = "bar", query }: { kind?: "bar" | "line"; query?: Query }) {
   const state = useQuery(query);
+  const { t, locale } = usePatinaText();
   if (state.status !== "ready" || state.result.shape !== "series")
     return (
-      <Frame title="Chart">
-        <Muted text={placeholder(state)} />
+      <Frame title={t("blockChart")}>
+        <Muted text={placeholder(state, t)} />
       </Frame>
     );
   const { label: title, points, valueDef } = state.result;
-  const fmt = (v: number) => formatField(valueDef, v);
+  const fmt = (v: number) => formatField(valueDef, v, locale);
 ${usesSvg ? "  const W = 600;\n  const H = 180;\n  const bw = W / Math.max(points.length, 1);\n  const x = (i: number) => i * bw;\n  const max = Math.max(1, ...points.map((p) => p.value));\n" : ""}  return (
     <Frame title={title}>
-      {points.length === 0 ? <Muted text="Nothing to show." /> : (
+      {points.length === 0 ? <Muted text={t("nothingToShow")} /> : (
       ${chart.body}
       )}
     </Frame>
@@ -285,14 +289,15 @@ ${usesSvg ? "  const W = 600;\n  const H = 180;\n  const bw = W / Math.max(point
 /** A single number. */
 export function PatinaStat({ query }: { query?: Query }) {
   const state = useQuery(query);
+  const { t, locale } = usePatinaText();
   if (state.status !== "ready" || state.result.shape !== "single")
     return (
-      <Frame title="…">
-        <Muted text={placeholder(state)} />
+      <Frame title={t("blockStat")}>
+        <Muted text={placeholder(state, t)} />
       </Frame>
     );
   const { label: title } = state.result;
-  const value = formatField(state.result.valueDef, state.result.value);
+  const value = formatField(state.result.valueDef, state.result.value, locale);
   return <Frame title={title}>{${kit.stat}}</Frame>;
 }
 `;

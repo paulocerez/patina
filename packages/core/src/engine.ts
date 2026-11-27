@@ -1,4 +1,5 @@
 import { type CollectionDef, humanize, isListType, type SlotDef, type TypeDef } from "./dsl.js";
+import { msg, tx } from "./i18n.js";
 import { type Manifest, nodeLabel } from "./manifest.js";
 import type {
   Anchor,
@@ -58,7 +59,7 @@ export function apply(
         opIndex,
         op: raw as Op,
         code: "malformed_op",
-        message: "This change isn't in a format Patina understands.",
+        message: msg(m.locale, "malformedOp"),
       });
       return;
     }
@@ -66,7 +67,7 @@ export function apply(
     try {
       r = step(m, current, op);
     } catch {
-      r = { ok: false, code: "malformed_op", message: "This change could not be applied." };
+      r = { ok: false, code: "malformed_op", message: msg(m.locale, "notApplied") };
     }
     if (r.ok) {
       current = r.spec;
@@ -109,14 +110,17 @@ function resolveTarget(
   prop: string,
 ): Target | StepResult {
   const node = spec.nodes[nodeId];
-  if (!node) return fail("unknown_node", `There is no “${nodeId}” on this page.`);
+  if (!node) return fail("unknown_node", msg(m.locale, "unknownNode", { id: nodeId }));
   const name = nodeLabel(m, spec, nodeId);
   const comp = m.components[node.component];
   const def = comp?.props[prop];
   if (!def) {
     return prop in node.props
-      ? fail("not_customizable", `${humanize(prop)} of ${name} can't be changed.`)
-      : fail("unknown_prop", `${name} has no setting called “${prop}”.`);
+      ? fail(
+          "not_customizable",
+          msg(m.locale, "propNotCustomizable", { prop: humanize(prop), name }),
+        )
+      : fail("unknown_prop", msg(m.locale, "noSuchSetting", { name, setting: prop }));
   }
   return { node, def, name };
 }
@@ -130,6 +134,11 @@ function listOfNode(node: SpecNode, prop: string): CollectionItem[] {
   return Array.isArray(v) ? (v as unknown as CollectionItem[]) : [];
 }
 
+/** “English” or „German“ quotes. */
+function quote(text: string, locale?: string): string {
+  return locale?.toLowerCase().startsWith("de") ? `„${text}“` : `“${text}”`;
+}
+
 function itemLabel(
   m: Manifest<unknown>,
   spec: SurfaceSpec,
@@ -137,7 +146,7 @@ function itemLabel(
   key: string,
 ): string {
   if (def.kind === "slot") return nodeLabel(m, spec, key);
-  return `“${def.labels?.[key] ?? humanize(key)}”`;
+  return quote(tx(def.labels?.[key], m.locale) ?? humanize(key), m.locale);
 }
 
 function withProps(spec: SurfaceSpec, nodeId: NodeId, props: Record<string, Value>): SurfaceSpec {
@@ -165,6 +174,7 @@ function step(m: Manifest<unknown>, spec: SurfaceSpec, op: Op): StepResult {
   const target = resolveTarget(m, spec, op.node, prop);
   if (!isTarget(target)) return target;
   const { node, def, name } = target;
+  const L = m.locale;
 
   switch (op.op) {
     case "set": {
@@ -172,13 +182,15 @@ function step(m: Manifest<unknown>, spec: SurfaceSpec, op: Op): StepResult {
         if (isListType(def))
           return fail(
             "not_customizable",
-            `${humanize(prop)} of ${name} can't be replaced as a whole.`,
+            msg(L, "propNotReplaceable", { prop: humanize(prop), name }),
           );
-        const err = checkValue(def, op.value);
+        const err = checkValue(def, op.value, L);
         if (err)
           return fail(
             "invalid_value",
-            def.kind === "query" ? `${name} ${err}.` : `${def.label ?? humanize(prop)} ${err}.`,
+            def.kind === "query"
+              ? msg(L, "queryInvalid", { name, error: err })
+              : msg(L, "propInvalid", { prop: tx(def.label, L) ?? humanize(prop), error: err }),
           );
         const props = { ...node.props };
         if (op.value === null) delete props[prop];
@@ -187,22 +199,30 @@ function step(m: Manifest<unknown>, spec: SurfaceSpec, op: Op): StepResult {
       }
       const [, key, field] = op.path;
       if (!isListType(def))
-        return fail("unknown_field", `${humanize(prop)} of ${name} has no items.`);
+        return fail("unknown_field", msg(L, "noItems", { prop: humanize(prop), name }));
       const list = listOfNode(node, prop);
       const idx = list.findIndex((it) => it.key === key);
-      if (idx < 0) return fail("unknown_key", `${name} has no ${humanize(key)}.`);
+      if (idx < 0) return fail("unknown_key", msg(L, "noSuchItem", { name, item: humanize(key) }));
       const label = itemLabel(m, spec, def, key);
-      if (field === "key") return fail("unknown_field", `The key of ${label} can't be changed.`);
+      if (field === "key") return fail("unknown_field", msg(L, "keyFixed", { item: label }));
       if (field === "hidden") {
-        if (!def.hide) return fail("not_hideable", `${label} can't be hidden.`);
+        if (!def.hide) return fail("not_hideable", msg(L, "notHideable", { item: label }));
         if (op.value !== null && typeof op.value !== "boolean")
-          return fail("invalid_value", `Hidden must be on or off.`);
+          return fail("invalid_value", msg(L, "hiddenOnOff"));
       } else {
         const fdef = def.kind === "collection" ? def.item[field] : undefined;
-        if (!fdef) return fail("unknown_field", `${label} has no setting called “${field}”.`);
-        const err = checkValue(fdef, op.value);
+        if (!fdef)
+          return fail("unknown_field", msg(L, "noSuchSetting", { name: label, setting: field }));
+        const err = checkValue(fdef, op.value, L);
         if (err)
-          return fail("invalid_value", `${fdef.label ?? humanize(field)} of ${label} ${err}.`);
+          return fail(
+            "invalid_value",
+            msg(L, "fieldInvalid", {
+              field: tx(fdef.label, L) ?? humanize(field),
+              item: label,
+              error: err,
+            }),
+          );
       }
       const item = { ...(list[idx] as CollectionItem) };
       if (op.value === null) delete item[field];
@@ -217,19 +237,23 @@ function step(m: Manifest<unknown>, spec: SurfaceSpec, op: Op): StepResult {
 
     case "move": {
       if (!isListType(def))
-        return fail("not_reorderable", `${humanize(prop)} of ${name} has no order.`);
+        return fail("not_reorderable", msg(L, "noOrder", { prop: humanize(prop), name }));
       if (!def.reorder)
-        return fail("not_reorderable", `The order of ${humanize(prop)} in ${name} is fixed.`);
+        return fail("not_reorderable", msg(L, "orderFixed", { prop: humanize(prop), name }));
       const list = listOfNode(node, prop);
       const from = list.findIndex((it) => it.key === op.key);
-      if (from < 0) return fail("unknown_key", `${name} has no ${humanize(op.key)}.`);
+      if (from < 0)
+        return fail("unknown_key", msg(L, "noSuchItem", { name, item: humanize(op.key) }));
       const item = list[from] as CollectionItem;
       const rest = list.filter((_, i) => i !== from);
       const at = anchorIndex(rest, op.to, op.key);
       if (at === null)
         return fail(
           "unknown_anchor",
-          `Can't place ${itemLabel(m, spec, def, op.key)} next to “${anchorRef(op.to)}”.`,
+          msg(L, "cantPlace", {
+            item: itemLabel(m, spec, def, op.key),
+            anchor: String(anchorRef(op.to)),
+          }),
         );
       rest.splice(at, 0, item);
       return {
@@ -242,36 +266,53 @@ function step(m: Manifest<unknown>, spec: SurfaceSpec, op: Op): StepResult {
       const preset = m.presets[op.preset];
       const allowed = def.kind === "slot" ? def.insert : [];
       if (!preset || !allowed.includes(op.preset)) {
-        const options = allowed.map((p) => m.presets[p]?.label).filter(Boolean);
+        const options = allowed.map((p) => tx(m.presets[p]?.label, L)).filter(Boolean);
+        const what =
+          tx(preset?.label, L) ??
+          (L?.startsWith("de") ? `„${humanize(op.preset)}“` : `“${humanize(op.preset)}”`);
         return fail(
           "preset_not_allowed",
-          `${preset?.label ?? `“${humanize(op.preset)}”`} isn't something you can add here.` +
-            (options.length ? ` You can add: ${options.join(", ")}.` : ""),
+          msg(L, "cantAdd", { preset: what }) +
+            (options.length ? msg(L, "youCanAdd", { options: options.join(", ") }) : ""),
         );
       }
+      const presetLabel = tx(preset.label, L) ?? op.preset;
       if (def.kind !== "slot" || !def.accepts.includes(preset.node.component))
-        return fail("preset_not_allowed", `${preset.label} can't go in ${name}.`);
+        return fail("preset_not_allowed", msg(L, "cantGoIn", { preset: presetLabel, name }));
       if (!op.key.startsWith(USER_KEY_PREFIX) || op.key.length > 64)
-        return fail("malformed_op", `New items need a key starting with “${USER_KEY_PREFIX}”.`);
+        return fail("malformed_op", msg(L, "newKeyPrefix", { prefix: USER_KEY_PREFIX }));
       const list = listOfNode(node, prop);
       if (spec.nodes[op.key] || list.some((it) => it.key === op.key))
-        return fail("duplicate_key", `Something called “${op.key}” already exists.`);
+        return fail("duplicate_key", msg(L, "duplicateKey", { key: op.key }));
       const at = anchorIndex(list, op.to, op.key);
       if (at === null)
-        return fail("unknown_anchor", `Can't place ${preset.label} next to “${anchorRef(op.to)}”.`);
+        return fail(
+          "unknown_anchor",
+          msg(L, "cantPlace", { item: presetLabel, anchor: String(anchorRef(op.to)) }),
+        );
       const props = structuredClone(preset.node.props);
       const comp = m.components[preset.node.component];
       for (const [k, v] of Object.entries(op.props ?? {})) {
         const pdef = comp?.props[k];
         if (!pdef || isListType(pdef))
-          return fail("not_customizable", `${preset.label} has no setting called “${k}”.`);
-        const err = checkValue(pdef, v);
+          return fail(
+            "not_customizable",
+            msg(L, "presetNoSetting", { preset: presetLabel, setting: k }),
+          );
+        const err = checkValue(pdef, v, L);
         if (err)
           return fail(
             "invalid_value",
             pdef.kind === "query"
-              ? `A new ${preset.label.toLowerCase()} ${err}.`
-              : `${pdef.label ?? humanize(k)} of ${preset.label} ${err}.`,
+              ? msg(L, "newQueryInvalid", {
+                  preset: L?.startsWith("de") ? presetLabel : presetLabel.toLowerCase(),
+                  error: err,
+                })
+              : msg(L, "fieldInvalid", {
+                  field: tx(pdef.label, L) ?? humanize(k),
+                  item: presetLabel,
+                  error: err,
+                }),
           );
         if (v === null) delete props[k];
         else props[k] = v;
@@ -287,15 +328,14 @@ function step(m: Manifest<unknown>, spec: SurfaceSpec, op: Op): StepResult {
     }
 
     case "remove": {
-      if (def.kind !== "slot")
-        return fail("cannot_remove_base_item", `Items in ${name} can be hidden but not removed.`);
+      if (def.kind !== "slot") return fail("cannot_remove_base_item", msg(L, "onlyHide", { name }));
       const list = listOfNode(node, prop);
       if (!list.some((it) => it.key === op.key))
-        return fail("unknown_key", `${name} has no ${humanize(op.key)}.`);
+        return fail("unknown_key", msg(L, "noSuchItem", { name, item: humanize(op.key) }));
       if (!op.key.startsWith(USER_KEY_PREFIX))
         return fail(
           "cannot_remove_base_item",
-          `${nodeLabel(m, spec, op.key)} is part of the page and can be hidden, but not removed.`,
+          msg(L, "baseNotRemovable", { name: nodeLabel(m, spec, op.key) }),
         );
       const nodes = { ...spec.nodes };
       delete nodes[op.key];
@@ -600,44 +640,64 @@ export function describe(
 }
 
 function describeOne(m: Manifest<unknown>, spec: SurfaceSpec, op: Op): string {
+  const L = m.locale;
+  const de = !!L?.toLowerCase().startsWith("de");
   const node = spec.nodes[op.node];
   const name = nodeLabel(m, spec, op.node);
   const prop = op.op === "set" ? op.path[0] : op.prop;
   const def = node ? m.components[node.component]?.props[prop] : undefined;
   const list = def && isListType(def) ? def : undefined;
-  const item = (key: string) => (list ? itemLabel(m, spec, list, key) : `“${humanize(key)}”`);
+  const item = (key: string) => (list ? itemLabel(m, spec, list, key) : quote(humanize(key), L));
   const place = (to: Anchor) =>
     to === "start"
-      ? "to the start"
+      ? msg(L, "toStart")
       : to === "end"
-        ? "to the end"
+        ? msg(L, "toEnd")
         : "before" in to
-          ? `before ${item(to.before)}`
-          : `after ${item(to.after)}`;
-  const inName = list?.kind === "collection" ? ` in ${name}` : "";
+          ? msg(L, "before", { item: item(to.before) })
+          : msg(L, "after", { item: item(to.after) });
+  const inName = list?.kind === "collection" ? msg(L, "inName", { name }) : "";
+  // English lowercases a setting's name mid-sentence; German keeps it.
+  const settingName = (label: string) => (de ? label : lowerFirst(label));
 
   switch (op.op) {
     case "set": {
       if (op.path.length === 1)
-        return `Set ${lowerFirst(def?.label ?? humanize(prop))} to ${formatValue(def, op.value)} in ${name}`;
+        return msg(L, "setProp", {
+          prop: settingName(tx(def?.label, L) ?? humanize(prop)),
+          value: formatValue(def, op.value, L),
+          name,
+        });
       const [, key, field] = op.path;
-      if (field === "hidden") return `${op.value === true ? "Hide" : "Show"} ${item(key)}${inName}`;
+      if (field === "hidden")
+        return msg(L, op.value === true ? "hide" : "show", { item: item(key), inName });
       const fdef = list?.kind === "collection" ? list.item[field] : undefined;
-      return `Set ${lowerFirst(fdef?.label ?? humanize(field))} of ${item(key)} to ${formatValue(fdef, op.value)}${inName}`;
+      return msg(L, "setField", {
+        field: settingName(tx(fdef?.label, L) ?? humanize(field)),
+        item: item(key),
+        value: formatValue(fdef, op.value, L),
+        inName,
+      });
     }
     case "move":
-      return `Move ${item(op.key)} ${place(op.to)}${inName}`;
+      return msg(L, "move", { item: item(op.key), place: place(op.to), inName });
     case "insert": {
       const preset = m.presets[op.preset];
       const comp = preset ? m.components[preset.node.component] : undefined;
       const settings = Object.entries(op.props ?? {})
-        .map(([k, v]) => (comp?.props[k]?.kind === "query" ? formatValue(comp.props[k], v) : null))
+        .map(([k, v]) =>
+          comp?.props[k]?.kind === "query" ? formatValue(comp.props[k], v, L) : null,
+        )
         .filter(Boolean);
       const what = settings.length ? `: ${settings.join(", ")}` : "";
-      return `Add ${preset?.label ?? humanize(op.preset)}${what} ${place(op.to)}`;
+      return msg(L, "add", {
+        preset: tx(preset?.label, L) ?? humanize(op.preset),
+        what,
+        place: place(op.to),
+      });
     }
     case "remove":
-      return `Remove ${nodeLabel(m, spec, op.key)}`;
+      return msg(L, "remove", { name: nodeLabel(m, spec, op.key) });
   }
 }
 

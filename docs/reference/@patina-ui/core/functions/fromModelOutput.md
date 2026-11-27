@@ -2,7 +2,7 @@
 
 # Function: fromModelOutput()
 
-> **fromModelOutput**(`raw`, `newKey?`): [`ModelResult`](../type-aliases/ModelResult.md)
+> **fromModelOutput**(`raw`, `newKey?`, `locale?`): [`ModelResult`](../type-aliases/ModelResult.md)
 
 Converts the model's flattened answer into a `ModelResult`. Insert keys are generated
 here, never by the model. The ops are still untrusted: always `validate` them.
@@ -16,6 +16,10 @@ here, never by the model. The ops are still untrusted: always `validate` them.
 ### newKey?
 
 () => `string`
+
+### locale?
+
+`string`
 
 ## Returns
 

@@ -15,7 +15,7 @@ offers aggregations (count, sum, …) over it, so totals are never silently wron
 
 ### description?
 
-> `optional` **description?**: `string`
+> `optional` **description?**: [`Text`](../type-aliases/Text.md)
 
 ***
 
@@ -43,7 +43,7 @@ Only GET. The path is relative to the app's origin; the model never sees it.
 
 ### label
 
-> **label**: `string`
+> **label**: [`Text`](../type-aliases/Text.md)
 
 ***
 

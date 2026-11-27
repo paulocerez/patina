@@ -64,10 +64,22 @@ function scanTsTypes(repo: Repo, files: string[], types: Map<string, TypeInfo>) 
     const src = repo.read(file);
     if (!src || !/interface|type\s/.test(src)) continue;
     for (const m of src.matchAll(
-      /export\s+(?:interface\s+(\w+)(?:\s+extends\s+[\w<>,\s]+)?|type\s+(\w+)\s*=)\s*\{([\s\S]*?)\n\}/g,
+      /export\s+(?:interface\s+(\w+)(?:\s+extends\s+[\w<>,\s]+)?|type\s+(\w+)\s*=)\s*\{/g,
     )) {
       const name = (m[1] ?? m[2]) as string;
-      const fields = parseTsBody(m[3] as string);
+      // The body up to the matching brace (works for one-line and multi-line declarations).
+      const open = (m.index ?? 0) + m[0].length - 1;
+      let depth = 0;
+      let end = -1;
+      for (let i = open; i < src.length && i < open + 20_000; i++) {
+        if (src[i] === "{") depth++;
+        else if (src[i] === "}" && --depth === 0) {
+          end = i;
+          break;
+        }
+      }
+      if (end < 0) continue;
+      const fields = parseTsBody(src.slice(open + 1, end));
       if (Object.keys(fields).length >= 2 && !types.has(name))
         types.set(name, { fields, evidence: `${file}#${name}` });
     }
@@ -187,14 +199,16 @@ function scanRoutes(repo: Repo, files: string[]): Route[] {
     ))
       returnTypes.set(m[1] as string, m[2] as string);
   }
+  const mounts = scanMounts(repo, files);
   const routes: Route[] = [];
   for (const file of files) {
     const src = repo.read(file);
     if (!src) continue;
-    // Express / Hono / Fastify / routers: app.get("/api/orders", …)
-    for (const m of src.matchAll(/\b\w+\.get\(\s*["'`](\/[^"'`]*)["'`]/g)) {
-      const path = m[1] as string;
-      if (/[:*]|\{/.test(path) || path === "/") continue;
+    // Express / Hono / Fastify / routers: router.get("/orders", …), resolved against the
+    // prefixes the router is mounted under (app.use("/api/orders", router)).
+    for (const m of src.matchAll(/\b(\w+)\.get\(\s*["'`](\/[^"'`]*)["'`]/g)) {
+      const receiver = m[1] as string;
+      const local = m[2] as string;
       const start = m.index ?? 0;
       const after = start + m[0].length;
       // The handler's code: up to the next route registration (or 1200 chars).
@@ -202,12 +216,16 @@ function scanRoutes(repo: Repo, files: string[]): Route[] {
         .slice(after, start + 1200)
         .search(/\b\w+\.(get|post|put|patch|delete|use|all|route|listen)\(/);
       const snippet = src.slice(start, nextRoute >= 0 ? after + nextRoute : start + 1200);
-      routes.push({
-        path,
-        params: paramsIn(snippet),
-        evidence: file,
-        typeHints: hintsIn(snippet, returnTypes),
-      });
+      for (const prefix of mounts.prefixesFor(file, receiver)) {
+        const path = joinPath(prefix, local);
+        if (/[:*]|\{/.test(path) || path === "/") continue;
+        routes.push({
+          path,
+          params: paramsIn(snippet),
+          evidence: file,
+          typeHints: hintsIn(snippet, returnTypes),
+        });
+      }
     }
     // Next.js App Router: app/**/route.ts exporting GET
     const next = /(?:^|\/)app\/(.*)\/route\.[jt]sx?$/.exec(file);
@@ -235,6 +253,138 @@ function scanRoutes(repo: Repo, files: string[]): Route[] {
     }
   }
   return routes;
+}
+
+// ─────────────────────────────── router mounts ───────────────────────────────
+
+function joinPath(prefix: string, path: string): string {
+  const joined = `${prefix.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`.replace(/\/+/g, "/");
+  return joined.length > 1 ? joined.replace(/\/$/, "") : joined;
+}
+
+/** Resolves a relative import ("./calls/routes", "../x.js") to a repo file. */
+function resolveImport(
+  repo: Repo,
+  fromFile: string,
+  spec: string,
+  known: Set<string>,
+): string | null {
+  if (!spec.startsWith(".")) return null;
+  const dir = fromFile.split("/").slice(0, -1);
+  const parts = [...dir];
+  for (const seg of spec.split("/")) {
+    if (seg === "..") parts.pop();
+    else if (seg !== ".") parts.push(seg);
+  }
+  const base = parts.join("/");
+  const noJs = base.replace(/\.(c|m)?js$/, "");
+  for (const c of [
+    base,
+    `${noJs}.ts`,
+    `${noJs}.tsx`,
+    `${noJs}.js`,
+    `${noJs}.mjs`,
+    `${noJs}/index.ts`,
+    `${noJs}/index.js`,
+  ])
+    if (known.has(c)) return c;
+  void repo;
+  return null;
+}
+
+/** The text of a call's arguments, from just after "(" to the matching ")". */
+function callArgs(src: string, openParen: number): string {
+  let depth = 0;
+  for (let i = openParen; i < src.length && i < openParen + 2000; i++) {
+    const c = src[i];
+    if (c === "(") depth++;
+    else if (c === ")" && --depth === 0) return src.slice(openParen + 1, i);
+  }
+  return "";
+}
+
+interface Mount {
+  parentFile: string;
+  parentVar: string;
+  prefix: string;
+  childFile: string;
+  childVar: string;
+}
+
+/**
+ * Finds `x.use("/prefix", router)` / `x.route("/prefix", router)` and resolves `router` to the
+ * file and variable it comes from, so routes defined on it get their full path.
+ */
+function scanMounts(repo: Repo, files: string[]) {
+  const known = new Set(repo.files);
+  const defaultExport = new Map<string, string>();
+  const mounts: Mount[] = [];
+  for (const file of files) {
+    const src = repo.read(file) ?? "";
+    const def =
+      /export\s+default\s+(\w+)\s*;?/.exec(src) ?? /module\.exports\s*=\s*(\w+)\s*;?/.exec(src);
+    if (def) defaultExport.set(file, def[1] as string);
+  }
+  for (const file of files) {
+    const src = repo.read(file);
+    if (!src || !/\.(use|route)\(/.test(src)) continue;
+    // local name → [file, exported variable or "default"]
+    const imports = new Map<string, [string, string]>();
+    for (const m of src.matchAll(
+      /import\s+(\w+)\s*(?:,\s*\{([^}]*)\})?\s*from\s*["'`]([^"'`]+)["'`]/g,
+    )) {
+      const target = resolveImport(repo, file, m[3] as string, known);
+      if (target) imports.set(m[1] as string, [target, "default"]);
+      for (const part of (m[2] ?? "").split(",")) addNamed(part, target);
+    }
+    for (const m of src.matchAll(/import\s*\{([^}]*)\}\s*from\s*["'`]([^"'`]+)["'`]/g)) {
+      const target = resolveImport(repo, file, m[2] as string, known);
+      for (const part of (m[1] ?? "").split(",")) addNamed(part, target);
+    }
+    for (const m of src.matchAll(
+      /(?:const|let|var)\s+(\w+)\s*=\s*require\(\s*["'`]([^"'`]+)["'`]\s*\)/g,
+    )) {
+      const target = resolveImport(repo, file, m[2] as string, known);
+      if (target) imports.set(m[1] as string, [target, "default"]);
+    }
+    function addNamed(part: string, target: string | null) {
+      const [orig, alias] = part.trim().split(/\s+as\s+/);
+      if (target && orig && /^\w+$/.test(orig))
+        imports.set((alias ?? orig).trim(), [target, orig.trim()]);
+    }
+    for (const m of src.matchAll(/\b(\w+)\.(?:use|route)\(\s*["'`](\/[^"'`]*)["'`]\s*,/g)) {
+      const args = callArgs(src, (m.index ?? 0) + m[0].indexOf("("));
+      const last = /(\w+)\s*,?\s*$/.exec(args.trim())?.[1];
+      if (!last) continue;
+      const imported = imports.get(last);
+      const [childFile, childVarRaw] = imported ?? [file, last];
+      const childVar =
+        childVarRaw === "default" ? (defaultExport.get(childFile) ?? "default") : childVarRaw;
+      mounts.push({
+        parentFile: file,
+        parentVar: m[1] as string,
+        prefix: m[2] as string,
+        childFile,
+        childVar,
+      });
+    }
+  }
+  const memo = new Map<string, string[]>();
+  function prefixesFor(file: string, variable: string, depth = 0): string[] {
+    const key = `${file}#${variable}`;
+    const cached = memo.get(key);
+    if (cached) return cached;
+    const own = mounts.filter((m) => m.childFile === file && m.childVar === variable);
+    if (own.length === 0 || depth > 6) return [""];
+    const out = new Set<string>();
+    for (const m of own)
+      for (const parent of prefixesFor(m.parentFile, m.parentVar, depth + 1))
+        out.add(joinPath(parent, m.prefix));
+    const list = [...out];
+    memo.set(key, list);
+    return list;
+  }
+  return { prefixesFor, mounts };
 }
 
 // ─────────────────────────────── OpenAPI ───────────────────────────────

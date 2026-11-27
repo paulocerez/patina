@@ -1155,3 +1155,33 @@ Unbuildable requests are product signal. Every customization request produces on
 
 **Possible follow-up:** model-assisted clustering of differently worded requests into themes
 ("export", "bulk actions"), as an opt-in `--ai` flag on `patina insights`.
+
+---
+
+## 18. Localization
+
+Patina's user-facing texts come from one catalog (`core/src/i18n.ts`) in English and German.
+German uses the formal "Sie", as in vetpal and most German business software.
+
+**How the locale flows:**
+
+- Every request has a locale: the host's `locale` hook, else `x-patina-locale` (sent by
+  `<PatinaProvider locale>`), else `Accept-Language`, else English.
+- The handler localizes the manifest (`localizeManifest`), so validation messages, previews,
+  value names and data-view titles come out in that language.
+- The model is told the reply language in the user turn. The system prompt stays English and
+  identical for every user, so prompt caching keeps working.
+- The browser's catalog gets resolved labels.
+
+**Host labels and descriptions:** host labels are `Text` (a string, or one string per
+language), resolved exact → base language → English → any. Descriptions are model-only and
+read in English.
+
+**Grammar:**
+
+- Templates are whole sentences per language (German puts verbs last).
+- English lowercases names mid-sentence; German keeps noun capitals.
+- Quotes are “…” in English and „…“ in German.
+
+**Not translated:** developer-facing output (the CLI, insights, the GitHub Action, developer
+errors).

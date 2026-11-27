@@ -8,7 +8,7 @@ export type { FieldDef, PublicCatalog, Query, QueryResult } from "@patina-ui/cor
 export type { ClientOptions, PatinaClient } from "./client.js";
 export { createPatinaClient, PatinaRequestError } from "./client.js";
 export type { PatinaProviderProps, UseSurface } from "./context.js";
-export { PatinaProvider, useSurface } from "./context.js";
+export { PatinaProvider, usePatinaText, useSurface } from "./context.js";
 export type { FetchSource, QueryState } from "./data.js";
 export { bindParams, defaultFetchSource, formatField, useQuery } from "./data.js";
 export type {

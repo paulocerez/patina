@@ -36,8 +36,11 @@ export function withBackup(primary: ModelAdapter, backup: ModelAdapter): ModelAd
 
 /** Thrown by adapters when the provider declined or failed in a way the user should see as a refusal. */
 export class ModelRefusal extends Error {
-  constructor(message: string) {
+  /** True for a generic safety decline: Patina shows its own (localized) message instead. */
+  readonly generic: boolean;
+  constructor(message: string, options: { generic?: boolean } = {}) {
     super(message);
     this.name = "ModelRefusal";
+    this.generic = options.generic ?? false;
   }
 }

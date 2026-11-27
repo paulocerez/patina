@@ -21,6 +21,8 @@ export interface PatinaClient {
 export interface ClientOptions {
   /** Where the server handler is mounted, e.g. "/api/patina". */
   endpoint: string;
+  /** Sent as `x-patina-locale`, so messages and previews come back in this language. */
+  locale?: string;
   /** Custom fetch, e.g. to add auth headers. Defaults to the global fetch with cookies. */
   fetch?: typeof fetch;
 }
@@ -28,13 +30,17 @@ export interface ClientOptions {
 /** A thin client for the `@patina-ui/server` routes. Holds no keys and no identity. */
 export function createPatinaClient({
   endpoint,
+  locale,
   fetch: f = (i, init) => fetch(i, { credentials: "same-origin", ...init }),
 }: ClientOptions): PatinaClient {
   const base = endpoint.replace(/\/$/, "");
   async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
     const res = await f(`${base}${path}`, {
       method,
-      headers: body === undefined ? {} : { "content-type": "application/json" },
+      headers: {
+        ...(body === undefined ? {} : { "content-type": "application/json" }),
+        ...(locale ? { "x-patina-locale": locale } : {}),
+      },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const data = (await res.json().catch(() => null)) as T | ErrorBody | null;

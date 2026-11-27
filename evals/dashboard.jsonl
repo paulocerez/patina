@@ -56,3 +56,9 @@
 {"id": "data-refuse-1", "user": "alice", "prompt": "add a column with the owner's phone number", "expect": {"kind": "refusal"}, "note": "ownerPhone is sensitive: not offered to the model."}
 {"id": "data-refuse-2", "user": "bob", "prompt": "add a chart of revenue by vet", "expect": {"kind": "refusal"}, "note": "Bob lacks finance.read: revenue isn't in his catalog."}
 {"id": "data-refuse-3", "user": "alice", "prompt": "add a chart of our stock prices", "expect": {"kind": "refusal"}}
+{"id": "de-cols-1", "user": "alice", "locale": "de", "prompt": "Blende die Umsatzspalte aus", "expect": {"kind": "patch", "ops": [{"op": "set", "node": "appointments", "path": ["columns", "revenue", "hidden"], "value": true}]}}
+{"id": "de-cols-2", "user": "alice", "locale": "de", "prompt": "Status direkt hinter das Datum", "expect": {"kind": "patch", "ops": [{"op": "move", "node": "appointments", "prop": "columns", "key": "status", "to": {"after": "date"}}]}}
+{"id": "de-table-1", "user": "alice", "locale": "de", "prompt": "Zeig 50 Zeilen pro Seite", "expect": {"kind": "patch", "ops": [{"op": "set", "node": "appointments", "path": ["pageSize"], "value": 50}]}}
+{"id": "de-filter-1", "user": "alice", "locale": "de", "prompt": "Standardmäßig diese Woche anzeigen", "expect": {"kind": "patch", "ops": [{"op": "set", "node": "filters", "path": ["dateRange"], "value": {"relative": "thisWeek"}}]}}
+{"id": "de-data-1", "user": "alice", "locale": "de", "prompt": "Füge ein Balkendiagramm mit dem Umsatz pro Tierarzt hinzu", "ignoreOrder": true, "expect": {"kind": "patch", "ops": [{"op": "insert", "node": "page", "prop": "main", "preset": "block.chart", "key": "u_eval", "to": "end", "props": {"kind": "bar", "query": {"source": "appointments", "groupBy": {"field": "vet"}, "metric": {"op": "sum", "field": "revenue"}}}}]}}
+{"id": "de-refuse-1", "user": "alice", "locale": "de", "prompt": "Lösche alle Termine von morgen", "expect": {"kind": "refusal"}}

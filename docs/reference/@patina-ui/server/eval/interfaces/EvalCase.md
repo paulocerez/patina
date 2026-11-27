@@ -74,6 +74,14 @@ Compare the result without caring about the order of items (when the prompt does
 
 ***
 
+### locale?
+
+> `optional` **locale?**: `string`
+
+The user's language (sent as x-patina-locale), e.g. "de".
+
+***
+
 ### note?
 
 > `optional` **note?**: `string`

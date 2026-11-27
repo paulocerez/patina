@@ -2,7 +2,7 @@
 
 # Function: fieldLabel()
 
-> **fieldLabel**(`s`, `field`): `string`
+> **fieldLabel**(`s`, `field`, `locale?`): `string`
 
 ## Parameters
 
@@ -11,6 +11,10 @@
 [`SourceDef`](../interfaces/SourceDef.md) \| `undefined`
 
 ### field
+
+`string`
+
+### locale?
 
 `string`
 

@@ -1,5 +1,6 @@
 import { type Catalog, type FieldDef, offerableFields } from "./catalog.js";
 import { t } from "./dsl.js";
+import { msgText } from "./i18n.js";
 import type { ComponentDef, Manifest, PresetDef } from "./manifest.js";
 import type { Query } from "./query.js";
 import type { SurfaceSpec, Value } from "./types.js";
@@ -25,24 +26,24 @@ export const BLOCK_COMPONENTS = ["PatinaTable", "PatinaChart", "PatinaStat"] as 
 export function dataBlocks(catalog: Catalog) {
   const components: Record<string, ComponentDef> = {
     PatinaTable: {
-      label: "Table",
+      label: msgText("blockTable"),
       description: "A table of rows from one data source, showing the chosen fields.",
-      props: { query: t.query(catalog, { shape: "rows" }, { label: "Data" }) },
+      props: { query: t.query(catalog, { shape: "rows" }, { label: msgText("data") }) },
     },
     PatinaChart: {
-      label: "Chart",
+      label: msgText("blockChart"),
       description:
         "A line or bar chart: one number per group (a category, or dates by day/week/month).",
       props: {
-        kind: t.enum(["bar", "line"], { label: "Chart type" }),
-        query: t.query(catalog, { shape: "series" }, { label: "Data" }),
+        kind: t.enum(["bar", "line"], { label: msgText("chartType") }),
+        query: t.query(catalog, { shape: "series" }, { label: msgText("data") }),
       },
     },
     PatinaStat: {
-      label: "Number card",
+      label: msgText("blockStat"),
       description:
         "A single number: a count, total, average, minimum or maximum, optionally filtered.",
-      props: { query: t.query(catalog, { shape: "single" }, { label: "Data" }) },
+      props: { query: t.query(catalog, { shape: "single" }, { label: msgText("data") }) },
     },
   };
 
@@ -55,7 +56,7 @@ export function dataBlocks(catalog: Catalog) {
     const [id, s] = first;
     const fields = Object.keys(offerableFields(s)).slice(0, 4);
     presets["block.table"] = {
-      label: "Table",
+      label: msgText("blockTable"),
       description: "A new table of data.",
       node: {
         component: "PatinaTable",
@@ -79,7 +80,7 @@ export function dataBlocks(catalog: Catalog) {
         metric: { op: "count" },
       };
       presets["block.chart"] = {
-        label: "Chart",
+        label: msgText("blockChart"),
         description: "A new chart of data.",
         node: {
           component: "PatinaChart",
@@ -88,7 +89,7 @@ export function dataBlocks(catalog: Catalog) {
       };
     }
     presets["block.stat"] = {
-      label: "Number card",
+      label: msgText("blockStat"),
       description: "A new card showing one number.",
       node: {
         component: "PatinaStat",

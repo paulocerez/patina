@@ -8,9 +8,12 @@ import {
   headSeq,
   type Issue,
   type Layer,
+  localizeManifest,
   type Manifest,
+  msg,
   type Op,
   type ProposeResponse,
+  pickLocale,
   publicCatalog,
   removeNodes,
   resolve,
@@ -57,15 +60,13 @@ export interface AvailabilityRule {
 }
 
 interface Availability {
+  /** The request's locale (see `locale` option). */
+  locale: string;
   customize: boolean;
   dataViews: boolean;
   whenOff: "keep" | "base";
   message?: string;
 }
-
-const DEFAULT_OFF_MESSAGE = "Customizing this view isn't available on your account.";
-const DEFAULT_DATA_VIEWS_MESSAGE =
-  "Creating new charts, tables and cards isn't available on your account.";
 
 export interface PatinaHandlerOptions<Ctx extends PatinaContext> {
   // NoInfer: Ctx is inferred from getContext; a manifest may need only part of it.
@@ -86,6 +87,12 @@ export interface PatinaHandlerOptions<Ctx extends PatinaContext> {
    *   })
    */
   availability?(ctx: NoInfer<Ctx>, surfaceId: string): AvailabilityRule | Promise<AvailabilityRule>;
+  /**
+   * The user's language for Patina's messages, previews and the model's replies. Default: the
+   * `x-patina-locale` header (sent by <PatinaProvider locale>), then Accept-Language, then
+   * English. Supported: en, de; host labels can be given per language.
+   */
+  locale?(ctx: NoInfer<Ctx>, request: Request): string | undefined | Promise<string | undefined>;
   limits?: {
     /** Default 500. */
     promptMaxChars?: number;
@@ -165,10 +172,20 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
   if (options.limits?.monthlyProposals && !options.storage.incrementUsage)
     throw new Error("limits.monthlyProposals needs a storage adapter with incrementUsage().");
 
-  async function availabilityFor(ctx: Ctx, surfaceId: string): Promise<Availability> {
+  async function availabilityFor(
+    ctx: Ctx,
+    surfaceId: string,
+    request: Request,
+  ): Promise<Availability> {
     const rule = (await options.availability?.(ctx, surfaceId)) ?? {};
     const customize = rule.customize ?? true;
+    const locale = pickLocale(
+      (await options.locale?.(ctx, request)) ??
+        request.headers.get("x-patina-locale") ??
+        request.headers.get("accept-language"),
+    );
     return {
+      locale,
       customize,
       dataViews: customize && (rule.dataViews ?? true),
       whenOff: rule.whenOff ?? "keep",
@@ -176,7 +193,7 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
     };
   }
 
-  async function checkQuota(ctx: Ctx) {
+  async function checkQuota(ctx: Ctx, locale: string) {
     const q = options.limits?.monthlyProposals?.(ctx);
     const increment = options.storage.incrementUsage?.bind(options.storage);
     if (!q || !increment) return;
@@ -185,20 +202,20 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
     if (q.user !== undefined) {
       const n = await increment({ tenantId, subjectId: ctx.userId, period });
       if (n > q.user)
-        throw new HttpError(
-          429,
-          `You've used all ${q.user} customization requests for this month.`,
-          { outcome: "over_quota", reason: "quota_user", source: "host" },
-        );
+        throw new HttpError(429, msg(locale, "quotaUser", { max: q.user }), {
+          outcome: "over_quota",
+          reason: "quota_user",
+          source: "host",
+        });
     }
     if (q.tenant !== undefined && tenantId) {
       const n = await increment({ tenantId, subjectId: "*", period });
       if (n > q.tenant)
-        throw new HttpError(
-          429,
-          "Your organization has used all its customization requests for this month.",
-          { outcome: "over_quota", reason: "quota_tenant", source: "host" },
-        );
+        throw new HttpError(429, msg(locale, "quotaTenant"), {
+          outcome: "over_quota",
+          reason: "quota_tenant",
+          source: "host",
+        });
     }
   }
 
@@ -219,13 +236,13 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
     }
   }
 
-  function rateLimit(ctx: Ctx) {
+  function rateLimit(ctx: Ctx, locale: string) {
     if (!perMinute) return;
     const k = `${ctx.tenantId ?? ""}:${ctx.userId}`;
     const now = Date.now();
     const times = (recent.get(k) ?? []).filter((t) => now - t < 60_000);
     if (times.length >= perMinute)
-      throw new HttpError(429, "That's a lot of changes at once. Try again in a minute.", {
+      throw new HttpError(429, msg(locale, "rateLimited"), {
         outcome: "over_quota",
         reason: "rate_limit",
         source: "host",
@@ -239,7 +256,7 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
   }
 
   async function load(manifest: Manifest<Ctx>, ctx: Ctx, av: Availability) {
-    const m = restrictManifest(manifest, {
+    const m = restrictManifest(localizeManifest(manifest, av.locale), {
       ...(manifest.restrict?.(ctx) ?? {}),
       permissions: ctx.permissions ?? [],
     });
@@ -292,14 +309,15 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
       canUndo: av.customize && undoTarget(loaded.userEntries) !== null,
       isCustomized: loaded.resolved.patchCount > 0,
       render: { slots, collections },
-      ...(loaded.m.catalog ? { catalog: publicCatalog(loaded.m.catalog) } : {}),
+      ...(loaded.m.catalog ? { catalog: publicCatalog(loaded.m.catalog, av.locale) } : {}),
+      locale: av.locale,
       availability: {
         customize: av.customize,
         dataViews: av.dataViews,
         ...(!av.customize
-          ? { message: av.message ?? DEFAULT_OFF_MESSAGE }
+          ? { message: av.message ?? msg(av.locale, "customizeOff") }
           : !av.dataViews
-            ? { message: av.message ?? DEFAULT_DATA_VIEWS_MESSAGE }
+            ? { message: av.message ?? msg(av.locale, "dataViewsOff") }
             : {}),
       },
     };
@@ -332,11 +350,12 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
     av: Availability,
     prompt: string,
   ): Promise<{ response: ProposeResponse; meta: Meta }> {
-    if (!prompt) throw new HttpError(400, "Type what you'd like to change.");
+    const L = av.locale;
+    if (!prompt) throw new HttpError(400, msg(L, "typeSomething"));
     if (prompt.length > promptMaxChars)
-      throw new HttpError(400, `Please keep requests under ${promptMaxChars} characters.`);
-    rateLimit(ctx);
-    await checkQuota(ctx);
+      throw new HttpError(400, msg(L, "promptTooLong", { max: promptMaxChars }));
+    rateLimit(ctx, L);
+    await checkQuota(ctx, L);
 
     const loaded = await load(manifest, ctx, av);
     const m = loaded.me;
@@ -368,15 +387,20 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
         raw = await options.model.propose(req, { signal: AbortSignal.timeout(60_000), attempt });
       } catch (e) {
         if (e instanceof ModelRefusal)
-          return done({ kind: "refusal", message: e.message }, "safety", "model", calls);
+          return done(
+            { kind: "refusal", message: e.generic ? msg(L, "safetyDecline") : e.message },
+            "safety",
+            "model",
+            calls,
+          );
         options.onError?.(e);
-        throw new HttpError(502, "The assistant is unavailable right now. Please try again.", {
+        throw new HttpError(502, msg(L, "modelUnavailable"), {
           outcome: "error",
           reason: "model_unavailable",
           source: null,
         });
       }
-      const result = fromModelOutput(raw);
+      const result = fromModelOutput(raw, undefined, L);
       if (result.kind === "refusal")
         return done({ kind: "refusal", message: result.reason }, result.category, "model", calls);
       if (result.kind === "clarify")
@@ -385,7 +409,7 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
         return done(
           {
             kind: "refusal",
-            message: "I couldn't find anything on this page to change for that request.",
+            message: msg(L, "nothingToChange"),
           },
           "no_change",
           "model",
@@ -424,13 +448,13 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
     // Asked for a data view without access to data views: say why, not which op failed.
     if (!av.dataViews && touchesDataViews(loaded.m, spec, lastOps))
       return done(
-        { kind: "refusal", message: av.message ?? DEFAULT_DATA_VIEWS_MESSAGE },
+        { kind: "refusal", message: av.message ?? msg(L, "dataViewsOff") },
         "data_views_off",
         "host",
         2,
       );
     return done(
-      { kind: "refusal", message: issues[0]?.message ?? "That change isn't possible here." },
+      { kind: "refusal", message: issues[0]?.message ?? msg(L, "notPossible") },
       issues[0]?.code ?? null,
       "validator",
       2,
@@ -439,8 +463,7 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
 
   async function commit(manifest: Manifest<Ctx>, ctx: Ctx, av: Availability, proposalId: string) {
     const proposal = await options.storage.takeProposal(proposalId, keyFor(ctx, manifest.id));
-    if (!proposal)
-      throw new HttpError(409, "This preview is no longer available. Please ask again.");
+    if (!proposal) throw new HttpError(409, msg(av.locale, "previewGone"));
     let stale = false;
     const after = await appendWithRetry(manifest, ctx, av, (loaded) => {
       if (validate(loaded.me, loaded.resolved.spec, proposal.ops).length > 0) {
@@ -463,7 +486,7 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
         model: proposal.model,
       };
     });
-    if (stale) throw new HttpError(409, "Your view changed since this preview. Please ask again.");
+    if (stale) throw new HttpError(409, msg(av.locale, "viewChanged"));
     await record({
       surfaceId: manifest.id,
       userId: ctx.userId,
@@ -549,7 +572,7 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
         }
       };
 
-      const av = await availabilityFor(ctx, manifest.id);
+      const av = await availabilityFor(ctx, manifest.id, request);
 
       if (route === "POST proposals") {
         // Every customization request is logged with its outcome, including refusals.
@@ -567,7 +590,7 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
         const ms = () => Math.round(performance.now() - started);
         try {
           if (!av.customize)
-            throw new HttpError(403, av.message ?? DEFAULT_OFF_MESSAGE, {
+            throw new HttpError(403, av.message ?? msg(av.locale, "customizeOff"), {
               outcome: "unavailable",
               reason: "customize_off",
               source: "host",
@@ -619,7 +642,7 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
 
       // The view always renders; only changing it depends on availability.
       if (request.method === "POST" && !av.customize)
-        throw new HttpError(403, av.message ?? DEFAULT_OFF_MESSAGE);
+        throw new HttpError(403, av.message ?? msg(av.locale, "customizeOff"));
 
       switch (route) {
         case "GET ":
@@ -636,7 +659,10 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
     } catch (e) {
       if (e instanceof HttpError) return json({ error: { message: e.message } }, e.status);
       options.onError?.(e);
-      return json({ error: { message: "Something went wrong." } }, 500);
+      const locale = pickLocale(
+        request.headers.get("x-patina-locale") ?? request.headers.get("accept-language"),
+      );
+      return json({ error: { message: msg(locale, "somethingWrong") } }, 500);
     }
   };
 }

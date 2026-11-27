@@ -316,3 +316,32 @@ describe("init-agent", () => {
     expect(await main(["init-agent", "--root", dir])).toBe(1); // won't overwrite without --force
   });
 });
+
+describe("scan: Express routers mounted under prefixes", () => {
+  it("resolves full paths through imports, nested routers, local routers and require", () => {
+    const paths = Object.values(scanRepo(copy("express-mounts")).sources)
+      .map((s) => s.endpoint.path)
+      .sort();
+    expect(paths).toEqual([
+      "/api/calls",
+      "/api/calls/dashboard-metrics",
+      "/health/status",
+      "/internal/calls/queue",
+      "/old/reports",
+      "/v1/calls",
+      "/v1/calls/dashboard-metrics",
+      "/v1/contacts",
+    ]);
+    // /:id and /api/accounts/:accountId/…: path parameters are skipped.
+  });
+
+  it("still matches row types and params on the full path", () => {
+    const calls = Object.values(scanRepo(copy("express-mounts")).sources).find(
+      (s) => s.endpoint.path === "/api/calls",
+    );
+    expect(calls).toMatchObject({
+      params: ["status"],
+      fields: { id: { kind: "string" }, startedAt: { kind: "date" }, status: { kind: "enum" } },
+    });
+  });
+});

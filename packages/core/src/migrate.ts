@@ -1,3 +1,4 @@
+import { msg } from "./i18n.js";
 import type { Manifest } from "./manifest.js";
 import type { Anchor, Op, Patch, Skip, SurfaceSpec } from "./types.js";
 
@@ -80,7 +81,7 @@ export function migratePatch(
         opIndex,
         op,
         code: "malformed_op" as const,
-        message: "This change was saved in a format this version can't read.",
+        message: msg(m.locale, "unreadableFormat"),
       })),
     };
   }

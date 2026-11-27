@@ -2,7 +2,7 @@
 
 # Function: checkValue()
 
-> **checkValue**(`def`, `value`): `string` \| `null`
+> **checkValue**(`def`, `value`, `locale?`): `string` \| `null`
 
 Checks a value against a scalar type. Returns a user-readable reason, or null if valid.
 `null` is always accepted: it means "back to the host's default".
@@ -16,6 +16,10 @@ Checks a value against a scalar type. Returns a user-readable reason, or null if
 ### value
 
 [`Value`](../type-aliases/Value.md)
+
+### locale?
+
+`string`
 
 ## Returns
 

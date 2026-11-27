@@ -14,7 +14,7 @@ ISO 4217 code, for currency fields.
 
 ### description?
 
-> `optional` **description?**: `string`
+> `optional` **description?**: [`Text`](../type-aliases/Text.md)
 
 ***
 
@@ -26,7 +26,7 @@ ISO 4217 code, for currency fields.
 
 ### label?
 
-> `optional` **label?**: `string`
+> `optional` **label?**: [`Text`](../type-aliases/Text.md)
 
 ***
 
@@ -48,7 +48,7 @@ Never offered to the model and never usable in new views.
 
 ### valueLabels?
 
-> `optional` **valueLabels?**: `Record`\<`string`, `string`\>
+> `optional` **valueLabels?**: `Record`\<`string`, [`Text`](../type-aliases/Text.md)\>
 
 Human names for enum values.
 

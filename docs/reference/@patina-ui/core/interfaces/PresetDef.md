@@ -6,13 +6,13 @@
 
 ### description?
 
-> `optional` **description?**: `string`
+> `optional` **description?**: [`Text`](../type-aliases/Text.md)
 
 ***
 
 ### label
 
-> **label**: `string`
+> **label**: [`Text`](../type-aliases/Text.md)
 
 ***
 

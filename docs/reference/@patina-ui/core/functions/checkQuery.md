@@ -2,7 +2,7 @@
 
 # Function: checkQuery()
 
-> **checkQuery**(`def`, `value`): `string` \| `null`
+> **checkQuery**(`def`, `value`, `locale?`): `string` \| `null`
 
 Returns a user-readable problem with a query, or null if it is valid.
 
@@ -15,6 +15,10 @@ Returns a user-readable problem with a query, or null if it is valid.
 ### value
 
 `unknown`
+
+### locale?
+
+`string`
 
 ## Returns
 

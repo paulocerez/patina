@@ -2,7 +2,7 @@
 
 # Function: runQuery()
 
-> **runQuery**(`catalog`, `q`, `input`): [`QueryResult`](../type-aliases/QueryResult.md)
+> **runQuery**(`catalog`, `q`, `input`, `locale?`): [`QueryResult`](../type-aliases/QueryResult.md)
 
 Evaluates a (validated) query over rows the endpoint returned. Pure and deterministic.
 
@@ -19,6 +19,10 @@ Evaluates a (validated) query over rows the endpoint returned. Pure and determin
 ### input
 
 `unknown`
+
+### locale?
+
+`string`
 
 ## Returns
 

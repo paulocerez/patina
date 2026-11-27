@@ -50,9 +50,13 @@ npm i -D @patina-ui/cli
 7. **Node IDs and keys are permanent.** Stored patches refer to them. To rename one, bump
    `version` and `base.baseVersion` together and add a migration (`migrations.renameKey`,
    `renameProp`, `renameNode`). Never reuse a key for something else.
-8. **Don't put secrets in descriptions or labels.** The model sees them and can paraphrase them
+8. **Match the app's language.** If the app is localized, pass `locale` to `<PatinaProvider>`
+   (e.g. `i18n.language`), and give user-visible labels per language:
+   `label: { en: "Orders", de: "Bestellungen" }`. English and German are built in. Write
+   `description`s in English, since only the model reads them.
+9. **Don't put secrets in descriptions or labels.** The model sees them and can paraphrase them
    to users.
-9. **Data views read only existing GET endpoints.** In the catalog:
+10. **Data views read only existing GET endpoints.** In the catalog:
    - mark personal fields `sensitive: true`;
    - gate fields by permission with `requires`;
    - set `complete: true` only if the endpoint returns _all_ matching rows (no pagination).
@@ -233,7 +237,7 @@ quotas and rate limits.
 ```tsx
 import { AvailabilityNotice, PatinaProvider, PromptInput, ProposalPreview, ResetButton, Surface, SurfaceMessage, UndoButton } from "@patina-ui/react";
 
-<PatinaProvider endpoint="/api/patina">
+<PatinaProvider endpoint="/api/patina" locale={i18n.language}>
   <AvailabilityNotice surfaceId="orders" />  {/* the host's message when customizing is off */}
   <PromptInput surfaceId="orders" />
   <SurfaceMessage surfaceId="orders" />      {/* refusals, clarifying questions, errors */}

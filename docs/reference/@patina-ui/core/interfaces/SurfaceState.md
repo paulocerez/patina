@@ -52,6 +52,14 @@ The user's data sources (restricted, no sensitive fields), for data blocks.
 
 ***
 
+### locale?
+
+> `optional` **locale?**: `string`
+
+The locale messages and previews are in (en, de).
+
+***
+
 ### render
 
 > **render**: `object`

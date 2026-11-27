@@ -32,7 +32,7 @@ Data sources users may compose into new views (see `defineCatalog`).
 
 ### description?
 
-> `optional` **description?**: `string`
+> `optional` **description?**: [`Text`](../type-aliases/Text.md)
 
 Written for the model: what this surface is.
 
@@ -46,7 +46,7 @@ Written for the model: what this surface is.
 
 ### labels?
 
-> `optional` **labels?**: `Record`\<`string`, `string`\>
+> `optional` **labels?**: `Record`\<`string`, [`Text`](../type-aliases/Text.md)\>
 
 Human names for nodes ("appointments" → "Appointments table").
 

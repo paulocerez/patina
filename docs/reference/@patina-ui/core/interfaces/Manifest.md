@@ -42,7 +42,7 @@
 
 ### description
 
-> **description**: `string`
+> **description**: [`Text`](../type-aliases/Text.md)
 
 Written for the model: what this surface is.
 
@@ -64,13 +64,21 @@ Written for the model: what this surface is.
 
 ### labels
 
-> **labels**: `Record`\<[`NodeId`](../type-aliases/NodeId.md), `string`\>
+> **labels**: `Record`\<[`NodeId`](../type-aliases/NodeId.md), [`Text`](../type-aliases/Text.md)\>
 
 Human names for nodes ("appointments" → "Appointments table").
 
 #### Inherited from
 
 [`SurfaceDefinition`](SurfaceDefinition.md).[`labels`](SurfaceDefinition.md#labels)
+
+***
+
+### locale?
+
+> `optional` **locale?**: `string`
+
+The locale texts are shown in (see `localizeManifest`). Default English.
 
 ***
 

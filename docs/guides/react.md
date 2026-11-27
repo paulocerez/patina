@@ -21,7 +21,8 @@ import { PatinaProvider, Surface, useSurface } from "@patina-ui/react";
 | `fetchSource` | How [data blocks](data-views.md) load catalog sources. The default is a same-origin GET with cookies |
 
 All `useSurface` calls and primitives for the same surface ID share one store, so they stay in
-sync.
+sync. Pass `locale` (e.g. `i18n.language`) for German or English messages and defaults; it
+defaults to the browser's language. See [Localization](localization.md).
 
 ## `<Surface>`
 

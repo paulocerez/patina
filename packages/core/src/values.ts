@@ -1,10 +1,5 @@
-import {
-  type CollectionDef,
-  humanize,
-  RELATIVE_RANGE_LABELS,
-  type SlotDef,
-  type TypeDef,
-} from "./dsl.js";
+import { type CollectionDef, humanize, type SlotDef, type TypeDef } from "./dsl.js";
+import { listOr, msg, RELATIVE_RANGE_TEXT, tx } from "./i18n.js";
 
 type ValueTypeDef = Exclude<TypeDef, CollectionDef | SlotDef>;
 
@@ -23,26 +18,32 @@ function isPlainObject(v: Value | undefined): v is { [k: string]: Value } {
  * Checks a value against a scalar type. Returns a user-readable reason, or null if valid.
  * `null` is always accepted: it means "back to the host's default".
  */
-export function checkValue(def: TypeDef, value: Value): string | null {
+export function checkValue(def: TypeDef, value: Value, locale?: string): string | null {
   if (value === null) return null;
+  const L = locale;
   switch (def.kind) {
     case "enum":
       return typeof value === "string" && def.values.includes(value)
         ? null
-        : `must be one of ${listOf(def.values.map((v) => def.labels?.[v] ?? humanize(v)))}`;
+        : msg(L, "mustBeOneOf", {
+            options: listOr(
+              def.values.map((v) => tx(def.labels?.[v], L) ?? humanize(v)),
+              L,
+            ),
+          });
     case "int":
       return typeof value === "number" &&
         Number.isInteger(value) &&
         value >= def.min &&
         value <= def.max
         ? null
-        : `must be a whole number from ${def.min} to ${def.max}`;
+        : msg(L, "mustBeWholeNumber", { min: def.min, max: def.max });
     case "bool":
-      return typeof value === "boolean" ? null : "must be on or off";
+      return typeof value === "boolean" ? null : msg(L, "mustBeOnOff");
     case "label":
-      if (typeof value !== "string") return "must be text";
-      if (value.length > def.maxLen) return `must be at most ${def.maxLen} characters`;
-      if (CONTROL_CHARS.test(value)) return "contains characters that aren't allowed";
+      if (typeof value !== "string") return msg(L, "mustBeText");
+      if (value.length > def.maxLen) return msg(L, "atMostChars", { max: def.maxLen });
+      if (CONTROL_CHARS.test(value)) return msg(L, "disallowedChars");
       return null;
     case "relativeDateRange": {
       const ok =
@@ -52,7 +53,12 @@ export function checkValue(def: TypeDef, value: Value): string | null {
         (def.allowed as string[]).includes(value.relative);
       return ok
         ? null
-        : `must be one of ${listOf(def.allowed.map((r) => RELATIVE_RANGE_LABELS[r]))}`;
+        : msg(L, "mustBeOneOf", {
+            options: listOr(
+              def.allowed.map((r) => rangeLabel(r, L)),
+              L,
+            ),
+          });
     }
     case "sort": {
       const ok =
@@ -61,33 +67,33 @@ export function checkValue(def: TypeDef, value: Value): string | null {
         typeof value.key === "string" &&
         def.keys.includes(value.key) &&
         (value.dir === "asc" || value.dir === "desc");
-      return ok
-        ? null
-        : `must sort by one of ${listOf(def.keys.map(humanize))}, ascending or descending`;
+      return ok ? null : msg(L, "mustSortBy", { options: listOr(def.keys.map(humanize), L) });
     }
     case "query":
-      return checkQuery(def, value);
+      return checkQuery(def, value, L);
     case "object": {
-      if (!isPlainObject(value)) return "has the wrong shape";
+      if (!isPlainObject(value)) return msg(L, "wrongShape");
       for (const k of Object.keys(value))
-        if (!(k in def.fields)) return `has an unknown field "${k}"`;
+        if (!(k in def.fields)) return msg(L, "unknownField", { field: k });
       for (const [k, fdef] of Object.entries(def.fields)) {
         const fv = value[k];
-        if (fv === undefined) return `is missing "${k}"`;
-        const err = checkValue(fdef, fv);
-        if (err) return `${humanize(k)} ${err}`;
+        if (fv === undefined) return msg(L, "missingField", { field: k });
+        const err = checkValue(fdef, fv, L);
+        if (err) return `${tx(fdef.label, L) ?? humanize(k)} ${err}`;
       }
       return null;
     }
     case "collection":
     case "slot":
-      return "cannot be replaced as a whole; change its items instead";
+      return msg(L, "notReplaceable");
   }
 }
 
 /** JSON Schema for a scalar type, in the subset structured outputs support. */
 export function jsonSchemaFor(def: ValueTypeDef): Record<string, unknown> {
-  const description = [def.description, rangeHint(def)].filter(Boolean).join(" ") || undefined;
+  // For the model: descriptions in English where the host provided several languages.
+  const description =
+    [tx(def.description, "en"), rangeHint(def)].filter(Boolean).join(" ") || undefined;
   const withDesc = (s: Record<string, unknown>) => (description ? { ...s, description } : s);
   switch (def.kind) {
     case "enum":
@@ -135,26 +141,29 @@ function rangeHint(def: ValueTypeDef): string | undefined {
   return undefined;
 }
 
-/** Human-readable rendering of a value for previews. */
-export function formatValue(def: TypeDef | undefined, value: Value): string {
-  if (value === null) return "the default";
+function rangeLabel(r: string, locale?: string): string {
+  const t = RELATIVE_RANGE_TEXT[r];
+  return t ? (tx(t, locale) ?? r) : r;
+}
+
+/** Human-readable rendering of a value for previews, in `locale`. */
+export function formatValue(def: TypeDef | undefined, value: Value, locale?: string): string {
+  const L = locale;
+  if (value === null) return msg(L, "default");
   if (def?.kind === "enum" && typeof value === "string")
-    return def.labels?.[value] ?? humanize(value);
-  if (def?.kind === "bool") return value ? "on" : "off";
+    return tx(def.labels?.[value], L) ?? humanize(value);
+  if (def?.kind === "bool") return value ? msg(L, "on") : msg(L, "off");
   if (def?.kind === "relativeDateRange" && isPlainObject(value))
-    return (
-      RELATIVE_RANGE_LABELS[value.relative as keyof typeof RELATIVE_RANGE_LABELS] ??
-      String(value.relative)
-    );
+    return rangeLabel(String(value.relative), L);
   if (def?.kind === "query" && isPlainObject(value))
-    return describeQuery(def.catalog, value as unknown as Query);
+    return describeQuery(def.catalog, value as unknown as Query, L);
   if (def?.kind === "sort" && isPlainObject(value))
-    return `${humanize(String(value.key))}, ${value.dir === "asc" ? "ascending" : "descending"}`;
-  if (typeof value === "string") return `“${value}”`;
+    return `${humanize(String(value.key))}, ${value.dir === "asc" ? msg(L, "ascending") : msg(L, "descending")}`;
+  if (typeof value === "string") return L?.startsWith("de") ? `„${value}“` : `“${value}”`;
   return JSON.stringify(value);
 }
 
+/** @deprecated Use listOr from i18n. */
 export function listOf(items: string[]): string {
-  if (items.length <= 1) return items.join("");
-  return `${items.slice(0, -1).join(", ")} or ${items[items.length - 1]}`;
+  return listOr(items, "en");
 }

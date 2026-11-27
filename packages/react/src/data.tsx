@@ -1,12 +1,15 @@
 import {
   type FieldDef,
+  msg,
   type PublicCatalog,
   type Query,
   type QueryResult,
   runQuery,
   type SurfaceSpec,
+  tx,
 } from "@patina-ui/core";
 import { createContext, useContext, useEffect, useState } from "react";
+import { LocaleContext } from "./locale.js";
 
 /**
  * Fetches rows for a catalog source. The default calls the source's GET endpoint with the
@@ -83,6 +86,7 @@ const TTL_MS = 10_000;
 export function useQuery(query: Query | undefined): QueryState {
   const surface = useContext(SurfaceRenderContext);
   const { fetchSource, cache } = useContext(DataContext);
+  const locale = useContext(LocaleContext);
   const catalog = surface?.catalog;
   const source = query ? catalog?.sources[query.source] : undefined;
   const params =
@@ -120,7 +124,8 @@ export function useQuery(query: Query | undefined): QueryState {
     }
     setState((s) => (s.status === "ready" ? s : { status: "loading" }));
     entry.promise.then(
-      (rows) => live && setState({ status: "ready", result: runQuery(catalog, query, rows) }),
+      (rows) =>
+        live && setState({ status: "ready", result: runQuery(catalog, query, rows, locale) }),
       (e) =>
         live && setState({ status: "error", error: e instanceof Error ? e.message : String(e) }),
     );
@@ -156,9 +161,9 @@ export function formatField(
         ? new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value)
         : String(value);
     case "enum":
-      return def.valueLabels?.[String(value)] ?? String(value);
+      return tx(def.valueLabels?.[String(value)], locale) ?? String(value);
     case "bool":
-      return value ? "Yes" : "No";
+      return value ? msg(locale, "yes") : msg(locale, "no");
     default:
       return String(value);
   }

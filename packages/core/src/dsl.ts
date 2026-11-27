@@ -1,4 +1,5 @@
 import { type Catalog, fieldLabel, offerableFields } from "./catalog.js";
+import type { Text } from "./i18n.js";
 import type { AggOp, QueryDef, QueryShape } from "./query.js";
 
 /**
@@ -10,13 +11,13 @@ import type { AggOp, QueryDef, QueryShape } from "./query.js";
 
 export interface TypeMeta {
   /** Short human name, used in previews and error messages ("Rows per page"). */
-  label?: string;
+  label?: Text;
   /** Written for the model: what this prop does. */
-  description?: string;
+  description?: Text;
 }
 
 export type TypeDef =
-  | ({ kind: "enum"; values: string[]; labels?: Record<string, string> } & TypeMeta)
+  | ({ kind: "enum"; values: string[]; labels?: Record<string, Text> } & TypeMeta)
   | ({ kind: "int"; min: number; max: number } & TypeMeta)
   | ({ kind: "bool" } & TypeMeta)
   | ({ kind: "label"; maxLen: number } & TypeMeta)
@@ -37,7 +38,7 @@ export interface CollectionDef extends TypeMeta {
   /** Every key that may appear. Fixed by the host. */
   keys: string[];
   /** Human names for keys ("revenue" → "Revenue"). Trusted host copy. */
-  labels?: Record<string, string>;
+  labels?: Record<string, Text>;
   reorder: boolean;
   hide: boolean;
   /** Extra per-item fields the user may set. */
@@ -84,7 +85,7 @@ export const RELATIVE_RANGE_LABELS: Record<RelativeRange, string> = {
 };
 
 export const t = {
-  enum: (values: string[], meta: TypeMeta & { labels?: Record<string, string> } = {}) =>
+  enum: (values: string[], meta: TypeMeta & { labels?: Record<string, Text> } = {}) =>
     ({ kind: "enum", values, ...meta }) as const satisfies TypeDef,
   int: (range: { min: number; max: number }, meta: TypeMeta = {}) =>
     ({ kind: "int", ...range, ...meta }) as const satisfies TypeDef,

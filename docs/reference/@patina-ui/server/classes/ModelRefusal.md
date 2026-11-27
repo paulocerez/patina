@@ -12,13 +12,19 @@ Thrown by adapters when the provider declined or failed in a way the user should
 
 ### Constructor
 
-> **new ModelRefusal**(`message`): `ModelRefusal`
+> **new ModelRefusal**(`message`, `options?`): `ModelRefusal`
 
 #### Parameters
 
 ##### message
 
 `string`
+
+##### options?
+
+###### generic?
+
+`boolean`
 
 #### Returns
 
@@ -37,6 +43,14 @@ Thrown by adapters when the provider declined or failed in a way the user should
 #### Inherited from
 
 `Error.cause`
+
+***
+
+### generic
+
+> `readonly` **generic**: `boolean`
+
+True for a generic safety decline: Patina shows its own (localized) message instead.
 
 ***
 

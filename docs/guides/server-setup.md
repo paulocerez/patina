@@ -27,6 +27,12 @@ feature flags, plans or anything else. `limits.monthlyProposals(ctx)` sets month
 The view always renders, and users who lose access keep their saved changes by default. See
 [Availability](availability.md).
 
+## Language
+
+Messages, previews and the model's replies follow the user's language: the `locale(ctx,
+request)` hook, else the `x-patina-locale` header, else `Accept-Language`. English and German
+are built in. See [Localization](localization.md).
+
 ## What customers ask for
 
 Every request is logged with its outcome and reason, including refusals. `onEvent(e)` forwards

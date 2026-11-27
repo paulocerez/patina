@@ -16,7 +16,7 @@ from these types cannot open those doors even by mistake.
 
 ### description?
 
-> `optional` **description?**: `string`
+> `optional` **description?**: [`Text`](../type-aliases/Text.md)
 
 Written for the model: what this prop does.
 
@@ -24,6 +24,6 @@ Written for the model: what this prop does.
 
 ### label?
 
-> `optional` **label?**: `string`
+> `optional` **label?**: [`Text`](../type-aliases/Text.md)
 
 Short human name, used in previews and error messages ("Rows per page").

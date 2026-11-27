@@ -1,21 +1,22 @@
 import { type Catalog, restrictCatalog } from "./catalog.js";
 import { type CollectionDef, isListType, type SlotDef, type TypeDef } from "./dsl.js";
+import { type Text, tx } from "./i18n.js";
 import type { Migration } from "./migrate.js";
 import type { NodeId, SpecNode, SurfaceSpec, Value } from "./types.js";
 import { checkValue } from "./values.js";
 
 export interface ComponentDef {
   /** Human name used in previews ("Table"). */
-  label?: string;
+  label?: Text;
   /** Written for the model. */
-  description?: string;
+  description?: Text;
   /** Only the props listed here can be customized. Others keep their base values. */
   props: Record<string, TypeDef>;
 }
 
 export interface PresetDef {
-  label: string;
-  description?: string;
+  label: Text;
+  description?: Text;
   node: { component: string; props: Record<string, Value> };
 }
 
@@ -41,9 +42,9 @@ export interface SurfaceDefinition<Ctx = unknown> {
   version: number;
   base: SurfaceSpec;
   /** Written for the model: what this surface is. */
-  description?: string;
+  description?: Text;
   /** Human names for nodes ("appointments" → "Appointments table"). */
-  labels?: Record<NodeId, string>;
+  labels?: Record<NodeId, Text>;
   components: Record<string, ComponentDef>;
   presets?: Record<string, PresetDef>;
   /** Narrows the manifest for one request. Called with the host's request context. */
@@ -60,6 +61,16 @@ export interface Manifest<Ctx = unknown>
   restrict?(ctx: Ctx): Restriction;
   /** Set on manifests returned by `restrictManifest`. */
   restriction?: Restriction;
+  /** The locale texts are shown in (see `localizeManifest`). Default English. */
+  locale?: string;
+}
+
+/**
+ * The manifest for one request's locale: Patina's own messages and host labels given per
+ * language (`{ de: "Anrufe", en: "Calls" }`) are shown in this locale.
+ */
+export function localizeManifest<Ctx>(m: Manifest<Ctx>, locale: string): Manifest<Ctx> {
+  return { ...m, locale };
 }
 
 /**
@@ -258,9 +269,12 @@ export function restrictSpec(m: Manifest<unknown>, spec: SurfaceSpec): SurfaceSp
 
 /** Human name for a node. */
 export function nodeLabel(m: Manifest<unknown>, spec: SurfaceSpec, id: NodeId): string {
-  if (m.labels[id]) return m.labels[id];
+  const own = tx(m.labels[id], m.locale);
+  if (own) return own;
   const node = spec.nodes[id];
-  if (node?.preset && m.presets[node.preset]) return m.presets[node.preset]?.label ?? id;
+  if (node?.preset && m.presets[node.preset])
+    return tx(m.presets[node.preset]?.label, m.locale) ?? id;
   const comp = node && m.components[node.component];
-  return comp?.label ? `${comp.label} “${id}”` : id;
+  const compLabel = tx(comp?.label, m.locale);
+  return compLabel ? `${compLabel} “${id}”` : id;
 }

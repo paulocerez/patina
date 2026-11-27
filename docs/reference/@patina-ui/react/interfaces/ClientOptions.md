@@ -57,3 +57,11 @@ Custom fetch, e.g. to add auth headers. Defaults to the global fetch with cookie
 ##### Returns
 
 `Promise`\<`Response`\>
+
+***
+
+### locale?
+
+> `optional` **locale?**: `string`
+
+Sent as `x-patina-locale`, so messages and previews come back in this language.

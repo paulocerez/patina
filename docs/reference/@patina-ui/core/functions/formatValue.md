@@ -2,9 +2,9 @@
 
 # Function: formatValue()
 
-> **formatValue**(`def`, `value`): `string`
+> **formatValue**(`def`, `value`, `locale?`): `string`
 
-Human-readable rendering of a value for previews.
+Human-readable rendering of a value for previews, in `locale`.
 
 ## Parameters
 
@@ -15,6 +15,10 @@ Human-readable rendering of a value for previews.
 ### value
 
 [`Value`](../type-aliases/Value.md)
+
+### locale?
+
+`string`
 
 ## Returns
 

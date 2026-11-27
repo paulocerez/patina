@@ -37,6 +37,10 @@ This takes well under a second on a typical app, runs offline and costs nothing.
 | CSS files                                                                         | `:root` / `@theme` variables, plus classes like `.card`, `.muted`, `.badge`                           |
 | `components/**`                                                                   | your `Card`, `Table`, `Badge`… and how to import them (tsconfig `paths` aliases included)             |
 
+Routers mounted under a prefix (`app.use("/api/orders", ordersRouter)`, nested routers,
+`require`) are followed, so endpoints get their full path. Paths with parameters
+(`/accounts/:id/…`) are skipped.
+
 An endpoint is matched to its row type by the type annotations or return types near its
 handler, or else by name (`/api/orders` → `Order`, `OrderSchema`, `model Order`). Detail
 routes (`/orders/:id`), writes, `.env` files and anything that looks like a secret are

@@ -15,7 +15,7 @@ from these types cannot open those doors even by mistake.
 
 ### description?
 
-> `optional` **description?**: `string`
+> `optional` **description?**: [`Text`](../type-aliases/Text.md)
 
 Written for the model: what this prop does.
 
@@ -55,7 +55,7 @@ Every key that may appear. Fixed by the host.
 
 ### label?
 
-> `optional` **label?**: `string`
+> `optional` **label?**: [`Text`](../type-aliases/Text.md)
 
 Short human name, used in previews and error messages ("Rows per page").
 
@@ -67,7 +67,7 @@ Short human name, used in previews and error messages ("Rows per page").
 
 ### labels?
 
-> `optional` **labels?**: `Record`\<`string`, `string`\>
+> `optional` **labels?**: `Record`\<`string`, [`Text`](../type-aliases/Text.md)\>
 
 Human names for keys ("revenue" → "Revenue"). Trusted host copy.
 

@@ -116,7 +116,7 @@ function singleModel(
       }
 
       if (response.stop_reason === "refusal") {
-        throw new ModelRefusal("I can't help with that request here.");
+        throw new ModelRefusal("I can't help with that request here.", { generic: true });
       }
       if (response.stop_reason === "max_tokens") {
         throw new Error("Model output was cut off (max_tokens)");
