@@ -64,6 +64,8 @@ npm i -D @patina-ui/cli
      (`f.weekday`, `f.hour`, `f.ranges`, `f.contains`), **per-tenant values** for a text field
      (`restrict: async (ctx) => ({ values: { "source.field": [...] } })`), or a param with
      **`choices`** a single view may pick (e.g. "this week"). See docs/guides/data-views.md.
+   - fetch through the scan's `patina/fetch.ts` (`createFetchSource`: paging, envelopes, date
+     ranges, tenant path params) instead of hand-writing a `fetchSource`.
 11. **Keep the footprint small.** Aim for a handful of files in a first integration:
    - **Existing page: use the hooks, not `<Surface>`.** `useSlot` / `useCollection` /
      `useSurfaceProp` keep the page's JSX and data flow. Don't split the page into components

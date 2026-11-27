@@ -9,6 +9,7 @@ import {
   parseCatalogSource,
   renderBlocks,
   renderCatalog,
+  renderFetch,
   renderMarkdown,
   scanRepo,
   upsertPrComment,
@@ -323,6 +324,8 @@ describe("scan: Express routers mounted under prefixes", () => {
       .map((s) => s.endpoint.path)
       .sort();
     expect(paths).toEqual([
+      "/api/accounts/:accountId/assistants",
+      "/api/accounts/:accountId/assistants/dashboard-metrics",
       "/api/calls",
       "/api/calls/dashboard-metrics",
       "/health/status",
@@ -332,7 +335,7 @@ describe("scan: Express routers mounted under prefixes", () => {
       "/v1/calls/dashboard-metrics",
       "/v1/contacts",
     ]);
-    // /:id and /api/accounts/:accountId/…: path parameters are skipped.
+    // /:id is skipped; a tenant placeholder (:accountId) is kept for the fetch layer to fill.
   });
 
   it("still matches row types and params on the full path", () => {
@@ -404,5 +407,62 @@ describe("followups", () => {
     expect(await main(["followups"], { storage })).toBe(1);
     expect(err.mock.calls.at(-1)?.[0]).toMatch(/SLACK_WEBHOOK_URL/);
     process.env = env;
+  });
+});
+
+describe("scan: layered Express (routes → controller → service)", () => {
+  const scan = scanRepo(fixture("express-layered"));
+
+  it("follows a handler passed by reference to the type its service returns, not a same-named decoy", () => {
+    expect(scan.sources.calls).toMatchObject({
+      endpoint: { path: "/api/calls" },
+      rows: "items",
+      fields: {
+        startedAt: { kind: "date" },
+        duration: { kind: "number" },
+        status: { kind: "enum", values: ["new", "completed", "missed"] },
+        fromNumber: { kind: "string", sensitive: true },
+      },
+      paging: { style: "offset", limit: "limit", offset: "offset" },
+      dateRange: { from: "fromDate", to: "toDate" },
+    });
+    expect(scan.sources.calls?.fields).not.toHaveProperty("from_number");
+    // A status, not free text: not sensitive.
+    expect(scan.sources.calls?.fields.transcriptStatus).toEqual({ kind: "string" });
+  });
+
+  it("drafts a fetch config and a catalog that use what it found", () => {
+    const fetchTs = renderFetch(scan);
+    expect(fetchTs).toContain(
+      "export const appFetchSource = ({ accountId }: { accountId: string }) =>",
+    );
+    expect(fetchTs).toContain("params: { accountId }");
+    expect(fetchTs).toContain('rows: "items",');
+    expect(fetchTs).toContain(
+      'paging: { style: "offset", size: 200, limit: "limit", offset: "offset" }',
+    );
+    expect(fetchTs).toContain('dateRange: { from: "fromDate", to: "toDate" }');
+
+    const catalogTs = renderCatalog(scan);
+    expect(catalogTs).toContain("complete: true, // paged (offset)");
+    expect(catalogTs).toContain('// weekday: f.weekday("startedAt"');
+    expect(catalogTs).toContain('// durationRange: f.ranges("duration"');
+    expect(catalogTs).not.toMatch(/\/\/ (limit|offset|fromDate|toDate): \{ from/);
+    expect(parseCatalogSource(catalogTs)).toMatchObject({
+      calls: { path: "/api/calls", fields: { fromNumber: { sensitive: true } } },
+      appointments: { path: "/api/accounts/:accountId/appointments" },
+    });
+  });
+
+  it("keeps routes under a tenant placeholder and skips detail routes", () => {
+    expect(scan.sources.appointments).toMatchObject({
+      endpoint: { path: "/api/accounts/:accountId/appointments" },
+      pathParams: ["accountId"],
+      rows: "appointments",
+      dateRange: { from: "from", to: "to" },
+      fields: { scheduledFor: { kind: "date" }, staffName: { kind: "string" } },
+    });
+    expect(Object.keys(scan.sources).some((id) => id.includes(":id"))).toBe(false);
+    expect(Object.values(scan.sources).map((s) => s.endpoint.path)).not.toContain("/api/calls/:id");
   });
 });

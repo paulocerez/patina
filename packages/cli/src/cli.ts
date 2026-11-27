@@ -23,6 +23,7 @@ import {
 import { checkRepo, renderMarkdown, type Severity } from "./check.js";
 import { renderBlocks } from "./generate/blocks.js";
 import { renderCatalog } from "./generate/catalog.js";
+import { renderFetch } from "./generate/fetch.js";
 import { scanRepo } from "./scan/index.js";
 
 const HELP = `patina: set up and maintain Patina's data catalog and data blocks
@@ -33,6 +34,7 @@ Usage:
         patina/scan.json     snapshot of what was found (commit it; CI compares against it)
         patina/catalog.ts    draft data catalog (catalog.draft.ts if catalog.ts exists)
         patina/blocks.tsx    data blocks in your UI kit (blocks.draft.tsx if it exists)
+        patina/fetch.ts      how blocks fetch: paging, envelopes, date ranges, tenant params
       --force overwrites catalog.ts / blocks.tsx. --ai asks Claude to refine both drafts
       (needs ANTHROPIC_API_KEY; sends the scan summary and a few named files, never secrets).
 
@@ -185,6 +187,7 @@ export async function main(
     for (const [name, draft, text] of [
       ["catalog.ts", "catalog.draft.ts", catalogTs],
       ["blocks.tsx", "blocks.draft.tsx", blocksTsx],
+      ["fetch.ts", "fetch.draft.ts", renderFetch(scan)],
     ] as const) {
       const target = existsSync(join(dir, name)) && !values.force ? draft : name;
       write(join(dir, target), text);

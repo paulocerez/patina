@@ -10,6 +10,7 @@ export { COMMENT_MARKER, checkRepo, renderMarkdown } from "./check.js";
 export { main } from "./cli.js";
 export { renderBlocks } from "./generate/blocks.js";
 export { renderCatalog } from "./generate/catalog.js";
+export { renderFetch } from "./generate/fetch.js";
 export { upsertPrComment } from "./github.js";
 export type {
   ScannedComponent,
