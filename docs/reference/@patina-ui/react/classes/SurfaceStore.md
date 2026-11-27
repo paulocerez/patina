@@ -52,6 +52,24 @@ Framework-agnostic state for one surface. React subscribes via useSyncExternalSt
 
 ***
 
+### dismissNotice()
+
+> **dismissNotice**(`key`): `Promise`\<`void`\>
+
+Hides a notice right away and tells the server, so it doesn't come back.
+
+#### Parameters
+
+##### key
+
+`string`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### getSnapshot()
 
 > **getSnapshot**(): [`SurfaceSnapshot`](../interfaces/SurfaceSnapshot.md)

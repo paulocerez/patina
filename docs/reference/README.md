@@ -9,4 +9,6 @@
 - [@patina-ui/server/anthropic](@patina-ui/server/anthropic/README.md)
 - [@patina-ui/server/eval](@patina-ui/server/eval/README.md)
 - [@patina-ui/server/express](@patina-ui/server/express/README.md)
+- [@patina-ui/server/followups](@patina-ui/server/followups/README.md)
+- [@patina-ui/server/integrations](@patina-ui/server/integrations/README.md)
 - [@patina-ui/server/testing](@patina-ui/server/testing/README.md)

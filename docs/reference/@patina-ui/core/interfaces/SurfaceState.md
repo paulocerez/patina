@@ -2,8 +2,6 @@
 
 # Interface: SurfaceState
 
-Body of GET /surfaces/:id and of successful commit, undo and reset.
-
 ## Properties
 
 ### availability
@@ -57,6 +55,15 @@ The user's data sources (restricted, no sensitive fields), for data blocks.
 > `optional` **locale?**: `string`
 
 The locale messages and previews are in (en, de).
+
+***
+
+### notices?
+
+> `optional` **notices?**: [`Notice`](Notice.md)[]
+
+Things this user asked for that weren't possible then and are now (shipped follow-ups).
+Sent with GET only; dismiss with POST /surfaces/:id/notices/:key/dismiss.
 
 ***
 

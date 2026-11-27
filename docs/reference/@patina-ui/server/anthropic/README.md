@@ -6,8 +6,10 @@ Anthropic model adapter.
 
 ## Interfaces
 
+- [AnthropicGrouperOptions](interfaces/AnthropicGrouperOptions.md)
 - [AnthropicModelOptions](interfaces/AnthropicModelOptions.md)
 
 ## Functions
 
+- [anthropicGrouper](functions/anthropicGrouper.md)
 - [anthropicModel](functions/anthropicModel.md)

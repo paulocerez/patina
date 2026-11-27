@@ -12,9 +12,11 @@ Request handler and storage adapters.
 ## Interfaces
 
 - [AvailabilityRule](interfaces/AvailabilityRule.md)
+- [FollowUpLinks](interfaces/FollowUpLinks.md)
 - [HistoryKey](interfaces/HistoryKey.md)
 - [InsightsReport](interfaces/InsightsReport.md)
 - [ModelAdapter](interfaces/ModelAdapter.md)
+- [NoticeTarget](interfaces/NoticeTarget.md)
 - [PatinaContext](interfaces/PatinaContext.md)
 - [PatinaHandlerOptions](interfaces/PatinaHandlerOptions.md)
 - [Proposal](interfaces/Proposal.md)
@@ -55,6 +57,12 @@ Request handler and storage adapters.
 ### ErrorBody
 
 Re-exports [ErrorBody](../core/interfaces/ErrorBody.md)
+
+***
+
+### Notice
+
+Re-exports [Notice](../core/interfaces/Notice.md)
 
 ***
 

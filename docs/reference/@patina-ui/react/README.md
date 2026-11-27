@@ -18,6 +18,7 @@ React bindings and headless UX primitives.
 - [PromptInputRenderProps](interfaces/PromptInputRenderProps.md)
 - [ProposalPreviewProps](interfaces/ProposalPreviewProps.md)
 - [ProposalPreviewRenderProps](interfaces/ProposalPreviewRenderProps.md)
+- [ShippedNoticeProps](interfaces/ShippedNoticeProps.md)
 - [SurfaceProps](interfaces/SurfaceProps.md)
 - [SurfaceSnapshot](interfaces/SurfaceSnapshot.md)
 - [UseSurface](interfaces/UseSurface.md)
@@ -44,6 +45,7 @@ React bindings and headless UX primitives.
 - [PromptInput](functions/PromptInput.md)
 - [ProposalPreview](functions/ProposalPreview.md)
 - [ResetButton](functions/ResetButton.md)
+- [ShippedNotice](functions/ShippedNotice.md)
 - [SkippedNotice](functions/SkippedNotice.md)
 - [Surface](functions/Surface.md)
 - [SurfaceMessage](functions/SurfaceMessage.md)
@@ -57,6 +59,12 @@ React bindings and headless UX primitives.
 ### FieldDef
 
 Re-exports [FieldDef](../core/interfaces/FieldDef.md)
+
+***
+
+### Notice
+
+Re-exports [Notice](../core/interfaces/Notice.md)
 
 ***
 

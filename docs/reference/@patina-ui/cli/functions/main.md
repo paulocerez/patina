@@ -14,6 +14,14 @@
 
 For tests: use this storage instead of connecting to Postgres.
 
+#### grouper?
+
+[`FollowUpGrouper`](../../server/followups/type-aliases/FollowUpGrouper.md)
+
+#### sinks?
+
+[`FollowUpSink`](../../server/followups/interfaces/FollowUpSink.md)[]
+
 #### storage?
 
 [`StorageAdapter`](../../server/interfaces/StorageAdapter.md)

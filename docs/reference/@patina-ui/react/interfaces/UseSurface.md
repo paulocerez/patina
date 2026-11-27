@@ -59,6 +59,18 @@ A refusal or clarifying question from the last request, for the user to read.
 
 ***
 
+### notices
+
+> **notices**: [`Notice`](../../core/interfaces/Notice.md)[]
+
+Things this user asked for earlier that are now possible (from the last load).
+
+#### Inherited from
+
+[`SurfaceSnapshot`](SurfaceSnapshot.md).[`notices`](SurfaceSnapshot.md#notices)
+
+***
+
 ### proposal
 
 > **proposal**: \{ `changes`: [`Change`](../../core/interfaces/Change.md)[]; `kind`: `"proposal"`; `ops`: [`Op`](../../core/type-aliases/Op.md)[]; `previewSpec`: [`SurfaceSpec`](../../core/interfaces/SurfaceSpec.md); `proposalId`: `string`; `summary`: `string`; \} \| `null`
@@ -156,6 +168,22 @@ Last state from the server, or null while loading for the first time.
 #### Returns
 
 `void`
+
+***
+
+### dismissNotice()
+
+> **dismissNotice**(`key`): `Promise`\<`void`\>
+
+#### Parameters
+
+##### key
+
+`string`
+
+#### Returns
+
+`Promise`\<`void`\>
 
 ***
 

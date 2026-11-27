@@ -24,6 +24,28 @@
 
 ***
 
+### dismissNotice()?
+
+> `optional` **dismissNotice**(`surfaceId`, `key`): `Promise`\<`void`\>
+
+Hides a "now possible" notice for good.
+
+#### Parameters
+
+##### surfaceId
+
+`string`
+
+##### key
+
+`string`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### get()
 
 > **get**(`surfaceId`): `Promise`\<[`SurfaceState`](../../core/interfaces/SurfaceState.md)\>

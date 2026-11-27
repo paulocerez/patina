@@ -2,6 +2,97 @@
 
 # Interface: StorageAdapter
 
+## Properties
+
+### dismissNotice?
+
+> `optional` **dismissNotice?**: (`who`, `key`) => `Promise`\<`void`\>
+
+#### Parameters
+
+##### who
+
+[`NoticeTarget`](NoticeTarget.md)
+
+##### key
+
+`string`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
+### linkFollowUp?
+
+> `optional` **linkFollowUp?**: (`link`) => `Promise`\<`void`\>
+
+Optional; enables "it's now possible" notices for shipped follow-ups.
+
+Records (or refreshes) who asked for a follow-up. Called by `runFollowUps` after delivery.
+
+#### Parameters
+
+##### link
+
+###### key
+
+`string`
+
+###### requesters
+
+[`NoticeTarget`](NoticeTarget.md)[]
+
+###### title
+
+`string`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
+### listNotices?
+
+> `optional` **listNotices?**: (`who`) => `Promise`\<[`Notice`](../../core/interfaces/Notice.md)[]\>
+
+Shipped, not yet dismissed notices for one user on one surface.
+
+#### Parameters
+
+##### who
+
+[`NoticeTarget`](NoticeTarget.md)
+
+#### Returns
+
+`Promise`\<[`Notice`](../../core/interfaces/Notice.md)[]\>
+
+***
+
+### shipFollowUp?
+
+> `optional` **shipFollowUp?**: (`key`, `message?`) => `Promise`\<`number`\>
+
+Marks a follow-up as shipped, so everyone who asked sees a notice on the surface where they
+asked. Returns how many notices that makes. Idempotent.
+
+#### Parameters
+
+##### key
+
+`string`
+
+##### message?
+
+`string` \| `null`
+
+#### Returns
+
+`Promise`\<`number`\>
+
 ## Methods
 
 ### append()

@@ -16,6 +16,14 @@ A refusal or clarifying question from the last request, for the user to read.
 
 ***
 
+### notices
+
+> **notices**: [`Notice`](../../core/interfaces/Notice.md)[]
+
+Things this user asked for earlier that are now possible (from the last load).
+
+***
+
 ### proposal
 
 > **proposal**: \{ `changes`: [`Change`](../../core/interfaces/Change.md)[]; `kind`: `"proposal"`; `ops`: [`Op`](../../core/type-aliases/Op.md)[]; `previewSpec`: [`SurfaceSpec`](../../core/interfaces/SurfaceSpec.md); `proposalId`: `string`; `summary`: `string`; \} \| `null`

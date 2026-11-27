@@ -18,6 +18,7 @@ Spec, manifest and patch engine. No framework or LLM dependencies.
 - [Layer](interfaces/Layer.md)
 - [Manifest](interfaces/Manifest.md)
 - [ModelRequest](interfaces/ModelRequest.md)
+- [Notice](interfaces/Notice.md)
 - [ParamBinding](interfaces/ParamBinding.md)
 - [Patch](interfaces/Patch.md)
 - [PresetDef](interfaces/PresetDef.md)
