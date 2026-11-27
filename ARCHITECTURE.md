@@ -1079,3 +1079,36 @@ The Action:
 
 Fork PRs, which get read-only tokens, skip the comment with a warning. This repo dogfoods it on
 `examples/demo` (`.github/workflows/patina-demo.yml`), and CI fails if the bundle is stale.
+
+---
+
+## 16. Availability: feature flags, plans and quotas
+
+Hosts decide per request who may customize, through a server hook. Feature flags (any
+provider), plans, roles and trials all go through it:
+
+```ts
+availability?(ctx, surfaceId): { customize?, dataViews?, whenOff?: "keep" | "base", message? } | Promise<…>
+limits.monthlyProposals?(ctx): { user?: number; tenant?: number } | undefined
+```
+
+**Decisions:**
+
+- **The view always renders.** Availability gates changes, never reads. Turning Patina off for
+  a customer must not break their page.
+- **`whenOff: "keep"` is the default** (signed off). Users who lose access keep their saved
+  customizations visible but frozen. `"base"` shows the default view without deleting
+  history, so access coming back restores it. Both apply to `customize` and to `dataViews`.
+- **The server enforces it, not the UI.** POST routes return 403 with the host's message. When
+  `dataViews` is off, edits are checked against a manifest without data-block presets and
+  with an empty catalog for queries (`withoutDataViews`). The model isn't told about data
+  sources, and requests for data views are refused with the host's message. Existing blocks
+  keep rendering ("keep"), because the render manifest still has the catalog.
+- **The UI follows the state.** `SurfaceState.availability` drives the React primitives, which
+  hide themselves, and `AvailabilityNotice`.
+- **Quotas count model calls** per user and/or tenant per calendar month, through the optional
+  `StorageAdapter.incrementUsage` (Postgres table `patina_usage`). They are checked before
+  the model is called.
+
+`restrict(ctx)` (§3) still handles _what_ may be customized. `availability` handles _whether_
+anything may be.

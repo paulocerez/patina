@@ -2,7 +2,7 @@
 
 # Function: UndoButton()
 
-> **UndoButton**(`__namedParameters`): `Element`
+> **UndoButton**(`__namedParameters`): `Element` \| `null`
 
 Undoes the last saved change (or the last reset).
 
@@ -14,4 +14,4 @@ Undoes the last saved change (or the last reset).
 
 ## Returns
 
-`Element`
+`Element` \| `null`

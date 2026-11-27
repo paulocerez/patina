@@ -2,7 +2,7 @@
 
 # Function: PromptInput()
 
-> **PromptInput**(`__namedParameters`): `Element`
+> **PromptInput**(`__namedParameters`): `Element` \| `null`
 
 A text box that sends the user's request. Clears itself when a preview arrives.
 
@@ -14,4 +14,4 @@ A text box that sends the user's request. Clears itself when a preview arrives.
 
 ## Returns
 
-`Element`
+`Element` \| `null`

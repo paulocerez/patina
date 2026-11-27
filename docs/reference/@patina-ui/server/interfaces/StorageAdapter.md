@@ -30,6 +30,25 @@ Appends at `expectedSeq + 1`. Throws `ConflictError` if the head is no longer `e
 
 ***
 
+### incrementUsage()?
+
+> `optional` **incrementUsage**(`key`): `Promise`\<`number`\>
+
+Adds one to a usage counter and returns the new total. Needed only for the
+`limits.monthlyProposals` quota. `subjectId` is a user id, or "*" for a whole tenant.
+
+#### Parameters
+
+##### key
+
+[`UsageKey`](UsageKey.md)
+
+#### Returns
+
+`Promise`\<`number`\>
+
+***
+
 ### list()
 
 > **list**(`key`): `Promise`\<[`Entry`](../type-aliases/Entry.md)[]\>

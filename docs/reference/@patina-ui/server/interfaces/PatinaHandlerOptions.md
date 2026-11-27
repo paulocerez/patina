@@ -40,6 +40,25 @@ Default 10 per user per minute. 0 disables the limit.
 
 How long a preview can be committed. Default 900 s.
 
+#### monthlyProposals()?
+
+> `optional` **monthlyProposals**(`ctx`): \{ `tenant?`: `number`; `user?`: `number`; \} \| `null` \| `undefined`
+
+Monthly quota of customization requests (each one is a model call), per user and/or per
+tenant. Return undefined for no limit. Needs a storage adapter with `incrementUsage`.
+
+  monthlyProposals: (ctx) => (ctx.plan === "pro" ? { user: 500 } : { user: 20, tenant: 200 })
+
+##### Parameters
+
+###### ctx
+
+`NoInfer`\<`Ctx`\>
+
+##### Returns
+
+\{ `tenant?`: `number`; `user?`: `number`; \} \| `null` \| `undefined`
+
 ***
 
 ### model
@@ -59,6 +78,34 @@ How long a preview can be committed. Default 900 s.
 > **surfaces**: [`Manifest`](../../core/interfaces/Manifest.md)\<`NoInfer`\<`Ctx`\>\>[]
 
 ## Methods
+
+### availability()?
+
+> `optional` **availability**(`ctx`, `surfaceId`): [`AvailabilityRule`](AvailabilityRule.md) \| `Promise`\<[`AvailabilityRule`](AvailabilityRule.md)\>
+
+Who may customize, per user and surface. Called on every request; can be async, so it can
+ask a feature-flag service or your billing. Default: everything on.
+
+  availability: async (ctx) => ({
+    customize: await flags.isEnabled("patina", ctx),
+    dataViews: ctx.plan !== "free",
+  })
+
+#### Parameters
+
+##### ctx
+
+`NoInfer`\<`Ctx`\>
+
+##### surfaceId
+
+`string`
+
+#### Returns
+
+[`AvailabilityRule`](AvailabilityRule.md) \| `Promise`\<[`AvailabilityRule`](AvailabilityRule.md)\>
+
+***
 
 ### getContext()
 

@@ -14,6 +14,15 @@ export interface SurfaceState {
   render: { slots: Record<string, string[]>; collections: Record<string, string[]> };
   /** The user's data sources (restricted, no sensitive fields), for data blocks. */
   catalog?: PublicCatalog;
+  /** What this user may do here (from the host's `availability` hook). */
+  availability: {
+    /** May change this view at all (prompt, apply, undo, reset). */
+    customize: boolean;
+    /** May create or edit data views (new charts, tables and cards from the catalog). */
+    dataViews: boolean;
+    /** Shown to the user when something is unavailable. */
+    message?: string;
+  };
 }
 
 /** Body of POST /surfaces/:id/proposals. */

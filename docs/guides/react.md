@@ -47,6 +47,7 @@ s.state; // last SurfaceState from the server (skipped, canUndo, isCustomized, â
 s.proposal; // { proposalId, changes, summary, previewSpec } while previewing
 s.message; // { kind: "refusal" | "clarify" | "error", text } after a request
 s.busy, s.canUndo, s.isCustomized;
+s.availability; // { customize, dataViews, message? } from the server's availability hook;
 s.propose(prompt);
 s.commit();
 s.discard();
@@ -67,6 +68,10 @@ attributes, or accepts a render-prop child for full control.
 | `SurfaceMessage`             | `<p role="status">` (or `alert` for errors)                | `{ kind, text }`                                           |
 | `UndoButton` / `ResetButton` | `<button>`, disabled when there's nothing to undo or reset | (button props pass through)                                |
 | `SkippedNotice`              | `<details>` listing changes that no longer apply           | `skipped[]`                                                |
+
+When customizing isn't available to the user, `PromptInput`, `UndoButton` and `ResetButton`
+render nothing. `AvailabilityNotice` shows the host's message (`<p role="note">`, or a render
+prop with `{ customize, dataViews, message }`). See [Availability](availability.md).
 
 ```tsx
 <ProposalPreview surfaceId="orders">

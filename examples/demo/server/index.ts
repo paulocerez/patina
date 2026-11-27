@@ -24,6 +24,21 @@ const patina = createPatinaHandler({
   basePath: "/api/patina",
   // Identity comes from the host's session. Here: a demo cookie.
   getContext: (req) => userFromCookie(req.headers.get("cookie")),
+  // Who may customize: a feature flag for the whole feature, the plan for data views.
+  // Users who lose access keep their saved customizations (whenOff defaults to "keep").
+  availability: (ctx) => ({
+    customize: ctx.flags.patina,
+    dataViews: ctx.plan === "pro",
+    message: !ctx.flags.patina
+      ? "Customizing dashboards isn't enabled for your account yet."
+      : ctx.plan === "free"
+        ? "New charts, tables and cards are part of the Pro plan. You can still rearrange and hide things."
+        : undefined,
+  }),
+  limits: {
+    // A monthly budget of model calls: per user on Pro, per clinic on Free.
+    monthlyProposals: (ctx) => (ctx.plan === "pro" ? { user: 500 } : { tenant: 50 }),
+  },
   onError: (e) => console.error("[patina]", e),
 });
 

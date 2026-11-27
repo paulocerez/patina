@@ -35,6 +35,13 @@ export interface Proposal {
   expiresAt: string;
 }
 
+export interface UsageKey {
+  tenantId: string | null;
+  subjectId: string;
+  /** e.g. "2026-11" */
+  period: string;
+}
+
 /** Thrown by `append` when another write got there first. */
 export class ConflictError extends Error {
   constructor() {
@@ -51,6 +58,11 @@ export interface StorageAdapter {
   saveProposal(proposal: Proposal): Promise<void>;
   /** Returns and deletes a proposal, if it exists, belongs to `key` and has not expired. */
   takeProposal(id: string, key: HistoryKey): Promise<Proposal | null>;
+  /**
+   * Adds one to a usage counter and returns the new total. Needed only for the
+   * `limits.monthlyProposals` quota. `subjectId` is a user id, or "*" for a whole tenant.
+   */
+  incrementUsage?(key: UsageKey): Promise<number>;
 }
 
 export function keyString(k: HistoryKey): string {
@@ -64,6 +76,7 @@ export function memoryStorage(): StorageAdapter & {
 } {
   const histories = new Map<string, Entry[]>();
   const proposals = new Map<string, Proposal>();
+  const usage = new Map<string, number>();
   return {
     async list(key) {
       return structuredClone(histories.get(keyString(key)) ?? []);
@@ -90,6 +103,12 @@ export function memoryStorage(): StorageAdapter & {
       proposals.delete(id);
       return Date.parse(p.expiresAt) > Date.now() ? p : null;
     },
+    async incrementUsage(k) {
+      const id = JSON.stringify([k.tenantId ?? "", k.subjectId, k.period]);
+      const n = (usage.get(id) ?? 0) + 1;
+      usage.set(id, n);
+      return n;
+    },
     async redactPrompts(before) {
       let n = 0;
       for (const list of histories.values())
@@ -103,6 +122,7 @@ export function memoryStorage(): StorageAdapter & {
     clear() {
       histories.clear();
       proposals.clear();
+      usage.clear();
     },
   };
 }

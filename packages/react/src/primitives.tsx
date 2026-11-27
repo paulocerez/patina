@@ -69,6 +69,7 @@ export function PromptInput({
       "aria-label": label,
     },
   };
+  if (!s.availability.customize) return null;
   if (children) return <>{children(props)}</>;
   return (
     <form className={className} data-patina="prompt" {...props.formProps}>
@@ -167,6 +168,7 @@ type ButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick"> & { 
 /** Undoes the last saved change (or the last reset). */
 export function UndoButton({ surfaceId, children = "Undo", disabled, ...rest }: ButtonProps) {
   const s = useSurface(surfaceId);
+  if (!s.availability.customize) return null;
   return (
     <button
       type="button"
@@ -188,6 +190,7 @@ export function ResetButton({
   ...rest
 }: ButtonProps) {
   const s = useSurface(surfaceId);
+  if (!s.availability.customize) return null;
   return (
     <button
       type="button"
@@ -226,5 +229,31 @@ export function SkippedNotice({ surfaceId, className, children }: SkippedNoticeP
         ))}
       </ul>
     </details>
+  );
+}
+
+export interface AvailabilityNoticeProps {
+  surfaceId: string;
+  className?: string;
+  children?: (availability: {
+    customize: boolean;
+    dataViews: boolean;
+    message: string;
+  }) => ReactNode;
+}
+
+/**
+ * Shows the host's message when customizing (or creating data views) isn't available to this
+ * user, e.g. "Upgrade to Pro to customize this dashboard". Renders nothing otherwise.
+ */
+export function AvailabilityNotice({ surfaceId, className, children }: AvailabilityNoticeProps) {
+  const { availability } = useSurface(surfaceId);
+  if (!availability.message || (availability.customize && availability.dataViews)) return null;
+  const a = { ...availability, message: availability.message };
+  if (children) return <>{children(a)}</>;
+  return (
+    <p className={className} data-patina="availability" role="note">
+      {a.message}
+    </p>
   );
 }

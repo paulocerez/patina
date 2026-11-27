@@ -52,6 +52,14 @@ create table if not exists patina_proposals (
   expires_at  timestamptz not null
 );
 create index if not exists patina_proposals_expires_at on patina_proposals (expires_at);
+
+create table if not exists patina_usage (
+  tenant_id   text    not null default '',
+  subject_id  text    not null,
+  period      text    not null,
+  count       integer not null default 0,
+  primary key (tenant_id, subject_id, period)
+);
 `;
 
 export async function migratePostgres(query: QueryFn): Promise<void> {
@@ -179,6 +187,16 @@ export function postgresStorage({ query }: { query: QueryFn }): StorageAdapter &
         model: r.model as string,
         expiresAt: iso(r.expires_at),
       };
+    },
+
+    async incrementUsage(k) {
+      const { rows } = await query(
+        `insert into patina_usage (tenant_id, subject_id, period, count) values ($1, $2, $3, 1)
+         on conflict (tenant_id, subject_id, period) do update set count = patina_usage.count + 1
+         returning count`,
+        [k.tenantId ?? "", k.subjectId, k.period],
+      );
+      return Number(rows[0]?.count ?? 0);
     },
 
     async redactPrompts(before) {

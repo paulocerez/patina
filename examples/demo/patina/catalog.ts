@@ -7,7 +7,7 @@ export const catalog = defineCatalog({
   appointments: {
     label: "Appointments",
     description: "Every appointment in the selected date range, one row each.",
-    // Found in: server/data.ts#Appointment, server/index.ts:43
+    // Found in: server/data.ts#Appointment, server/index.ts
     endpoint: { path: "/api/data/appointments", method: "GET" },
     params: {
       range: { from: "filters.dateRange" },

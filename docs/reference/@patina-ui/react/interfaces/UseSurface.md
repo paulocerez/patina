@@ -8,6 +8,27 @@
 
 ## Properties
 
+### availability
+
+> **availability**: `object`
+
+What this user may do (from the server's `availability` hook). Customizing defaults to
+allowed while the first state is loading.
+
+#### customize
+
+> **customize**: `boolean`
+
+#### dataViews
+
+> **dataViews**: `boolean`
+
+#### message?
+
+> `optional` **message?**: `string`
+
+***
+
 ### busy
 
 > **busy**: `boolean`

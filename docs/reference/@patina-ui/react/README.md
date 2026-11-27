@@ -36,6 +36,7 @@ React bindings and headless UX primitives.
 
 ## Functions
 
+- [AvailabilityNotice](functions/AvailabilityNotice.md)
 - [bindParams](functions/bindParams.md)
 - [createPatinaClient](functions/createPatinaClient.md)
 - [formatField](functions/formatField.md)

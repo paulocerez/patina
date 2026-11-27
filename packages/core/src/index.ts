@@ -4,7 +4,13 @@
  * @module @patina-ui/core
  */
 
-export { BLOCK_COMPONENTS, dataBlocks } from "./blocks.js";
+export {
+  BLOCK_COMPONENTS,
+  dataBlocks,
+  dataPresetIds,
+  removeNodes,
+  withoutDataViews,
+} from "./blocks.js";
 export type {
   Catalog,
   FieldDef,

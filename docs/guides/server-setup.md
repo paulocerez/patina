@@ -20,6 +20,13 @@ export const patina = createPatinaHandler({
 });
 ```
 
+## Who gets it
+
+`availability(ctx, surfaceId)` turns customizing and data views on or off per user, from
+feature flags, plans or anything else. `limits.monthlyProposals(ctx)` sets monthly quotas.
+The view always renders, and users who lose access keep their saved changes by default. See
+[Availability](availability.md).
+
 ## Mounting
 
 The handler is `(request: Request) => Promise<Response>`, so it works anywhere the Fetch API

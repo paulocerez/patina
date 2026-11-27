@@ -1,4 +1,5 @@
 import {
+  AvailabilityNotice,
   type FetchSource,
   PatinaProvider,
   PromptInput,
@@ -167,6 +168,10 @@ function Customizer() {
           </form>
         )}
       </PromptInput>
+
+      <AvailabilityNotice surfaceId={SURFACE}>
+        {(a) => <p className="message message-availability">{a.message}</p>}
+      </AvailabilityNotice>
 
       <SurfaceMessage surfaceId={SURFACE}>
         {(m) => (

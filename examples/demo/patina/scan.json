@@ -63,7 +63,7 @@
           "optional": true
         }
       },
-      "evidence": ["server/data.ts#Appointment", "server/index.ts:43"]
+      "evidence": ["server/data.ts#Appointment", "server/index.ts"]
     },
     "metrics": {
       "endpoint": {
@@ -87,7 +87,7 @@
           "optional": true
         }
       },
-      "evidence": ["server/index.ts:49", "src/data.tsx#Metrics"]
+      "evidence": ["server/index.ts", "src/data.tsx#Metrics"]
     },
     "me": {
       "endpoint": {
@@ -96,7 +96,7 @@
       },
       "params": [],
       "fields": {},
-      "evidence": ["server/index.ts:34"]
+      "evidence": ["server/index.ts"]
     }
   }
 }

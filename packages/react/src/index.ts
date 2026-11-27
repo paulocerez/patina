@@ -18,6 +18,7 @@ export type {
   ProposalPreviewRenderProps,
 } from "./primitives.js";
 export {
+  AvailabilityNotice,
   PromptInput,
   ProposalPreview,
   ResetButton,

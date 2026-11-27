@@ -87,6 +87,15 @@ export function storageContract(
       expect(await s.takeProposal("p2", key)).toBeNull();
     });
 
+    it("counts usage per key", async () => {
+      const s = await make();
+      const k = { tenantId: "t1", subjectId: "u1", period: "2026-11" };
+      expect(await s.incrementUsage?.(k)).toBe(1);
+      expect(await s.incrementUsage?.(k)).toBe(2);
+      expect(await s.incrementUsage?.({ ...k, period: "2026-12" })).toBe(1);
+      expect(await s.incrementUsage?.({ ...k, subjectId: "*" })).toBe(1);
+    });
+
     it("redacts old prompts", async () => {
       const s = await make();
       await s.append(key, patch("a"), 0);

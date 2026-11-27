@@ -11,12 +11,14 @@ Request handler and storage adapters.
 
 ## Interfaces
 
+- [AvailabilityRule](interfaces/AvailabilityRule.md)
 - [HistoryKey](interfaces/HistoryKey.md)
 - [ModelAdapter](interfaces/ModelAdapter.md)
 - [PatinaContext](interfaces/PatinaContext.md)
 - [PatinaHandlerOptions](interfaces/PatinaHandlerOptions.md)
 - [Proposal](interfaces/Proposal.md)
 - [StorageAdapter](interfaces/StorageAdapter.md)
+- [UsageKey](interfaces/UsageKey.md)
 
 ## Type Aliases
 

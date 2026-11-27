@@ -2,7 +2,7 @@
 
 # Function: ResetButton()
 
-> **ResetButton**(`__namedParameters`): `Element`
+> **ResetButton**(`__namedParameters`): `Element` \| `null`
 
 Returns the view to its default. Can itself be undone.
 
@@ -14,4 +14,4 @@ Returns the view to its default. Can itself be undone.
 
 ## Returns
 
-`Element`
+`Element` \| `null`

@@ -13,7 +13,8 @@ data blocks that look like the rest of your app. A GitHub Action flags PRs that 
 **The model never writes UI code.** It proposes a small declarative patch against a schema
 **you** declare: which components a view contains and what about them may change. Every patch
 is validated before it is saved, and again whenever it is replayed. Users can preview, undo
-and reset. Permissions stay in your app.
+and reset. Permissions stay in your app, and you decide per customer, from feature flags or
+plans, who gets to customize.
 
 ```
 packages/core     @patina-ui/core     spec, manifest, patch engine (no dependencies)
@@ -184,6 +185,7 @@ view or in the model's prompt.
   - [Model and evals](docs/guides/model-and-evals.md)
   - [Data views](docs/guides/data-views.md): `patina scan`, the catalog, data blocks
   - [GitHub Action](docs/guides/github-action.md): check every PR
+  - [Availability](docs/guides/availability.md): who may customize, from feature flags, plans and quotas
 - [API reference](docs/reference/README.md) (generated with `pnpm docs:api`)
 - [Releasing](docs/releasing.md): npm publishing with Changesets
 - [ARCHITECTURE.md](ARCHITECTURE.md): the design and its tradeoffs

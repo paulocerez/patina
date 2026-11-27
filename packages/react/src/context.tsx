@@ -55,6 +55,11 @@ export interface UseSurface extends SurfaceSnapshot {
   reload(): Promise<void>;
   canUndo: boolean;
   isCustomized: boolean;
+  /**
+   * What this user may do (from the server's `availability` hook). Customizing defaults to
+   * allowed while the first state is loading.
+   */
+  availability: { customize: boolean; dataViews: boolean; message?: string };
   busy: boolean;
 }
 
@@ -74,6 +79,7 @@ export function useSurface(surfaceId: string): UseSurface {
     reload: store.reload,
     canUndo: snap.state?.canUndo ?? false,
     isCustomized: snap.state?.isCustomized ?? false,
+    availability: snap.state?.availability ?? { customize: true, dataViews: true },
     busy: snap.status === "loading" || snap.status === "proposing" || snap.status === "committing",
   };
 }

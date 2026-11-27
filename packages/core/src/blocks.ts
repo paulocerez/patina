@@ -1,8 +1,8 @@
 import { type Catalog, type FieldDef, offerableFields } from "./catalog.js";
 import { t } from "./dsl.js";
-import type { ComponentDef, PresetDef } from "./manifest.js";
+import type { ComponentDef, Manifest, PresetDef } from "./manifest.js";
 import type { Query } from "./query.js";
-import type { Value } from "./types.js";
+import type { SurfaceSpec, Value } from "./types.js";
 
 /** Component names of the generated data blocks (see `patina scan`, `patina/blocks.tsx`). */
 export const BLOCK_COMPONENTS = ["PatinaTable", "PatinaChart", "PatinaStat"] as const;
@@ -102,4 +102,67 @@ export function dataBlocks(catalog: Catalog) {
     componentNames: [...BLOCK_COMPONENTS] as string[],
     presetIds: Object.keys(presets),
   };
+}
+
+/** Presets that create data blocks (their component has a `t.query` prop). */
+export function dataPresetIds(m: Manifest<unknown>): string[] {
+  return Object.entries(m.presets)
+    .filter(([, p]) =>
+      Object.values(m.components[p.node.component]?.props ?? {}).some((d) => d.kind === "query"),
+    )
+    .map(([id]) => id);
+}
+
+/**
+ * The manifest without data views: no data-block presets to insert, and data queries can't be
+ * changed or created. Existing blocks still render; tables keep their columns.
+ */
+export function withoutDataViews<Ctx>(m: Manifest<Ctx>): Manifest<Ctx> {
+  const presets = new Set(dataPresetIds(m as Manifest<unknown>));
+  const empty: Catalog = { sources: {} };
+  const components = Object.fromEntries(
+    Object.entries(m.components).map(([name, comp]) => [
+      name,
+      {
+        ...comp,
+        props: Object.fromEntries(
+          Object.entries(comp.props).map(([prop, def]) => [
+            prop,
+            def.kind === "query"
+              ? { ...def, catalog: empty }
+              : def.kind === "slot"
+                ? { ...def, insert: def.insert.filter((p) => !presets.has(p)) }
+                : def,
+          ]),
+        ),
+      },
+    ]),
+  );
+  return {
+    ...m,
+    components,
+    presets: Object.fromEntries(Object.entries(m.presets).filter(([id]) => !presets.has(id))),
+    catalog: empty,
+  };
+}
+
+/** Removes nodes (and their entries in slots) from a spec. */
+export function removeNodes(
+  m: Manifest<unknown>,
+  spec: SurfaceSpec,
+  ids: Set<string>,
+): SurfaceSpec {
+  if (ids.size === 0) return spec;
+  const nodes: SurfaceSpec["nodes"] = {};
+  for (const [id, node] of Object.entries(spec.nodes)) {
+    if (ids.has(id)) continue;
+    const props = { ...node.props };
+    for (const [prop, def] of Object.entries(m.components[node.component]?.props ?? {}))
+      if (def.kind === "slot" && Array.isArray(props[prop]))
+        props[prop] = (props[prop] as unknown as { key: string }[]).filter(
+          (it) => !ids.has(it.key),
+        ) as unknown as Value;
+    nodes[id] = { ...node, props };
+  }
+  return { ...spec, nodes };
 }

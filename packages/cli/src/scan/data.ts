@@ -157,10 +157,6 @@ interface Route {
   typeHints: string[];
 }
 
-function lineOf(src: string, index: number): number {
-  return src.slice(0, index).split("\n").length;
-}
-
 function hintsIn(snippet: string, returnTypes: Map<string, string>): string[] {
   const hints: string[] = [];
   for (const m of snippet.matchAll(/(?::|as|<)\s*(?:Array<)?([A-Z]\w*)(?:\[\]|>)/g))
@@ -209,7 +205,7 @@ function scanRoutes(repo: Repo, files: string[]): Route[] {
       routes.push({
         path,
         params: paramsIn(snippet),
-        evidence: `${file}:${lineOf(src, m.index ?? 0)}`,
+        evidence: file,
         typeHints: hintsIn(snippet, returnTypes),
       });
     }
@@ -222,7 +218,7 @@ function scanRoutes(repo: Repo, files: string[]): Route[] {
         routes.push({
           path: `/${segs.join("/")}`,
           params: paramsIn(src),
-          evidence: `${file}:${lineOf(src, at)}`,
+          evidence: file,
           typeHints: hintsIn(src.slice(at), returnTypes),
         });
       }
