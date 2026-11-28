@@ -40,8 +40,21 @@ export interface FieldDef {
   currency?: string;
   /** Permission the user needs (checked against `ctx.permissions`) to be offered this field. */
   requires?: string;
-  /** Never offered to the model and never usable in new views. */
+  /**
+   * Never offered to the model and never usable in new views. Same as `privacy: "never"`.
+   * Use it only for values users can't already see in your app.
+   */
   sensitive?: boolean;
+  /**
+   * How far the field may be used. Default: everywhere (shown, filtered, grouped, aggregated).
+   * - "display": may be shown as a column in table/list views and listed in capabilities, but
+   *   never used to filter, group, sort or aggregate, and its values never reach the model
+   *   (it sees only the field's name, label and kind). Pick this when users already see the
+   *   value elsewhere in the app (e.g. a call summary on every call row).
+   * - "never": same as `sensitive: true`.
+   * `requires` applies at every level.
+   */
+  privacy?: "display" | "never";
   /** Computed from another field of the row instead of read from it (see `Derive`). */
   derive?: Derive;
 }
@@ -203,7 +216,11 @@ function deriveProblems(
   if (!from) return [`${at}: derives from "${d.from}", which isn't a field of "${id}"`];
   if (from.derive) return [`${at}: can't derive from another derived field ("${d.from}")`];
   // A derived value is offered to the model and shown in views: it would leak what it reads.
-  if (from.sensitive) return [`${at}: can't derive from the sensitive field "${d.from}"`];
+  if (fieldPrivacy(from) === "never")
+    return [`${at}: can't derive from the sensitive field "${d.from}"`];
+  // Derived values can be grouped and filtered: that would reveal a display-only field's values.
+  if (fieldPrivacy(from) === "display")
+    return [`${at}: can't derive from the display-only field "${d.from}"`];
   const need: Record<Derive["op"], FieldKind[]> = {
     weekday: ["date"],
     hour: ["date"],
@@ -266,12 +283,33 @@ export function restrictCatalog(
   return { sources };
 }
 
-/** Fields that may be offered to the model and used in new views. */
-export function offerableFields(s: SourceDef): Record<string, FieldDef> {
-  return Object.fromEntries(Object.entries(s.fields).filter(([, fd]) => !fd.sensitive));
+/** A field's privacy level: "full" (default), "display" or "never" (`sensitive: true`). */
+export function fieldPrivacy(fd: FieldDef): "full" | "display" | "never" {
+  if (fd.sensitive || fd.privacy === "never") return "never";
+  return fd.privacy === "display" ? "display" : "full";
 }
 
-/** What the browser needs to fetch and format block data. No sensitive fields, no descriptions. */
+/**
+ * Fields that may appear in new views and capabilities: everything except `sensitive` /
+ * `privacy: "never"`. Includes display-only fields (columns only); see `queryableFields`.
+ */
+export function offerableFields(s: SourceDef): Record<string, FieldDef> {
+  return Object.fromEntries(
+    Object.entries(s.fields).filter(([, fd]) => fieldPrivacy(fd) !== "never"),
+  );
+}
+
+/** Fields that may be filtered, grouped, sorted and aggregated on: no display-only fields. */
+export function queryableFields(s: SourceDef): Record<string, FieldDef> {
+  return Object.fromEntries(
+    Object.entries(s.fields).filter(([, fd]) => fieldPrivacy(fd) === "full"),
+  );
+}
+
+/**
+ * What the browser needs to fetch and format block data. No sensitive fields, no descriptions.
+ * Display-only fields keep `privacy: "display"` so the browser can tell them apart.
+ */
 export type PublicCatalog = Catalog;
 
 /** The catalog for the browser, with labels resolved to `locale`. */

@@ -5,7 +5,7 @@
  */
 
 export type { FieldDef, Notice, PublicCatalog, Query, QueryResult } from "@patina-ui/core";
-export type { ClientOptions, PatinaClient } from "./client.js";
+export type { ClarifyThread, ClientOptions, PatinaClient } from "./client.js";
 export { createPatinaClient, PatinaRequestError } from "./client.js";
 export type { PatinaProviderProps, UseSurface } from "./context.js";
 export { PatinaProvider, usePatinaText, useSurface } from "./context.js";
@@ -21,12 +21,14 @@ export type {
   ProposalPreviewProps,
   ProposalPreviewRenderProps,
   ShippedNoticeProps,
+  SurfaceMessageProps,
 } from "./primitives.js";
 export {
   AvailabilityNotice,
   Capabilities,
   PromptInput,
   ProposalPreview,
+  RedoButton,
   ResetButton,
   ShippedNotice,
   SkippedNotice,
@@ -41,5 +43,5 @@ export type {
   SurfaceScopeProps,
 } from "./Surface.js";
 export { PatinaBlock, Surface, SurfaceScope } from "./Surface.js";
-export type { Proposal, SurfaceSnapshot, SurfaceStatus } from "./store.js";
+export type { Proposal, SurfaceMessageData, SurfaceSnapshot, SurfaceStatus } from "./store.js";
 export { SurfaceStore } from "./store.js";

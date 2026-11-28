@@ -6,6 +6,9 @@
  *   pnpm eval --model claude-haiku-5-5 --backup claude-opus-5-5   # any pair
  *   pnpm eval --model offline                # the demo's keyword model (free; a baseline)
  *   pnpm eval --filter refuse --concurrency 2 --cases dashboard.jsonl
+ *   pnpm eval --surface calls --cases real-de.jsonl   # the first real host's prompts (German)
+ *   pnpm eval --surface calls --cases real-de.jsonl --model scripted
+ *                                            # replays each case's recorded model answers (free)
  *
  * Every run against a real model costs money: ~49 cases, 1–2 calls each.
  * Results are also written to evals/results/<timestamp>.json (gitignored).
@@ -16,6 +19,10 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import type { ModelAdapter } from "@patina-ui/server";
 import { type EvalCase, runEval } from "@patina-ui/server/eval";
+import {
+  callsContexts,
+  callsDashboard,
+} from "../packages/server/test/fixtures/calls-dashboard.js";
 import { offlineModel } from "../examples/demo/server/offlineModel.js";
 import { dashboard } from "../examples/demo/server/surface.js";
 import { USERS } from "../examples/demo/server/users.js";
@@ -30,10 +37,13 @@ const { values } = parseArgs({
     concurrency: { type: "string", default: "4" },
     effort: { type: "string" },
     backup: { type: "string" },
+    surface: { type: "string", default: "demo" },
   },
 });
+const scripted = values.model === "scripted";
 
-async function pickModel(): Promise<ModelAdapter> {
+async function pickModel(): Promise<ModelAdapter | undefined> {
+  if (scripted) return undefined;
   if (values.model === "offline") return offlineModel();
   if (!process.env.ANTHROPIC_API_KEY) {
     console.error("ANTHROPIC_API_KEY is not set. Use --model offline for a free baseline run.");
@@ -53,18 +63,22 @@ const cases = readFileSync(join(here, values.cases as string), "utf8")
   .filter((c) => !values.filter || c.id.includes(values.filter));
 
 const model = await pickModel();
-console.log(`Running ${cases.length} cases against ${model.id}\n`);
+console.log(`Running ${cases.length} cases against ${model?.id ?? "the recorded answers"}\n`);
 
+const target =
+  values.surface === "calls"
+    ? { surface: callsDashboard, contexts: callsContexts }
+    : { surface: dashboard, contexts: USERS };
 const { results, summary } = await runEval(cases, {
-  surface: dashboard,
-  model,
-  contexts: USERS,
+  ...(target as { surface: typeof dashboard; contexts: typeof USERS }),
+  ...(model ? { model } : {}),
+  scripted,
   concurrency: Number(values.concurrency),
   onResult: (r) => {
     const mark = r.pass ? "✓" : "✗";
-    const repair = r.calls > 1 ? " (repaired)" : "";
+    const repair = r.calls > 1 ? " (2 calls)" : "";
     console.log(
-      `${mark} ${r.id.padEnd(16)} ${String(r.ms).padStart(6)}ms${repair}  ${r.pass ? "" : (r.detail ?? "")}`,
+      `${mark} ${r.id.padEnd(28)} ${String(r.ms).padStart(6)}ms${repair}  ${r.pass ? "" : (r.detail ?? "")}`,
     );
   },
 });
@@ -76,8 +90,9 @@ Accuracy          ${summary.passed}/${summary.total} (${pct(summary.accuracy)})
   patches         ${summary.byExpected.patch.passed}/${summary.byExpected.patch.total}
   refusals        ${summary.byExpected.refusal.passed}/${summary.byExpected.refusal.total}
   clarifications  ${summary.byExpected.clarify.passed}/${summary.byExpected.clarify.total}
+  answers         ${summary.byExpected.answer.passed}/${summary.byExpected.answer.total}
 Refusal precision ${pct(summary.refusalPrecision)}   recall ${pct(summary.refusalRecall)}
-Repair rate       ${pct(summary.repairRate)}
+Retry rate        ${pct(summary.repairRate)}
 Errors            ${summary.errors}
 Latency           p50 ${summary.latencyMs.p50}ms   p95 ${summary.latencyMs.p95}ms`);
 

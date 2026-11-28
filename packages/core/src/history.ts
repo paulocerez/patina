@@ -30,12 +30,40 @@ export function undoTarget(entries: readonly HistoryEntry[]): HistoryEntry | nul
   return candidates.sort((a, b) => b.seq - a.seq)[0] ?? null;
 }
 
+/**
+ * The undo that `redo` would take back: the latest revert still in effect, as long as no change
+ * was made after it (a new change ends the redo chain, like in any editor). Redo appends a
+ * revert of this revert.
+ */
+export function redoTarget(entries: readonly HistoryEntry[]): HistoryEntry | null {
+  const reverted = revertedIds(entries);
+  const sorted = [...entries].sort((a, b) => b.seq - a.seq);
+  for (const e of sorted) {
+    if (reverted.has(e.id)) continue;
+    if (e.kind === "revert") {
+      // An earlier redo (a revert of a revert): look past it for the next undo to redo.
+      if (entries.find((x) => x.id === e.targetId)?.kind === "revert") continue;
+      return e;
+    }
+    return null; // a patch or reset after the last undo: nothing to redo
+  }
+  return null;
+}
+
 export function headSeq(entries: readonly HistoryEntry[]): number {
   return entries.reduce((max, e) => Math.max(max, e.seq), 0);
 }
 
+/**
+ * Entries that are reverted. A revert that is itself reverted (redo) doesn't count, so its
+ * target is back in effect. Reverts always target earlier entries, so one pass from the newest
+ * entry down settles every case.
+ */
 function revertedIds(entries: readonly HistoryEntry[]): Set<string> {
-  return new Set(entries.flatMap((e) => (e.kind === "revert" ? [e.targetId] : [])));
+  const reverted = new Set<string>();
+  for (const e of [...entries].sort((a, b) => b.seq - a.seq))
+    if (e.kind === "revert" && !reverted.has(e.id)) reverted.add(e.targetId);
+  return reverted;
 }
 
 export interface Layer {

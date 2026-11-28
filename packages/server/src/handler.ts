@@ -1,27 +1,39 @@
 import {
+  answerText,
   apply,
   buildModelRequest,
+  type Capabilities,
   capabilities,
   capabilityHint,
   dataPresetIds,
   describe,
   effectivePatches,
+  fieldPrivacy,
   fromModelOutput,
   headSeq,
   type Issue,
+  identifierWords,
+  isCapabilityQuestion,
   type Layer,
   localizeManifest,
   type Manifest,
+  type ModelRefusalDetail,
   msg,
+  nodeLabel,
+  normalizeText,
   type Op,
   type ProposeResponse,
   pickLocale,
   publicCatalog,
+  redoTarget,
+  relevantOptions,
   removeNodes,
+  rescueRefusal,
   resolve,
   restrictManifest,
   type SurfaceSpec,
   type SurfaceState,
+  scopeCapabilities,
   undoTarget,
   validate,
   withoutDataViews,
@@ -33,6 +45,7 @@ import {
   type Entry,
   type HistoryKey,
   type NewEntry,
+  type RequestDetail,
   type RequestEvent,
   type StorageAdapter,
 } from "./storage.js";
@@ -114,11 +127,16 @@ export interface PatinaHandlerOptions<Ctx extends PatinaContext> {
   onError?(error: unknown): void;
   /**
    * Called once per customization request with what happened (proposed, applied, refused,
-   * clarified, unavailable, over_quota, error) and why. Forward it to your analytics.
+   * clarified, answered, unavailable, over_quota, error), why, the user's words (`prompt`), what
+   * they were shown (`message`) and structured `detail`. Forward it to your analytics.
    * Errors thrown here are reported to onError and never affect the user.
    */
   onEvent?(event: RequestEvent): void | Promise<void>;
-  /** Store the request log through the storage adapter (if it supports it). Default true. */
+  /**
+   * Store the request log through the storage adapter (if it supports it). Default true.
+   * With `false` (or a storage adapter without a request log) no prompt is stored anywhere:
+   * set `onEvent` to see what users ask for. The handler warns at startup if neither is on.
+   */
   logRequests?: boolean;
   /**
    * Enables `GET {basePath}/insights` for the users you allow (e.g. your own staff): a report of
@@ -156,6 +174,31 @@ const json = (body: unknown, status = 200) =>
     status,
     headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
   });
+
+const OUTCOMES = {
+  proposal: "proposed",
+  refusal: "refused",
+  clarify: "clarified",
+  answer: "answered",
+} as const satisfies Record<ProposeResponse["kind"], RequestEvent["outcome"]>;
+
+/** "short call duration" / "row_limit" → "shortCallDuration" / "rowLimit" (at most 40 chars). */
+function slug(s: string): string {
+  const words = s
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .map((w) => w.toLowerCase());
+  return words
+    .map((w, i) => (i === 0 ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join("")
+    .slice(0, 40);
+}
+
+/** The parts of the page an answer covers (for the request log). */
+function scopeOf(caps: Capabilities): string[] {
+  return [...new Set([...caps.arrange.map((a) => a.node), ...caps.settings.map((x) => x.node)])];
+}
 
 const newId = (prefix: string) => `${prefix}_${globalThis.crypto.randomUUID().replace(/-/g, "")}`;
 
@@ -226,6 +269,11 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
   }
 
   const logRequests = options.logRequests !== false && !!options.storage.logRequest;
+  // Without the log or onEvent, nobody can see what users asked for (or what was refused).
+  if (!logRequests && !options.onEvent)
+    console.warn(
+      "[patina] The request log is off (logRequests: false, or a storage adapter without logRequest such as postgresStorage({ requestLog: false })) and no onEvent is set: no prompt or refusal is recorded anywhere. Set onEvent to forward requests to your analytics.",
+    );
 
   /** Writes one request-log event and forwards it to onEvent. Never throws. */
   async function record(e: Omit<RequestEvent, "id" | "at">) {
@@ -313,6 +361,8 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
         .filter((s) => s.layer === "user")
         .map((s) => ({ message: s.message, patchId: s.patchId })),
       canUndo: av.customize && undoTarget(loaded.userEntries) !== null,
+      canRedo: av.customize && redoTarget(loaded.userEntries) !== null,
+      seq: headSeq(loaded.userEntries),
       isCustomized: loaded.resolved.patchCount > 0,
       render: { slots, collections },
       ...(loaded.m.catalog ? { catalog: publicCatalog(loaded.m.catalog, av.locale) } : {}),
@@ -355,53 +405,207 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
     }
   }
 
-  type Meta = { reason: string | null; source: RequestEvent["source"]; modelCalls: number };
+  type Meta = {
+    reason: string | null;
+    source: RequestEvent["source"];
+    modelCalls: number;
+    detail?: RequestDetail | null;
+  };
+  type Loaded = Awaited<ReturnType<typeof load>>;
+  type Thread = { prompt: string; question: string };
+
+  /** Answers "what can I …?" from the manifest: the same data as `useCapabilities`, scoped. */
+  function answer(loaded: Loaded, av: Availability, prompt: string, node: string | null) {
+    const m = loaded.me;
+    const spec = loaded.resolved.spec;
+    const all = capabilities(m, spec, { dataViews: av.dataViews });
+    const about =
+      node && spec.nodes[node] ? `${prompt} ${nodeLabel(m, spec, node)} ${node}` : prompt;
+    const { caps, scope } = scopeCapabilities(all, m, spec, about);
+    const text = answerText(caps, scope, av.locale);
+    const response: ProposeResponse = {
+      kind: "answer",
+      message: text,
+      question: text,
+      capabilities: caps,
+    };
+    return response;
+  }
+
+  /** The refusal's detail, checked against the manifest: real node, slug, catalog field. */
+  function refusalDetail(
+    manifest: Manifest<Ctx>,
+    loaded: Loaded,
+    d: ModelRefusalDetail | null | undefined,
+  ): RequestDetail | null {
+    if (!d) return null;
+    const spec = loaded.resolved.spec;
+    const node = d.node && spec.nodes[d.node] ? d.node : null;
+    const wanted = d.wanted ? slug(d.wanted) : null;
+    if (!node && !wanted) return null;
+    let field: RequestDetail["field"] = null;
+    if (wanted) {
+      const w = normalizeText(identifierWords(wanted));
+      for (const [sid, src] of Object.entries(manifest.catalog?.sources ?? {})) {
+        for (const [fid, fd] of Object.entries(src.fields)) {
+          if (normalizeText(identifierWords(fid)) !== w) continue;
+          const visible = loaded.m.catalog?.sources[sid]?.fields[fid];
+          const privacy = fieldPrivacy(fd);
+          if (privacy === "never") field = { source: sid, field: fid, privacy: "never" };
+          else if (!visible) field = { source: sid, field: fid, privacy: "restricted" };
+          else if (privacy === "display") field = { source: sid, field: fid, privacy: "display" };
+        }
+      }
+    }
+    return {
+      node,
+      component: node ? (spec.nodes[node]?.component ?? null) : null,
+      wanted,
+      ...(field ? { field } : {}),
+    };
+  }
 
   async function propose(
     manifest: Manifest<Ctx>,
     ctx: Ctx,
     av: Availability,
     prompt: string,
+    thread: Thread | null,
   ): Promise<{ response: ProposeResponse; meta: Meta }> {
     const L = av.locale;
     if (!prompt) throw new HttpError(400, msg(L, "typeSomething"));
     if (prompt.length > promptMaxChars)
       throw new HttpError(400, msg(L, "promptTooLong", { max: promptMaxChars }));
-    rateLimit(ctx, L);
-    await checkQuota(ctx, L);
 
     const loaded = await load(manifest, ctx, av);
     const m = loaded.me;
     const spec = loaded.resolved.spec;
-    const request = buildModelRequest(m, spec, prompt);
+    const threadDetail = thread ? { thread } : {};
     const done = (
       response: ProposeResponse,
       reason: string | null,
       source: Meta["source"],
       modelCalls: number,
+      detail: RequestDetail | null = null,
     ) => ({
       response,
-      meta: { reason, source, modelCalls },
+      meta: {
+        reason,
+        source,
+        modelCalls,
+        detail: detail || thread ? { ...(detail ?? {}), ...threadDetail } : null,
+      },
     });
 
-    let issues: Issue[] = [];
-    let lastOps: Op[] = [];
+    // "What can I show here?" is answered from the manifest: no model call, no quota.
+    if (!thread && isCapabilityQuestion(prompt)) {
+      const response = answer(loaded, av, prompt, null);
+      return done(response, null, "host", 0, {
+        scope: response.kind === "answer" ? scopeOf(response.capabilities) : [],
+      });
+    }
+
+    rateLimit(ctx, L);
+    await checkQuota(ctx, L);
+
+    const request = buildModelRequest(m, spec, prompt, thread ? { thread } : {});
+    // What the guard reads: a reply to a question only makes sense with the question's request.
+    const fullPrompt = thread ? `${thread.prompt}\n${prompt}` : prompt;
+
+    const save = async (ops: Op[], summary: string) => {
+      const proposalId = newId("pr");
+      await options.storage.saveProposal({
+        id: proposalId,
+        key: loaded.key,
+        baseSeq: headSeq(loaded.userEntries),
+        ops,
+        summary,
+        prompt,
+        model: options.model.id,
+        expiresAt: new Date(Date.now() + ttl * 1000).toISOString(),
+      });
+      const response: ProposeResponse = {
+        kind: "proposal",
+        proposalId,
+        ops,
+        changes: describe(m, spec, ops),
+        summary,
+        previewSpec: apply(m, spec, ops).spec,
+      };
+      return response;
+    };
+
+    /**
+     * Every refusal passes here (except safety and the host's own rules): if the prompt names
+     * something the manifest allows, propose it or ask which, instead of refusing.
+     */
+    const refuse = async (
+      category: string,
+      reason: string,
+      source: Meta["source"],
+      calls: number,
+      modelDetail: ModelRefusalDetail | null = null,
+    ) => {
+      const detail = refusalDetail(manifest, loaded, modelDetail);
+      const rescue = rescueRefusal(m, spec, fullPrompt, {
+        category,
+        message: reason,
+        detail: modelDetail,
+      });
+      if (rescue?.kind === "patch")
+        return done(
+          await save(rescue.ops, rescue.summary),
+          `rescued:${category}`,
+          "guard",
+          calls,
+          detail,
+        );
+      // One clarification at most: a reply to a question doesn't get another one.
+      if (rescue?.kind === "clarify" && !thread)
+        return done(
+          {
+            kind: "clarify",
+            question: rescue.question,
+            options: rescue.options.map((o) => ({ label: o.label })),
+          },
+          `rescued:${category}`,
+          "guard",
+          calls,
+          detail,
+        );
+      // Asked for something that isn't here: say what is, from the manifest, not the model.
+      const hint =
+        category === "data_access" || category === "not_on_page"
+          ? capabilityHint(capabilities(m, spec, { dataViews: av.dataViews }), L, "data")
+          : "";
+      return done(
+        { kind: "refusal", message: hint ? `${reason} ${hint}` : reason, category },
+        category,
+        source,
+        calls,
+        detail,
+      );
+    };
+
+    let retryNote = "";
+    let last:
+      | { kind: "refusal"; category: string; reason: string; detail: ModelRefusalDetail | null }
+      | { kind: "invalid"; issues: Issue[]; ops: Op[] }
+      | null = null;
     for (let attempt = 0; attempt < 2; attempt++) {
       const calls = attempt + 1;
-      const req =
-        attempt === 0
-          ? request
-          : {
-              ...request,
-              user: `${request.user}\n\n<problems_with_previous_answer>\n${issues.map((i) => `- op ${i.opIndex}: ${i.message}`).join("\n")}\n</problems_with_previous_answer>\nAnswer again, fixing these problems, or refuse if the request can't be done.`,
-            };
+      const req = attempt === 0 ? request : { ...request, user: `${request.user}\n\n${retryNote}` };
       let raw: unknown;
       try {
         raw = await options.model.propose(req, { signal: AbortSignal.timeout(60_000), attempt });
       } catch (e) {
         if (e instanceof ModelRefusal)
           return done(
-            { kind: "refusal", message: e.generic ? msg(L, "safetyDecline") : e.message },
+            {
+              kind: "refusal",
+              message: e.generic ? msg(L, "safetyDecline") : e.message,
+              category: "safety",
+            },
             "safety",
             "model",
             calls,
@@ -413,73 +617,112 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
           source: null,
         });
       }
-      const result = fromModelOutput(raw, undefined, L);
-      if (result.kind === "refusal") {
-        // Asked for something that isn't here: say what is, from the manifest, not the model.
-        const hint =
-          result.category === "data_access" || result.category === "not_on_page"
-            ? capabilityHint(capabilities(m, spec, { dataViews: av.dataViews }), L, "data")
-            : "";
-        return done(
-          { kind: "refusal", message: hint ? `${result.reason} ${hint}` : result.reason },
-          result.category,
-          "model",
-          calls,
-        );
-      }
-      if (result.kind === "clarify")
-        return done({ kind: "clarify", question: result.question }, null, "model", calls);
-      if (result.ops.length === 0)
-        return done(
-          {
-            kind: "refusal",
-            message: msg(L, "nothingToChange"),
-          },
-          "no_change",
-          "model",
-          calls,
-        );
+      let result = fromModelOutput(raw, undefined, L);
+      // One clarification at most: the schema leaves "clarify" out for replies; if a model
+      // asks anyway, it couldn't tell.
+      if (result.kind === "clarify" && thread)
+        result = { kind: "refusal", reason: result.question, category: "unclear", detail: null };
 
-      lastOps = result.ops;
-      issues = validate(m, spec, result.ops);
-      if (issues.length === 0) {
-        const proposalId = newId("pr");
-        await options.storage.saveProposal({
-          id: proposalId,
-          key: loaded.key,
-          baseSeq: headSeq(loaded.userEntries),
-          ops: result.ops,
-          summary: result.summary,
-          prompt,
-          model: options.model.id,
-          expiresAt: new Date(Date.now() + ttl * 1000).toISOString(),
+      if (result.kind === "answer") {
+        const response = answer(loaded, av, prompt, result.detail?.node ?? null);
+        return done(response, null, "model", calls, {
+          scope: response.kind === "answer" ? scopeOf(response.capabilities) : [],
         });
-        return done(
-          {
-            kind: "proposal",
-            proposalId,
-            ops: result.ops,
-            changes: describe(m, spec, result.ops),
-            summary: result.summary,
-            previewSpec: apply(m, spec, result.ops).spec,
-          },
-          null,
-          null,
-          calls,
-        );
       }
+
+      if (result.kind === "refusal") {
+        if (result.category === "safety")
+          return done(
+            { kind: "refusal", message: result.reason, category: "safety" },
+            "safety",
+            "model",
+            calls,
+          );
+        last = {
+          kind: "refusal",
+          category: result.category,
+          reason: result.reason,
+          detail: result.detail,
+        };
+        // A second look, by the backup model, with the part of the manifest the refusal is about.
+        retryNote = [
+          "<previous_answer>",
+          `refusal (${result.category}): ${JSON.stringify(result.reason)}`,
+          "</previous_answer>",
+          "<relevant_options>",
+          relevantOptions(m, spec, fullPrompt, {
+            category: result.category,
+            message: result.reason,
+            detail: result.detail,
+          }),
+          "</relevant_options>",
+          "Check the request against these options again (labels are in the user's language). If it can be done with them, answer with a patch. Otherwise refuse with the most specific category and detail.",
+        ].join("\n");
+        continue;
+      }
+
+      if (result.kind === "clarify") {
+        // Offer only options that are possible: each one's ops must validate.
+        const problems: string[] = [];
+        const valid = result.options.filter((o) => {
+          if (o.ops.length === 0) {
+            problems.push(`- option ${JSON.stringify(o.label)}: has no valid ops`);
+            return false;
+          }
+          const issues = validate(m, spec, o.ops);
+          if (issues.length)
+            problems.push(`- option ${JSON.stringify(o.label)}: ${issues[0]?.message}`);
+          return issues.length === 0;
+        });
+        if (valid.length)
+          return done(
+            {
+              kind: "clarify",
+              question: result.question,
+              options: valid.map((o) => ({ label: o.label })),
+            },
+            null,
+            "model",
+            calls,
+          );
+        last = { kind: "refusal", category: "unclear", reason: result.question, detail: null };
+        retryNote = `<problems_with_previous_answer>\nYou asked: ${JSON.stringify(result.question)}, but none of its options is possible:\n${problems.join("\n") || "- no options given"}\n</problems_with_previous_answer>\nAnswer with a patch if one reading is clearly meant, ask again offering only possible options (with their ops), or refuse.`;
+        continue;
+      }
+
+      if (result.ops.length === 0) {
+        last = {
+          kind: "refusal",
+          category: "no_change",
+          reason: msg(L, "nothingToChange"),
+          detail: null,
+        };
+        retryNote =
+          "Your previous answer had no ops. Answer with the ops that do the request, or refuse with a category.";
+        continue;
+      }
+
+      const issues = validate(m, spec, result.ops);
+      if (issues.length === 0)
+        return done(await save(result.ops, result.summary), null, null, calls);
+      last = { kind: "invalid", issues, ops: result.ops };
+      retryNote = `<problems_with_previous_answer>\n${issues.map((i) => `- op ${i.opIndex}: ${i.message}`).join("\n")}\n</problems_with_previous_answer>\nAnswer again, fixing these problems, or refuse if the request can't be done.`;
     }
+
+    if (last?.kind === "refusal")
+      return refuse(last.category, last.reason, "model", 2, last.detail);
+    const issues = last?.issues ?? [];
     // Asked for a data view without access to data views: say why, not which op failed.
-    if (!av.dataViews && touchesDataViews(loaded.m, spec, lastOps))
+    if (!av.dataViews && touchesDataViews(loaded.m, spec, last?.ops ?? []))
       return done(
         { kind: "refusal", message: av.message ?? msg(L, "dataViewsOff") },
         "data_views_off",
         "host",
         2,
       );
-    return done(
-      { kind: "refusal", message: issues[0]?.message ?? msg(L, "notPossible") },
-      issues[0]?.code ?? null,
+    return refuse(
+      issues[0]?.code ?? "not_possible",
+      issues[0]?.message ?? msg(L, "notPossible"),
       "validator",
       2,
     );
@@ -528,19 +771,42 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
     return state(manifest, after, av);
   }
 
-  async function undo(manifest: Manifest<Ctx>, ctx: Ctx, av: Availability) {
+  /**
+   * The client's history position must still be the head: a second click on Undo (sent before
+   * the first one's answer arrived) gets 409 instead of undoing a step the user never saw.
+   */
+  function checkSeq(loaded: Loaded, expectedSeq: number | undefined, locale: string) {
+    if (expectedSeq !== undefined && headSeq(loaded.userEntries) !== expectedSeq)
+      throw new HttpError(409, msg(locale, "staleUndo"));
+  }
+
+  async function undo(manifest: Manifest<Ctx>, ctx: Ctx, av: Availability, expectedSeq?: number) {
     const after = await appendWithRetry(manifest, ctx, av, (loaded) => {
+      checkSeq(loaded, expectedSeq, av.locale);
       const target = undoTarget(loaded.userEntries);
       return target ? { kind: "revert", id: newId("r"), targetId: target.id } : null;
     });
     return state(manifest, after, av);
   }
 
-  async function reset(manifest: Manifest<Ctx>, ctx: Ctx, av: Availability) {
-    const after = await appendWithRetry(manifest, ctx, av, (loaded) =>
+  /** Takes back the last undo: appends a revert of that revert. */
+  async function redo(manifest: Manifest<Ctx>, ctx: Ctx, av: Availability, expectedSeq?: number) {
+    const after = await appendWithRetry(manifest, ctx, av, (loaded) => {
+      checkSeq(loaded, expectedSeq, av.locale);
+      const target = redoTarget(loaded.userEntries);
+      return target ? { kind: "revert", id: newId("r"), targetId: target.id } : null;
+    });
+    return state(manifest, after, av);
+  }
+
+  async function reset(manifest: Manifest<Ctx>, ctx: Ctx, av: Availability, expectedSeq?: number) {
+    const after = await appendWithRetry(manifest, ctx, av, (loaded) => {
+      checkSeq(loaded, expectedSeq, av.locale);
       // Only when the user's own layer changes anything: resetting a default view is a no-op.
-      effectivePatches(loaded.userEntries).length > 0 ? { kind: "reset", id: newId("x") } : null,
-    );
+      return effectivePatches(loaded.userEntries).length > 0
+        ? { kind: "reset", id: newId("x") }
+        : null;
+    });
     return state(manifest, after, av);
   }
 
@@ -597,12 +863,27 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
       };
 
       const av = await availabilityFor(ctx, manifest.id, request);
+      // Optional: clients before 0.7 send no body (some with a JSON content type).
+      const expectedSeq = async () => {
+        const b = (await body().catch(() => ({}))) as { expectedSeq?: unknown };
+        return Number.isInteger(b?.expectedSeq) ? (b.expectedSeq as number) : undefined;
+      };
 
       if (route === "POST proposals") {
         // Every customization request is logged with its outcome, including refusals.
         const started = performance.now();
-        const b = (await body()) as { prompt?: unknown };
+        const b = (await body()) as { prompt?: unknown; thread?: unknown };
         const prompt = typeof b?.prompt === "string" ? b.prompt.trim() : "";
+        // The question this prompt answers (sent by clients from 0.7). Only the user's own
+        // words and Patina's question: nothing in it is trusted, the ops are still validated.
+        const t = b?.thread as { prompt?: unknown; question?: unknown } | undefined;
+        const thread =
+          t && typeof t.prompt === "string" && typeof t.question === "string" && t.prompt.trim()
+            ? {
+                prompt: t.prompt.trim().slice(0, promptMaxChars),
+                question: t.question.trim().slice(0, 1000),
+              }
+            : null;
         const base = {
           surfaceId: manifest.id,
           userId: ctx.userId,
@@ -619,23 +900,19 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
               reason: "customize_off",
               source: "host",
             });
-          const { response, meta } = await propose(manifest, ctx, av, prompt);
+          const { response, meta } = await propose(manifest, ctx, av, prompt, thread);
           await record({
             ...base,
-            outcome:
-              response.kind === "proposal"
-                ? "proposed"
-                : response.kind === "refusal"
-                  ? "refused"
-                  : "clarified",
+            outcome: OUTCOMES[response.kind],
             reason: meta.reason,
             source: meta.source,
             message:
-              response.kind === "refusal"
+              response.kind === "refusal" || response.kind === "answer"
                 ? response.message
                 : response.kind === "clarify"
                   ? response.question
                   : null,
+            detail: meta.detail ?? null,
             proposalId: response.kind === "proposal" ? response.proposalId : null,
             latencyMs: ms(),
             modelCalls: meta.modelCalls,
@@ -696,9 +973,11 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
         case "POST proposals/:id/commit":
           return json(await commit(manifest, ctx, av, parts[3] as string));
         case "POST undo":
-          return json(await undo(manifest, ctx, av));
+          return json(await undo(manifest, ctx, av, await expectedSeq()));
+        case "POST redo":
+          return json(await redo(manifest, ctx, av, await expectedSeq()));
         case "POST reset":
-          return json(await reset(manifest, ctx, av));
+          return json(await reset(manifest, ctx, av, await expectedSeq()));
         default:
           return json({ error: { message: "Not found" } }, 404);
       }

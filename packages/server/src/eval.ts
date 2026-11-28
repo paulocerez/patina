@@ -21,9 +21,9 @@ import {
 } from "@patina-ui/core";
 import { createPatinaHandler, type PatinaContext } from "./handler.js";
 import type { ModelAdapter } from "./model.js";
-import { memoryStorage } from "./storage.js";
+import { memoryStorage, type RequestEvent } from "./storage.js";
 
-export type EvalKind = "patch" | "refusal" | "clarify";
+export type EvalKind = "patch" | "refusal" | "clarify" | "answer";
 
 export interface EvalCase {
   id: string;
@@ -40,8 +40,32 @@ export interface EvalCase {
         /** Other op lists that are also correct (e.g. using an existing preset instead). */
         alternatives?: Op[][];
       }
-    | { kind: "refusal" }
-    | { kind: "clarify" };
+    | {
+        kind: "refusal";
+        /** The refusal category it must have (e.g. "missing_field"). */
+        category?: string;
+        /** Detail it must have (as stored in the request log), e.g. { node: "recentCalls", wanted: "summary" }. */
+        detail?: { node?: string; wanted?: string };
+      }
+    | {
+        kind: "clarify";
+        /** At most this many options (every option offered must be possible). */
+        optionsMax?: number;
+        /** At least this many options. */
+        optionsMin?: number;
+      }
+    | {
+        kind: "answer";
+        /** Labels the answer must mention (e.g. column names). */
+        mentions?: string[];
+      };
+  /** The question this prompt answers: sent as `thread`, like the React client does. */
+  thread?: { prompt: string; question: string };
+  /**
+   * Raw model outputs, one per call, for `runEval(…, { scripted: true })`: replays a model's
+   * answers (good or bad) to test what Patina does with them, without an API key.
+   */
+  script?: unknown[];
   /** Compare the result without caring about the order of items (when the prompt doesn't say where). */
   ignoreOrder?: boolean;
   /** The user's language (sent as x-patina-locale), e.g. "de". */
@@ -59,9 +83,11 @@ export interface EvalResult {
   pass: boolean;
   /** Why it failed, or what the model said. */
   detail?: string;
-  /** Model calls for this case (2 = one repair round-trip). */
+  /** Model calls for this case (2 = one retry: repair or a second look at a refusal). */
   calls: number;
   ms: number;
+  /** For refusals: the category and detail the request log got. */
+  category?: string | null;
 }
 
 export interface EvalSummary {
@@ -79,7 +105,13 @@ export interface EvalSummary {
 
 export interface RunEvalOptions<Ctx extends PatinaContext> {
   surface: Manifest<NoInfer<Ctx>>;
-  model: ModelAdapter;
+  /** Not needed with `scripted`. */
+  model?: ModelAdapter;
+  /**
+   * Answer every model call from the case's `script` instead of a model: tests the
+   * deterministic parts (validation, the refusal guard, answers, clarification checks) in CI.
+   */
+  scripted?: boolean;
   /** Request contexts by name, e.g. { alice: {...}, bob: {...} }. */
   contexts: Record<string, Ctx>;
   concurrency?: number;
@@ -102,7 +134,10 @@ export async function runEval<Ctx extends PatinaContext>(
   await Promise.all(workers);
   const order = new Map(cases.map((c, i) => [c.id, i]));
   results.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
-  return { results, summary: summarize(results, options.model.id) };
+  return {
+    results,
+    summary: summarize(results, options.scripted ? "scripted" : (options.model?.id ?? "none")),
+  };
 }
 
 async function runCase<Ctx extends PatinaContext>(
@@ -133,13 +168,25 @@ async function runCase<Ctx extends PatinaContext>(
 
   let calls = 0;
   let cause: string | null = null;
+  const inner: ModelAdapter | undefined = o.scripted
+    ? {
+        id: "scripted",
+        propose: async () => {
+          const out = c.script?.[calls - 1];
+          if (out === undefined) throw new Error(`script has no answer for call ${calls}`);
+          return out;
+        },
+      }
+    : o.model;
+  if (!inner) return { ...base, got: "error", pass: false, detail: "no model and not scripted" };
   const counted: ModelAdapter = {
-    id: o.model.id,
+    id: inner.id,
     propose: (req, opts) => {
       calls++;
-      return o.model.propose(req, opts);
+      return inner.propose(req, opts);
     },
   };
+  const events: RequestEvent[] = [];
   const handler = createPatinaHandler<Ctx>({
     surfaces: [o.surface],
     storage,
@@ -148,6 +195,9 @@ async function runCase<Ctx extends PatinaContext>(
     // Keep the real cause of model failures for the report (the user only sees a generic message).
     onError: (e) => {
       cause = e instanceof Error ? e.message.slice(0, 300) : String(e);
+    },
+    onEvent: (e) => {
+      events.push(e);
     },
     limits: { proposalsPerMinute: 0 },
   });
@@ -170,27 +220,29 @@ async function runCase<Ctx extends PatinaContext>(
   const started = performance.now();
   try {
     const before = await call<SurfaceState>("GET", "");
-    const r = await call<ProposeResponse>("POST", "/proposals", { prompt: c.prompt });
+    const r = await call<ProposeResponse>("POST", "/proposals", {
+      prompt: c.prompt,
+      ...(c.thread ? { thread: c.thread } : {}),
+    });
     const ms = Math.round(performance.now() - started);
     const got: EvalKind = r.kind === "proposal" ? "patch" : r.kind;
     const accepted = new Set<EvalKind>([c.expect.kind, ...(c.accept ?? [])]);
+    const event = events.at(-1);
     const said =
       r.kind === "refusal"
-        ? r.message
+        ? `${r.message}${event?.reason ? ` [${event.reason}${event.detail?.node || event.detail?.wanted ? ` ${event.detail?.node ?? ""}.${event.detail?.wanted ?? ""}` : ""}]` : ""}`
         : r.kind === "clarify"
-          ? r.question
-          : r.changes.map((x) => x.text).join("; ");
+          ? `${r.question}${r.options?.length ? ` (${r.options.map((x) => x.label).join(" | ")})` : ""}`
+          : r.kind === "answer"
+            ? r.message.replace(/\n/g, " ")
+            : r.changes.map((x) => x.text).join("; ");
+    const result = { ...base, got, calls, ms, category: event?.reason ?? null };
     if (!accepted.has(got))
-      return {
-        ...base,
-        got,
-        pass: false,
-        detail: `expected ${c.expect.kind}, got ${got}: ${said}`,
-        calls,
-        ms,
-      };
+      return { ...result, pass: false, detail: `expected ${c.expect.kind}, got ${got}: ${said}` };
+    const fail = checkKind(c, r, event);
+    if (fail) return { ...result, pass: false, detail: `${fail}: ${said}` };
     if (got !== "patch" || c.expect.kind !== "patch" || r.kind !== "proposal")
-      return { ...base, got, pass: true, detail: said, calls, ms };
+      return { ...result, pass: true, detail: said };
 
     const m = restrictManifest(o.surface as Manifest<unknown>, {
       ...((await o.surface.restrict?.(ctx)) ?? {}),
@@ -225,6 +277,35 @@ async function runCase<Ctx extends PatinaContext>(
       ms: Math.round(performance.now() - started),
     };
   }
+}
+
+/** Checks what the kind alone doesn't: category, detail, options, what an answer mentions. */
+function checkKind(
+  c: EvalCase,
+  r: ProposeResponse,
+  event: RequestEvent | undefined,
+): string | null {
+  const e = c.expect;
+  if (e.kind === "refusal" && r.kind === "refusal") {
+    if (e.category && event?.reason !== e.category)
+      return `expected category ${e.category}, got ${event?.reason ?? "none"}`;
+    if (e.detail?.node && event?.detail?.node !== e.detail.node)
+      return `expected detail.node ${e.detail.node}, got ${event?.detail?.node ?? "none"}`;
+    if (e.detail?.wanted && event?.detail?.wanted !== e.detail.wanted)
+      return `expected detail.wanted ${e.detail.wanted}, got ${event?.detail?.wanted ?? "none"}`;
+  }
+  if (e.kind === "clarify" && r.kind === "clarify") {
+    const n = r.options?.length ?? 0;
+    if (e.optionsMax !== undefined && n > e.optionsMax)
+      return `expected at most ${e.optionsMax} options, got ${n}`;
+    if (e.optionsMin !== undefined && n < e.optionsMin)
+      return `expected at least ${e.optionsMin} options, got ${n}`;
+  }
+  if (e.kind === "answer" && r.kind === "answer") {
+    const missing = (e.mentions ?? []).filter((x) => !r.message.includes(x));
+    if (missing.length) return `answer doesn't mention ${missing.join(", ")}`;
+  }
+  return null;
 }
 
 /** Sorts every keyed list (slots, collections) by key, for order-insensitive comparison. */
@@ -278,7 +359,7 @@ export function normalize(spec: SurfaceSpec): SurfaceSpec {
 }
 
 function summarize(results: EvalResult[], model: string): EvalSummary {
-  const kinds: EvalKind[] = ["patch", "refusal", "clarify"];
+  const kinds: EvalKind[] = ["patch", "refusal", "clarify", "answer"];
   const byExpected = Object.fromEntries(
     kinds.map((k) => {
       const of = results.filter((r) => r.expected === k);

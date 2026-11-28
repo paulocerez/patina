@@ -10,7 +10,12 @@
  * @packageDocumentation
  * @module @patina-ui/server/followups
  */
-import { normalizePrompt, REASON_LABELS } from "./insights.js";
+import {
+  normalizePrompt,
+  REASON_LABELS,
+  suggestionKey,
+  suggestManifestChange,
+} from "./insights.js";
 import type { RequestEvent, RequestFilter, StorageAdapter } from "./storage.js";
 
 /** One thing customers want that the product doesn't offer yet. */
@@ -31,6 +36,11 @@ export interface FollowUp {
   surfaces: string[];
   /** Up to five distinct wordings, redacted. */
   examples: string[];
+  /**
+   * What to change in the manifest, from the refusals' structured detail (e.g. "Add a
+   * `summary` column to RecentCallsTable"). Null when the refusals don't say.
+   */
+  suggestion?: string | null;
   /** Customer names from `customerName`, if you provided it (most requests first). */
   customerNames: string[];
   /**
@@ -139,6 +149,9 @@ export type FollowUpGrouper = (
  * plan/availability reasons (pass them in `reasons` to send sales signals instead).
  */
 export const DEMAND_REASONS = [
+  "missing_field",
+  "missing_setting",
+  "missing_value",
   "new_component",
   "styling",
   "action",
@@ -261,10 +274,11 @@ export async function buildFollowUps(
       reasons.has(e.reason ?? ""),
   );
 
-  // 1. Same wording (after normalizing) → one cluster.
+  // 1. Same missing thing (from the refusal's detail, e.g. "summary column on recentCalls"),
+  //    or else the same wording (after normalizing) → one cluster.
   const byWording = new Map<string, RequestEvent[]>();
   for (const e of relevant) {
-    const k = normalizePrompt(e.prompt as string);
+    const k = suggestionKey(e) ?? normalizePrompt(e.prompt as string);
     if (k) byWording.set(k, [...(byWording.get(k) ?? []), e]);
   }
   const clusterEvents = [...byWording.values()];
@@ -327,8 +341,12 @@ export async function buildFollowUps(
       const names = await Promise.all(tenants.map((t) => options.customerName?.(t)));
       customerNames = names.filter((n): n is string => !!n);
     }
+    const suggestion = mostCommon(
+      es.map((e) => suggestManifestChange(e)).filter((x): x is string => !!x),
+    )[0];
     followUps.push({
       key,
+      suggestion: suggestion ?? null,
       title: g.title.trim().slice(0, 120),
       summary: g.summary?.trim() || null,
       count: es.length,
@@ -468,6 +486,7 @@ export function renderFollowUpMarkdown(f: FollowUp, opts: { appName?: string } =
     "",
     "**Why it couldn't be done**",
     ...f.reasons.map((r) => `- ${r.label} (\`${r.code}\`, ${r.count}×)`),
+    ...(f.suggestion ? ["", `**Suggested change:** ${f.suggestion}`] : []),
     "",
     `**Where:** ${f.surfaces.map((s) => `\`${s}\``).join(", ")}`,
   ];

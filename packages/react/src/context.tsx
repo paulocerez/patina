@@ -73,10 +73,14 @@ export interface UseSurface extends SurfaceSnapshot {
   commit(): Promise<void>;
   discard(): void;
   undo(): Promise<void>;
+  /** Takes back the last undo. */
+  redo(): Promise<void>;
   reset(): Promise<void>;
   reload(): Promise<void>;
   dismissNotice(key: string): Promise<void>;
   canUndo: boolean;
+  /** An undo can be taken back (servers from 0.7). */
+  canRedo: boolean;
   isCustomized: boolean;
   /**
    * What this user may do (from the server's `availability` hook). Customizing defaults to
@@ -98,10 +102,12 @@ export function useSurface(surfaceId: string): UseSurface {
     commit: store.commit,
     discard: store.discard,
     undo: store.undo,
+    redo: store.redo,
     reset: store.reset,
     reload: store.reload,
     dismissNotice: store.dismissNotice,
     canUndo: snap.state?.canUndo ?? false,
+    canRedo: snap.state?.canRedo ?? false,
     isCustomized: snap.state?.isCustomized ?? false,
     availability: snap.state?.availability ?? { customize: true, dataViews: true },
     busy: snap.status === "loading" || snap.status === "proposing" || snap.status === "committing",

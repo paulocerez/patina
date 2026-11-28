@@ -107,6 +107,7 @@ export const patinaRequests = pgTable(
     model: text("model"),
     latencyMs: integer("latency_ms"),
     modelCalls: integer("model_calls"),
+    detail: jsonb("detail"),
   },
   (t) => [
     index("patina_requests_created_at").on(t.createdAt),

@@ -1,5 +1,11 @@
 import type { ErrorBody, ProposeResponse, SurfaceState } from "@patina-ui/core";
 
+/** The clarifying question a prompt answers (see `PatinaClient.propose`). */
+export interface ClarifyThread {
+  prompt: string;
+  question: string;
+}
+
 export class PatinaRequestError extends Error {
   constructor(
     readonly status: number,
@@ -12,10 +18,17 @@ export class PatinaRequestError extends Error {
 
 export interface PatinaClient {
   get(surfaceId: string): Promise<SurfaceState>;
-  propose(surfaceId: string, prompt: string): Promise<ProposeResponse>;
+  /** `thread`: the question this prompt answers, so the server reads both together. */
+  propose(surfaceId: string, prompt: string, thread?: ClarifyThread): Promise<ProposeResponse>;
   commit(surfaceId: string, proposalId: string): Promise<SurfaceState>;
-  undo(surfaceId: string): Promise<SurfaceState>;
-  reset(surfaceId: string): Promise<SurfaceState>;
+  /**
+   * `expectedSeq`: `SurfaceState.seq` as the user saw it. If the history moved on since (a
+   * second click), the server answers 409 instead of undoing one more step.
+   */
+  undo(surfaceId: string, expectedSeq?: number): Promise<SurfaceState>;
+  /** Takes back the last undo. Optional for custom clients written before 0.7. */
+  redo?(surfaceId: string, expectedSeq?: number): Promise<SurfaceState>;
+  reset(surfaceId: string, expectedSeq?: number): Promise<SurfaceState>;
   /** Hides a "now possible" notice for good. */
   dismissNotice?(surfaceId: string, key: string): Promise<void>;
 }
@@ -67,12 +80,17 @@ export function createPatinaClient({
   const s = (id: string) => `/surfaces/${encodeURIComponent(id)}`;
   return {
     get: (id) => call("GET", s(id)),
-    propose: (id, prompt) => call("POST", `${s(id)}/proposals`, { prompt }),
+    propose: (id, prompt, thread) =>
+      call("POST", `${s(id)}/proposals`, { prompt, ...(thread ? { thread } : {}) }),
     commit: (id, pid) => call("POST", `${s(id)}/proposals/${encodeURIComponent(pid)}/commit`),
-    undo: (id) => call("POST", `${s(id)}/undo`),
-    reset: (id) => call("POST", `${s(id)}/reset`),
+    undo: (id, expectedSeq) => call("POST", `${s(id)}/undo`, seqBody(expectedSeq)),
+    redo: (id, expectedSeq) => call("POST", `${s(id)}/redo`, seqBody(expectedSeq)),
+    reset: (id, expectedSeq) => call("POST", `${s(id)}/reset`, seqBody(expectedSeq)),
     dismissNotice: async (id, key) => {
       await call("POST", `${s(id)}/notices/${encodeURIComponent(key)}/dismiss`);
     },
   };
 }
+
+const seqBody = (expectedSeq: number | undefined) =>
+  expectedSeq === undefined ? undefined : { expectedSeq };

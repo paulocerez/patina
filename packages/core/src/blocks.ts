@@ -1,4 +1,4 @@
-import { type Catalog, type FieldDef, offerableFields } from "./catalog.js";
+import { type Catalog, type FieldDef, offerableFields, queryableFields } from "./catalog.js";
 import { t } from "./dsl.js";
 import { msgText } from "./i18n.js";
 import type { ComponentDef, Manifest, PresetDef } from "./manifest.js";
@@ -67,7 +67,7 @@ export function dataBlocks(catalog: Catalog) {
   const complete = sources.find(([, s]) => s.complete);
   if (complete) {
     const [id, s] = complete;
-    const entries = Object.entries(offerableFields(s));
+    const entries = Object.entries(queryableFields(s));
     const group = entries.find(
       ([, fd]) => fd.kind === "enum" || fd.kind === "string" || fd.kind === "bool",
     );
