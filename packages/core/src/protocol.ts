@@ -23,6 +23,13 @@ export interface SurfaceState {
   /** Earlier changes that no longer apply. */
   skipped: { message: string; patchId?: string }[];
   canUndo: boolean;
+  /** Whether the last undo can be taken back (POST /surfaces/:id/redo). */
+  canRedo?: boolean;
+  /**
+   * The user's history position. Send it back as `expectedSeq` with undo, redo and reset: the
+   * server answers 409 instead of undoing a step the user didn't see (double clicks).
+   */
+  seq?: number;
   isCustomized: boolean;
   /** Which props are slots and which are collections, per component, for the renderer. */
   render: { slots: Record<string, string[]>; collections: Record<string, string[]> };
@@ -57,8 +64,45 @@ export type ProposeResponse =
       summary: string;
       previewSpec: SurfaceSpec;
     }
-  | { kind: "refusal"; message: string }
-  | { kind: "clarify"; question: string };
+  | {
+      kind: "refusal";
+      message: string;
+      /** Why (see `REFUSAL_CATEGORIES`), when known. */
+      category?: string;
+    }
+  | {
+      kind: "clarify";
+      question: string;
+      /**
+       * Choices the user can pick, each checked to be possible. Send the picked label (or any
+       * reply) back as the next prompt with `thread: { prompt, question }`.
+       */
+      options?: { label: string }[];
+    }
+  | {
+      /** The user asked what is possible: answered from the manifest, not by the model. */
+      kind: "answer";
+      message: string;
+      /** Same as `message`, so clients from before 0.7 (which show `question`) show it too. */
+      question: string;
+      /** What the user can change, narrowed to what they asked about. */
+      capabilities: Capabilities;
+    };
+
+/**
+ * Body of POST /surfaces/:id/proposals. `thread` carries the question this prompt answers
+ * (one clarification at most: the server won't ask again).
+ */
+export interface ProposeRequest {
+  prompt: string;
+  thread?: { prompt: string; question: string };
+}
+
+/** Body of POST /surfaces/:id/undo, /redo and /reset. All optional. */
+export interface HistoryRequest {
+  /** `SurfaceState.seq` as the client saw it. A different head answers 409. */
+  expectedSeq?: number;
+}
 
 /** Body of any non-2xx response. */
 export interface ErrorBody {

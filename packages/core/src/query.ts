@@ -9,7 +9,9 @@ import {
   type Derive,
   type FieldDef,
   fieldLabel,
+  fieldPrivacy,
   offerableFields,
+  queryableFields,
   type SourceDef,
   WEEKDAYS,
 } from "./catalog.js";
@@ -73,12 +75,15 @@ export function checkQuery(def: QueryDef, value: unknown, locale?: string): stri
       : msg(L, "queryNoData");
   }
   const fields = offerableFields(source);
-  const fieldErr = (f: unknown, kinds?: Set<string>): string | null => {
+  /** `queryable`: filter, group, sort or aggregate, which display-only fields can't be used for. */
+  const fieldErr = (f: unknown, kinds?: Set<string>, queryable = true): string | null => {
     if (typeof f !== "string" || !fields[f])
       return msg(L, "queryFieldUnavailable", {
         field: String(f),
         source: tx(source.label, L) as string,
       });
+    if (queryable && fieldPrivacy(fields[f] as FieldDef) === "display")
+      return msg(L, "queryFieldDisplayOnly", { field: fieldLabel(source, f, L) });
     if (kinds && !kinds.has((fields[f] as FieldDef).kind))
       return msg(L, "queryFieldWrongWay", { field: fieldLabel(source, f, L) });
     return null;
@@ -117,7 +122,7 @@ export function checkQuery(def: QueryDef, value: unknown, locale?: string): stri
       return msg(L, "queryFieldCount", { max: MAX_FIELDS });
     if (new Set(fs).size !== fs.length) return msg(L, "queryFieldTwice");
     for (const fld of fs) {
-      const e = fieldErr(fld);
+      const e = fieldErr(fld, undefined, false);
       if (e) return e;
     }
     if (value.sort !== undefined) {
@@ -185,8 +190,10 @@ export function querySchema(def: QueryDef): Record<string, unknown> {
     const fields = offerableFields(s);
     const names = Object.keys(fields);
     if (!names.length) continue;
+    // Display-only fields may be listed (rows "fields"), never filtered, grouped, sorted or aggregated.
+    const queryable = Object.keys(queryableFields(s));
     const of = (pred: (fd: FieldDef) => boolean) =>
-      names.filter((n) => pred(fields[n] as FieldDef));
+      queryable.filter((n) => pred(fields[n] as FieldDef));
     const filterable = of((fd) => fd.kind === "enum" || fd.kind === "bool");
     const where = filterable.length
       ? nullable({
@@ -220,7 +227,7 @@ export function querySchema(def: QueryDef): Record<string, unknown> {
           where,
           sort: nullable(
             obj({
-              field: { type: "string", enum: names },
+              field: { type: "string", enum: queryable.length ? queryable : names },
               dir: { type: "string", enum: ["asc", "desc"] },
             }),
           ),

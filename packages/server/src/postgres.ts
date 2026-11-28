@@ -88,8 +88,11 @@ create table if not exists patina_requests (
   proposal_id  text        null,
   model        text        null,
   latency_ms   integer     null,
-  model_calls  integer     null
+  model_calls  integer     null,
+  detail       jsonb       null        -- structured refusal detail (node, wanted, …)
 );
+-- 0.7: tables created by earlier versions get the column when migratePostgres runs again.
+alter table patina_requests add column if not exists detail jsonb null;
 create index if not exists patina_requests_created_at on patina_requests (created_at);
 create index if not exists patina_requests_tenant on patina_requests (tenant_id, created_at);
 `,
@@ -317,8 +320,8 @@ function fullPostgresStorage(query: QueryFn, requestLog: boolean): FullPostgresS
       await query(
         `insert into patina_requests
            (id, created_at, tenant_id, surface_id, user_id, prompt, outcome, reason, source, message,
-            proposal_id, model, latency_ms, model_calls)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+            proposal_id, model, latency_ms, model_calls, detail)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb)`,
         [
           e.id,
           e.at,
@@ -334,6 +337,7 @@ function fullPostgresStorage(query: QueryFn, requestLog: boolean): FullPostgresS
           e.model,
           e.latencyMs,
           e.modelCalls,
+          e.detail ? JSON.stringify(e.detail) : null,
         ],
       );
     },
@@ -373,6 +377,10 @@ function fullPostgresStorage(query: QueryFn, requestLog: boolean): FullPostgresS
           r.latency_ms === null || r.latency_ms === undefined ? null : Number(r.latency_ms),
         modelCalls:
           r.model_calls === null || r.model_calls === undefined ? null : Number(r.model_calls),
+        detail:
+          r.detail === null || r.detail === undefined
+            ? null
+            : (json(r.detail) as RequestEvent["detail"]),
       }));
     },
 

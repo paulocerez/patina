@@ -1129,7 +1129,7 @@ anything may be.
 Unbuildable requests are product signal. Every customization request produces one
 `RequestEvent`:
 
-- **What happened** (`outcome`): proposed, applied, refused, clarified, unavailable,
+- **What happened** (`outcome`): proposed, applied, refused, clarified, answered, unavailable,
   over_quota or error.
 - **Who decided** (`source`): the model, the validator, or the host's rules.
 - **Why** (`reason`): a code.
@@ -1138,8 +1138,10 @@ Unbuildable requests are product signal. Every customization request produces on
 
 **Decisions:**
 
-- **The model tags its own refusals.** The output schema gains a nullable `category`:
-  data_access, action, new_component, styling, not_on_page, unclear or other. Validator and
+- **The model tags its own refusals.** The output schema gains a nullable `category`
+  (missing_field, missing_setting, missing_value, data_access, action, new_component, styling,
+  not_on_page, unclear, safety or other) and `detail: { node, wanted }`, which the server checks
+  against the manifest and stores, so "summary column on recentCalls × 2" groups by itself. Validator and
   host refusals use their own codes, so every refusal is grouped without parsing text.
 - **Storage is optional and append-only.** `logRequest` and `listRequests` are optional
   adapter methods (Postgres `patina_requests`), and logging can't affect the user. `onEvent`
@@ -1158,7 +1160,38 @@ Unbuildable requests are product signal. Every customization request produces on
 
 ---
 
-## 18. Localization
+## 18. Reliability on real prompts (0.7)
+
+The first real host (German, one user, two sessions) showed what goes wrong with real prompts:
+a false refusal of an allowed enum value, a capability question refused as `new_component`,
+clarifications offering impossible options and losing their thread, `other` refusals nobody
+could act on, and four undos in two seconds.
+
+**Decisions:**
+
+- **One retry for refusals, by the backup model, with the relevant manifest excerpt.** Any
+  refusal but `safety` gets the second call the repair round-trip already had. Calls stay ≤ 2.
+- **A deterministic guard before any refusal.** If the prompt names an allowed value of a
+  setting the refusal is about, or a hidden column of a table it names, Patina proposes it (or
+  asks which). It never overrides `safety`, `data_access` or `action`. Matching is
+  case/umlaut-folded with a light de/en stem, no model and no dictionary. Rescues are logged as
+  source `guard` so the model's mistakes become eval cases.
+- **Questions are answered from the manifest.** A regex detector catches "what can I …?" before
+  any model call; the model's `answer` kind covers the rest. The text always comes from
+  `capabilities()`, never from the model, so an answer can't list something that doesn't exist.
+  The response carries `question` too, so 0.6 clients (which show `question` for unknown kinds)
+  show it.
+- **Clarify options carry op indices** into the answer's `ops` (keeps the precise schema small)
+  and are validated one by one. The thread is stateless (`thread: { prompt, question }` in the
+  request): spoofing it only changes the user's own words, and a reply's schema has no
+  `clarify` kind, which caps clarifications at one without server state.
+- **Redo is a revert of a revert.** `revertedIds` ignores reverts that were themselves reverted,
+  which leaves every existing history unchanged. `expectedSeq` on undo/redo/reset turns a
+  double click into a 409 instead of a second undo.
+- **`privacy: "display"`** sits between full use and `sensitive`: shown as a column and in
+  capabilities, never filtered/grouped/sorted/aggregated, values never sent to the model.
+
+## 19. Localization
 
 Patina's user-facing texts come from one catalog (`core/src/i18n.ts`) in English and German.
 German uses the formal "Sie", as in vetpal and most German business software.

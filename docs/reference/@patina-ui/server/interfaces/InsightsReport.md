@@ -62,6 +62,36 @@ Customization requests (prompts), not counting the later "applied" events.
 
 ***
 
+### rescued
+
+> **rescued**: `object`[]
+
+Requests the model refused although the manifest allowed them (the refusal guard proposed
+or asked instead). Each one is a model mistake: add it to your evals.
+
+#### at
+
+> **at**: `string`
+
+#### prompt
+
+> **prompt**: `string`
+
+#### reason
+
+> **reason**: `string`
+
+***
+
+### suggestions
+
+> **suggestions**: `ManifestSuggestion`[]
+
+Manifest changes that would make refused requests possible, from the refusals' structured
+detail (missing_field, missing_setting, missing_value), most-asked first.
+
+***
+
 ### surfaces
 
 > **surfaces**: `object`[]

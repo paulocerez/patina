@@ -10,9 +10,11 @@ into Linear issues and a Slack digest, see [Follow-ups](follow-ups.md).
 | ------------------------------------- | --------------------------------------------------------------------------------- | ---------------------------------------------- | -------------------------------------------------- |
 | A change is possible                  | preview of the change, then Apply                                                 | Patina (from the patch)                        | `proposed`, then `applied`                         |
 | Outside what the page allows          | _"I can only change how this dashboard is laid out and filtered…"_                | the model, told to say kindly what it _can_ do | `refused`, source `model`, reason = category       |
+| The model refused something allowed   | the preview of it anyway (e.g. _"Standard-Zeitraum auf Heute setzen"_)            | Patina (the refusal guard)                     | `proposed`, source `guard`, reason `rescued:…`     |
+| Asks what is possible                 | _"Das können Sie bei Letzte Anrufe ändern: …"_ with the list                      | Patina (from the manifest, no model call)      | `answered`                                         |
 | The model tried something not allowed | _"“Delete button” isn't something you can add here. You can add: No-shows card."_ | Patina's validator (fixed wording)             | `refused`, source `validator`, reason = issue code |
 | Not on their plan or flag             | your `message`, e.g. _"New charts are part of the Pro plan."_                     | you ([Availability](availability.md))          | `unavailable` / `refused`, source `host`           |
-| Too vague                             | _"Which table do you mean?"_                                                      | the model                                      | `clarified`                                        |
+| Too vague                             | _"Which table do you mean?"_ with buttons for the possible choices                | the model (choices checked by Patina)          | `clarified`                                        |
 | Quota used up                         | _"You've used all 20 customization requests for this month."_                     | Patina                                         | `over_quota`                                       |
 | The model is down                     | _"The assistant is unavailable right now."_                                       | Patina                                         | `error`                                            |
 
@@ -31,27 +33,45 @@ Messages appear under the prompt box (`<SurfaceMessage>`), and nothing on the pa
 
 One row per request, stored through your storage adapter (Postgres table `patina_requests`):
 
-| Field                                            |                                                                                     |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------- |
-| `at`, `surfaceId`, `userId`, `tenantId`          | when, where, who                                                                    |
-| `prompt`                                         | the user's words, **in full** (see Retention)                                       |
-| `outcome`                                        | `proposed`, `applied`, `refused`, `clarified`, `unavailable`, `over_quota`, `error` |
-| `source`                                         | who decided: `model`, `validator` or `host` (your rules)                            |
-| `reason`                                         | why, as a code (below)                                                              |
-| `message`                                        | what the user was shown                                                             |
-| `proposalId`, `model`, `latencyMs`, `modelCalls` | for debugging and cost (2 calls = one repair round-trip)                            |
+| Field                                            |                                                                                                 |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `at`, `surfaceId`, `userId`, `tenantId`          | when, where, who                                                                                |
+| `prompt`                                         | the user's words, **in full** (see Retention)                                                   |
+| `outcome`                                        | `proposed`, `applied`, `refused`, `clarified`, `answered`, `unavailable`, `over_quota`, `error` |
+| `source`                                         | who decided: `model`, `validator`, `host` (your rules) or `guard` (the refusal guard)           |
+| `reason`                                         | why, as a code (below)                                                                          |
+| `message`                                        | what the user was shown                                                                         |
+| `detail`                                         | structured detail (below): what a refusal was about, the thread of a reply                      |
+| `proposalId`, `model`, `latencyMs`, `modelCalls` | for debugging and cost (2 calls = one retry: a repair, or a second look at a refusal)           |
 
 **Reason codes**
 
-| Source                      | Codes                                                                                                         |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| The model tags each refusal | `data_access`, `action`, `new_component`, `styling`, `not_on_page`, `unclear`, `other`, `safety`, `no_change` |
-| Patina's validator          | the issue code, e.g. `preset_not_allowed`, `not_customizable`, `invalid_value`, `unknown_key`                 |
-| Your rules                  | `customize_off`, `data_views_off`, `quota_user`, `quota_tenant`, `rate_limit`                                 |
-| Errors                      | `model_unavailable`, `internal`                                                                               |
+| Source                      | Codes                                                                                                                                                              |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The model tags each refusal | `missing_field`, `missing_setting`, `missing_value`, `data_access`, `action`, `new_component`, `styling`, `not_on_page`, `unclear`, `other`, `safety`, `no_change` |
+| The refusal guard           | `rescued:<category>`: the model refused something the manifest allows, and Patina proposed it (or asked which)                                                     |
+| Patina's validator          | the issue code, e.g. `preset_not_allowed`, `not_customizable`, `invalid_value`, `unknown_key`                                                                      |
+| Your rules                  | `customize_off`, `data_views_off`, `quota_user`, `quota_tenant`, `rate_limit`                                                                                      |
+| Errors                      | `model_unavailable`, `internal`                                                                                                                                    |
+
+**Refusal detail.** Refusals the host can act on carry `detail`, checked against the manifest
+(unknown nodes are dropped), so you can group and count them without reading prompts:
+
+| Field       |                                                                                               |
+| ----------- | --------------------------------------------------------------------------------------------- |
+| `node`      | the part of the page, e.g. `recentCalls`                                                      |
+| `component` | its component, e.g. `RecentCallsTable`                                                        |
+| `wanted`    | what was missing, as a camelCase name: `summary` (a field), `rowLimit` (a setting), …         |
+| `field`     | when the catalog has that field but it is `sensitive` (`"never"`) or removed (`"restricted"`) |
+| `thread`    | on a reply to a clarifying question: `{ prompt, question }`                                   |
 
 Logging is on whenever the storage adapter supports it (`memoryStorage` and
-`postgresStorage` both do). Turn it off with `logRequests: false`.
+`postgresStorage` both do).
+
+> **`logRequests: false` (or `postgresStorage({ requestLog: false })`) means no prompt is stored
+> anywhere.** You won't see what users asked for, what was refused or why. If you turn it off,
+> set `onEvent` (below) and send at least `prompt`, `outcome`, `reason`, `message` and `detail`
+> to your analytics. The handler logs a one-line warning at startup when neither is on.
 
 ## Sending events to your analytics
 
@@ -62,7 +82,14 @@ createPatinaHandler({
     posthog.capture({
       distinctId: e.userId,
       event: `patina_${e.outcome}`,
-      properties: { surface: e.surfaceId, reason: e.reason, source: e.source, prompt: e.prompt },
+      properties: {
+        surface: e.surfaceId,
+        prompt: e.prompt, // what the user asked
+        message: e.message, // what they were shown
+        reason: e.reason,
+        source: e.source,
+        detail: e.detail, // e.g. { node: "recentCalls", wanted: "summary" }
+      },
       groups: e.tenantId ? { company: e.tenantId } : undefined,
     }),
 });
@@ -93,7 +120,24 @@ matters more than one persistent user. It also breaks down _why_ requests weren'
 | show me other users' appointments |     2 |    2 |     2 | data_access    |
 | Add a bar chart of revenue by vet |     1 |    1 |     1 | data_views_off |
 | let me export the table           |     1 |    1 |     1 | action         |
+
+## Suggested manifest changes
+
+| Change                                                                                     | Times | Orgs |
+|--------------------------------------------------------------------------------------------|------:|-----:|
+| Add a `summary` column or field to RecentCallsTable (`recentCalls`), or a `summary` field… |     2 |    2 |
+| Add a `rowLimit` setting to RecentCallsTable (`recentCalls`) (e.g. `t.int` for a count…)   |     1 |    1 |
 ```
+
+**Suggested manifest changes** come from the refusals' `detail` (`missing_field`,
+`missing_setting`, `missing_value`), grouped by `category|node|wanted`, so differently worded
+requests for the same missing thing count together. When the field exists but is `sensitive`,
+the suggestion says so: if users already see it in your app, mark it `privacy: "display"`
+([Data views](data-views.md)).
+
+**Refusals the guard overrode** (`report.rescued`) lists requests the model refused although the
+manifest allowed them. Each one is a model mistake: add the prompt to your evals
+([Model and evals](model-and-evals.md)).
 
 There are three ways to get it.
 
@@ -126,14 +170,16 @@ const report = await getInsights(storage, { since: "2026-11-01T00:00:00Z", tenan
 
 ### Reading it
 
-| You see                                                                              | It usually means                                                                                                              |
-| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| `preset_not_allowed` / `new_component` for the same thing, across many organizations | build it as a component, and offer it as a preset                                                                             |
-| `not_customizable` on a prop                                                         | open that prop in the manifest                                                                                                |
-| `data_views_off` from many free-plan organizations                                   | an upsell signal, or a reason to move the feature down a plan                                                                 |
-| `data_access`                                                                        | usually fine: customers asking for data they shouldn't see. Check the wording in case it's a real need                        |
-| `unclear` / many `clarified`                                                         | improve your manifest's descriptions and labels                                                                               |
-| a high `modelCalls` average                                                          | the model often needs its repair round-trip; check descriptions, or try another model with the [eval set](model-and-evals.md) |
+| You see                                                                              | It usually means                                                                                                                                            |
+| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `preset_not_allowed` / `new_component` for the same thing, across many organizations | build it as a component, and offer it as a preset                                                                                                           |
+| `not_customizable` on a prop                                                         | open that prop in the manifest                                                                                                                              |
+| `data_views_off` from many free-plan organizations                                   | an upsell signal, or a reason to move the feature down a plan                                                                                               |
+| `data_access`                                                                        | usually fine: customers asking for data they shouldn't see. Check the wording in case it's a real need                                                      |
+| `unclear` / many `clarified`                                                         | improve your manifest's descriptions and labels                                                                                                             |
+| `missing_field` / `missing_setting` / `missing_value`                                | the "Suggested manifest changes" section says what to add                                                                                                   |
+| `rescued:…`                                                                          | the model refused something allowed; the guard caught it. Add the prompt to your evals                                                                      |
+| a high `modelCalls` average                                                          | the model often needs its retry (a repair, or a second look at a refusal); check descriptions, or try another model with the [eval set](model-and-evals.md) |
 
 ## Retention
 

@@ -10,9 +10,11 @@
 
 ### message
 
-> **message**: \{ `kind`: `"refusal"` \| `"clarify"` \| `"error"`; `text`: `string`; \} \| `null`
+> **message**: [`SurfaceMessageData`](SurfaceMessageData.md) \| `null`
 
-A refusal or clarifying question from the last request, for the user to read.
+What the last request said back, for the user to read: a refusal, a clarifying question
+(with the options it offers), an answer to "what can I …?" (with the capabilities it
+lists), an error, or "info" for a reply kind this version doesn't know.
 
 ***
 

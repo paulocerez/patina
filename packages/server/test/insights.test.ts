@@ -35,7 +35,13 @@ const model = {
       return { kind: "refusal", message: "I can't delete records.", category: "action", ops: [] };
     if (prompt.includes("unsafe")) throw new ModelRefusal("I can't help with that.");
     if (prompt.includes("down")) throw new Error("ECONNRESET");
-    if (prompt.includes("which")) return { kind: "clarify", message: "Which table?", ops: [] };
+    if (prompt.includes("which"))
+      return {
+        kind: "clarify",
+        message: "Which table?",
+        ops: [hideVet],
+        options: [{ label: "Appointments", ops: [0] }],
+      };
     if (prompt.includes("widget"))
       return {
         kind: "patch",
@@ -127,7 +133,7 @@ describe("request log", () => {
     expect(rows).toEqual([
       ["hide the vet column", "proposed", null, null, 1],
       ["hide the vet column", "applied", null, null, null],
-      ["Please delete all appointments!", "refused", "model", "action", 1],
+      ["Please delete all appointments!", "refused", "model", "action", 2],
       ["which one?", "clarified", "model", null, 1],
       ["add a weather widget", "refused", "validator", "preset_not_allowed", 2],
       ["unsafe thing", "refused", "model", "safety", 1],

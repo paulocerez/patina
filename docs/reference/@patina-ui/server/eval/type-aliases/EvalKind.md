@@ -2,4 +2,4 @@
 
 # Type Alias: EvalKind
 
-> **EvalKind** = `"patch"` \| `"refusal"` \| `"clarify"`
+> **EvalKind** = `"patch"` \| `"refusal"` \| `"clarify"` \| `"answer"`

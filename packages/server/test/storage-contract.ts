@@ -113,13 +113,17 @@ export function storageContract(
         surfaceId: "s",
         userId: "u1",
         prompt: `p ${id}`,
-        reason: outcome === "refused" ? "action" : null,
+        reason: outcome === "refused" ? "missing_field" : null,
         source: outcome === "refused" ? ("model" as const) : null,
         message: null,
         proposalId: null,
         model: "m",
         latencyMs: 12,
         modelCalls: 1,
+        detail:
+          outcome === "refused"
+            ? { node: "recentCalls", component: "RecentCallsTable", wanted: "summary" }
+            : null,
       });
       await s.logRequest?.(ev("a", "2026-11-01T00:00:00.000Z", "t1", "refused"));
       await s.logRequest?.(ev("b", "2026-11-02T00:00:00.000Z", "t2", "proposed"));

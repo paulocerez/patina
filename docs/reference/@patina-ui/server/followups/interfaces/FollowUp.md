@@ -88,6 +88,15 @@ per-customer sinks (HubSpot) to find the account.
 
 ***
 
+### suggestion?
+
+> `optional` **suggestion?**: `string` \| `null`
+
+What to change in the manifest, from the refusals' structured detail (e.g. "Add a
+`summary` column to RecentCallsTable"). Null when the refusals don't say.
+
+***
+
 ### summary
 
 > **summary**: `string` \| `null`

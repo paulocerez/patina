@@ -2,7 +2,7 @@
 
 # Function: buildModelRequest()
 
-> **buildModelRequest**(`m`, `spec`, `prompt`): [`ModelRequest`](../interfaces/ModelRequest.md)
+> **buildModelRequest**(`m`, `spec`, `prompt`, `options?`): [`ModelRequest`](../interfaces/ModelRequest.md)
 
 Builds the system and user messages for one request. Contains no view data rows.
 
@@ -19,6 +19,12 @@ Builds the system and user messages for one request. Contains no view data rows.
 ### prompt
 
 `string`
+
+### options?
+
+#### thread?
+
+[`ClarifyThread`](../interfaces/ClarifyThread.md)
 
 ## Returns
 
