@@ -1,5 +1,34 @@
 # @patina-ui/cli
 
+## 0.7.0
+
+### Minor Changes
+
+- [#9](https://github.com/paulocerez/patina/pull/9) [`1ab6dc1`](https://github.com/paulocerez/patina/commit/1ab6dc1c98aab4a967beabc5692066cd4b876afe) Thanks [@paulocerez](https://github.com/paulocerez)! - Reliable on real prompts. Every problem here came from the first real host's prompts; every new check is deterministic and tested.
+  
+  - **Never refuse what the manifest allows:** every model refusal except `safety` gets one more look by the backup model, together with the refusal and the relevant part of the manifest (allowed values with labels in the user's language, collection keys, presets, data fields). A deterministic guard then checks each of the model's refusals: if the prompt names an allowed value of a setting it is about ("Standard-Zeitraum auf Heute setzen"), or a hidden column of a table it names, Patina proposes it or asks which one. Rescues are logged as source `guard`, reason `rescued:<category>`, and listed in insights so they can become eval cases. Calls per request stay at 2 or fewer.
+  - **Answers instead of refusals:** questions such as "Was kann ich bei den letzten Anrufen anzeigen?" or "Which columns can I add?" get a new response, `{ kind: "answer", message, capabilities }`, built from the same data as `useCapabilities` and scoped to the part of the page named. There is no model call, and the outcome `answered` goes to `onEvent` and insights. The response also carries `question`, so clients before 0.7 show it.
+  - **Clarifications only offer what's possible:** each option the model offers carries its ops, and options that don't validate are dropped. The reply goes back with the original request and the question (`thread` on `POST …/proposals`). A reply can't get a second question.
+  - **Refusal categories a developer can act on:** new categories `missing_field`, `missing_setting` and `missing_value`, plus `safety`. Each comes with structured `detail: { node, component, wanted, field? }`, checked against the manifest and stored with the request (new `detail` column; run `migratePostgres` again). Insights gain "Suggested manifest changes" (e.g. "Add a `summary` column to RecentCallsTable"), and follow-ups group by detail, so different wordings of the same missing thing count together.
+  - **Undo can't run away:** `SurfaceState.seq` and `canRedo`. Undo, redo and reset accept `{ expectedSeq }`; a stale one answers 409 instead of undoing one more step. There is a new `POST …/redo` (undo of an undo) and a `<RedoButton>`, and the React store ignores history actions while a request is in flight.
+  - **`privacy: "display"` for catalog fields:** for values users already see elsewhere in the app. These fields can be shown as table columns and are listed in capabilities, but can't be filtered, grouped, sorted or aggregated, and their values never reach the model. `sensitive: true` keeps its meaning (`privacy: "never"`).
+  - **Observability:** the handler warns once at startup when the request log is off and no `onEvent` is set. The docs explain that `logRequests: false` / `requestLog: false` hides every prompt. PostHog events gain `detail_node` and `detail_wanted`.
+  - **`<SurfaceMessage>`:** renders answers as a list and clarify options as buttons, and shows `message` for unknown reply kinds.
+  - **Evals:** `EvalCase` gains `answer`, refusal `category`/`detail`, clarify `optionsMin`/`optionsMax`, `thread` and `script`. `runEval(…, { scripted: true })` replays recorded model answers. The new `evals/real-de.jsonl` holds the first host's 19 German prompts against a host-shaped fixture, scripted in CI. Run it live with `PATINA_LIVE_EVAL=1` or `pnpm eval --surface calls --cases real-de.jsonl`.
+
+- [#8](https://github.com/paulocerez/patina/pull/8) [`79144f3`](https://github.com/paulocerez/patina/commit/79144f31a076016e5f40a1a6cc910822fafcc9e8) Thanks [@paulocerez](https://github.com/paulocerez)! - Less hand work per app: the scan understands layered backends, and fetching is configured instead of written.
+  
+  - **Scan:** follows handlers passed by reference (`router.get("/", controller.list)`) into their bodies, the helpers they hand `req` to, and the return types of the services they call, including class methods and wrapped lists (`Promise<{ items: T[]; total }>`). It prefers row types near the route over same-named ones elsewhere, resolves exported string-literal unions to enums, keeps tenant path placeholders (`/accounts/:accountId/…`), and notes paging, date-range params and the rows' key. More personal fields are flagged (caller numbers, person names, notes, comments, transcripts).
+  - **`patina/fetch.ts`:** the scan drafts a `fetchSource` from what it found, and the catalog draft suggests derived fields (weekday, hour, ranges).
+  - **`createFetchSource`** (react): another origin, tenant params and path placeholders, rows inside an envelope, offset/page/cursor paging (pages fetched in order, capped by `maxPages`), and relative date ranges mapped to the endpoint's own params.
+  - **`rangeBounds`, `asRelativeRange`** (core): a relative range as two dates.
+
+### Patch Changes
+
+- Updated dependencies [[`1ab6dc1`](https://github.com/paulocerez/patina/commit/1ab6dc1c98aab4a967beabc5692066cd4b876afe), [`79144f3`](https://github.com/paulocerez/patina/commit/79144f31a076016e5f40a1a6cc910822fafcc9e8)]:
+  - @patina-ui/core@0.7.0
+  - @patina-ui/server@0.7.0
+
 ## 0.6.0
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@patina-ui/cli",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "patina scan / check / init-action: detects the data your API exposes and your design system, drafts a data catalog and matching data blocks.",
   "keywords": [
     "patina-ui",
