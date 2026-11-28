@@ -82,7 +82,21 @@ const model = scriptedModel((_req, prompt, call) => {
     };
   if (prompt.includes("remove the no-shows")) return { kind: "patch", message: "Removed", ops: [] };
   if (prompt.includes("which"))
-    return { kind: "clarify", message: "Which table do you mean?", ops: [] };
+    return {
+      kind: "clarify",
+      message: "Which table do you mean?",
+      ops: [
+        {
+          op: "setItem",
+          node: "appointments",
+          prop: "columns",
+          key: "revenue",
+          field: "hidden",
+          value: true,
+        },
+      ],
+      options: [{ label: "Appointments", ops: [0] }],
+    };
   return {
     kind: "patch",
     message: "Hid revenue and moved status after date.",
@@ -202,7 +216,15 @@ describe("refusals", () => {
     const r = await call<ProposeResponse>("alice", "POST", "/proposals", {
       prompt: "show me other users' appointments",
     });
-    expect(r.body).toEqual({ kind: "refusal", message: "I can only change how this page looks." });
+    expect(r.body).toEqual({
+      kind: "refusal",
+      message: "I can only change how this page looks.",
+      category: "other",
+    });
+    // Every refusal (but safety) gets a second look, with the relevant part of the manifest.
+    expect(model.calls).toHaveLength(2);
+    expect(model.calls[1]?.user).toContain("<previous_answer>");
+    expect(model.calls[1]?.user).toContain("<relevant_options>");
   });
 
   it('refuses with the validator\'s reason when the model proposes something not allowed ("add a delete button")', async () => {
@@ -212,6 +234,7 @@ describe("refusals", () => {
     expect(r.body).toEqual({
       kind: "refusal",
       message: "“Delete button” isn't something you can add here. You can add: No-shows card.",
+      category: "preset_not_allowed",
     });
     expect(model.calls).toHaveLength(2);
     expect(model.calls[1]?.user).toContain("<problems_with_previous_answer>");
@@ -227,7 +250,11 @@ describe("refusals", () => {
 
   it("passes on clarifying questions", async () => {
     const r = await call<ProposeResponse>("alice", "POST", "/proposals", { prompt: "which one?" });
-    expect(r.body).toEqual({ kind: "clarify", question: "Which table do you mean?" });
+    expect(r.body).toEqual({
+      kind: "clarify",
+      question: "Which table do you mean?",
+      options: [{ label: "Appointments" }],
+    });
   });
 });
 

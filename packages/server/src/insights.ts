@@ -27,6 +27,22 @@ export interface ReasonCount {
   examples: string[];
 }
 
+/** A change to the manifest that would have made a group of refused requests possible. */
+export interface ManifestSuggestion {
+  /** `category|node|wanted`: stable across runs, for grouping. */
+  key: string;
+  category: string;
+  node: string | null;
+  component: string | null;
+  wanted: string | null;
+  /** What to change, for a developer ("Add a `summary` column to RecentCallsTable"). */
+  text: string;
+  count: number;
+  tenants: number;
+  users: number;
+  examples: string[];
+}
+
 export interface InsightsReport {
   period: { since: string | null; until: string | null };
   /** Customization requests (prompts), not counting the later "applied" events. */
@@ -41,12 +57,25 @@ export interface InsightsReport {
   reasons: ReasonCount[];
   /** The most-asked things that couldn't be done, grouped by (normalized) wording. */
   unmet: UnmetRequest[];
+  /**
+   * Manifest changes that would make refused requests possible, from the refusals' structured
+   * detail (missing_field, missing_setting, missing_value), most-asked first.
+   */
+  suggestions: ManifestSuggestion[];
+  /**
+   * Requests the model refused although the manifest allowed them (the refusal guard proposed
+   * or asked instead). Each one is a model mistake: add it to your evals.
+   */
+  rescued: { prompt: string; reason: string; at: string }[];
   surfaces: { surfaceId: string; requests: number; applied: number; unmet: number }[];
   /** True if the log had more rows than were read; narrow the period for exact numbers. */
   truncated: boolean;
 }
 
 export const REASON_LABELS: Record<string, string> = {
+  missing_field: "Wanted a column or field the component or catalog doesn't have",
+  missing_setting: "Wanted a setting that doesn't exist (row count, size, …)",
+  missing_value: "Wanted a value a setting doesn't offer",
   data_access: "Wanted data they can't see (other users, hidden records)",
   action: "Wanted to do something to data (delete, edit, send, export)",
   new_component: "Wanted a kind of component that doesn't exist here",
@@ -99,6 +128,7 @@ export function summarizeRequests(
     applied: 0,
     refused: 0,
     clarified: 0,
+    answered: 0,
     unavailable: 0,
     over_quota: 0,
     error: 0,
@@ -113,7 +143,12 @@ export function summarizeRequests(
 
   const byReason = new Map<string, RequestEvent[]>();
   for (const e of events)
-    if (e.outcome !== "proposed" && e.outcome !== "applied" && e.outcome !== "clarified") {
+    if (
+      e.outcome !== "proposed" &&
+      e.outcome !== "applied" &&
+      e.outcome !== "clarified" &&
+      e.outcome !== "answered"
+    ) {
       const k = `${e.source ?? ""}|${e.reason ?? "unknown"}`;
       byReason.set(k, [...(byReason.get(k) ?? []), e]);
     }
@@ -165,6 +200,35 @@ export function summarizeRequests(
     .sort((a, b) => b.tenants - a.tenants || b.count - a.count || b.lastAt.localeCompare(a.lastAt))
     .slice(0, 50);
 
+  const bySuggestion = new Map<string, RequestEvent[]>();
+  for (const e of events) {
+    if (e.outcome !== "refused") continue;
+    const key = suggestionKey(e);
+    if (key) bySuggestion.set(key, [...(bySuggestion.get(key) ?? []), e]);
+  }
+  const suggestions: ManifestSuggestion[] = [...bySuggestion.entries()]
+    .map(([key, es]) => {
+      const e = es[0] as RequestEvent;
+      return {
+        key,
+        category: e.reason as string,
+        node: e.detail?.node ?? null,
+        component: e.detail?.component ?? null,
+        wanted: e.detail?.wanted ?? null,
+        text: suggestManifestChange(e) as string,
+        count: es.length,
+        tenants: tenantsOf(es),
+        users: usersOf(es),
+        examples: [...new Set(es.map((x) => x.prompt).filter((p): p is string => !!p))].slice(0, 3),
+      };
+    })
+    .sort((a, b) => b.tenants - a.tenants || b.count - a.count || a.key.localeCompare(b.key));
+
+  const rescued = events
+    .filter((e) => e.source === "guard" && e.reason?.startsWith("rescued:") && e.prompt)
+    .map((e) => ({ prompt: e.prompt as string, reason: e.reason as string, at: e.at }))
+    .slice(0, 50);
+
   const bySurface = new Map<string, { requests: number; applied: number; unmet: number }>();
   for (const e of events) {
     const row = bySurface.get(e.surfaceId) ?? { requests: 0, applied: 0, unmet: 0 };
@@ -183,11 +247,42 @@ export function summarizeRequests(
     customers: { tenants: tenantsOf(events), users: usersOf(events) },
     reasons,
     unmet,
+    suggestions,
+    rescued,
     surfaces: [...bySurface.entries()]
       .map(([surfaceId, r]) => ({ surfaceId, ...r }))
       .sort((a, b) => b.requests - a.requests),
     truncated,
   };
+}
+
+const ACTIONABLE = new Set(["missing_field", "missing_setting", "missing_value"]);
+
+/** `category|node|wanted` for refusals whose detail says what was missing; null otherwise. */
+export function suggestionKey(e: Pick<RequestEvent, "reason" | "detail">): string | null {
+  if (!e.reason || !ACTIONABLE.has(e.reason) || !e.detail?.wanted) return null;
+  return `${e.reason}|${e.detail.node ?? ""}|${e.detail.wanted}`;
+}
+
+/**
+ * What a developer could change in the manifest so a refused request becomes possible, from
+ * its structured detail. Null when the refusal says nothing actionable.
+ */
+export function suggestManifestChange(e: Pick<RequestEvent, "reason" | "detail">): string | null {
+  const d = e.detail;
+  if (!d?.wanted || !e.reason || !ACTIONABLE.has(e.reason)) return null;
+  const where = d.component ?? d.node ?? "the page";
+  const at = d.node ? ` (\`${d.node}\`)` : "";
+  if (e.reason === "missing_field") {
+    if (d.field?.privacy === "never")
+      return `\`${d.field.source}.${d.field.field}\` is sensitive. If users already see it in your app, mark it \`privacy: "display"\` so it can be shown as a column in ${where}.`;
+    if (d.field?.privacy === "restricted")
+      return `\`${d.field.source}.${d.field.field}\` exists but is removed for these users (restrict or requires). Check whether they should see it in ${where}.`;
+    return `Add a \`${d.wanted}\` column or field to ${where}${at}, or a \`${d.wanted}\` field to the data catalog.`;
+  }
+  if (e.reason === "missing_setting")
+    return `Add a \`${d.wanted}\` setting to ${where}${at} (e.g. \`t.int\` for a count, \`t.enum\` for a choice).`;
+  return `Add \`${d.wanted}\` to the allowed values of a setting of ${where}${at}.`;
 }
 
 const MAX_ROWS = 10_000;
@@ -232,7 +327,7 @@ export function renderInsightsMarkdown(r: InsightsReport): string {
     "",
     `- Applied: ${r.outcomes.applied} (${pct(r.appliedRate)})`,
     `- Couldn't be done: ${r.outcomes.refused + r.outcomes.unavailable} (${pct(r.unmetRate)})`,
-    `- Asked to clarify: ${r.outcomes.clarified} · over quota: ${r.outcomes.over_quota} · errors: ${r.outcomes.error}`,
+    `- Asked to clarify: ${r.outcomes.clarified} · questions answered: ${r.outcomes.answered} · over quota: ${r.outcomes.over_quota} · errors: ${r.outcomes.error}`,
   ];
   if (r.unmet.length) {
     lines.push(
@@ -260,6 +355,29 @@ export function renderInsightsMarkdown(r: InsightsReport): string {
         (x) =>
           `| ${cell(x.label)} (\`${x.reason}\`) | ${x.source ?? "–"} | ${x.count} | ${x.tenants} | ${cell(x.examples[0] ?? "")} |`,
       ),
+    );
+  }
+  if (r.suggestions.length) {
+    lines.push(
+      "",
+      "## Suggested manifest changes",
+      "",
+      "| Change | Times | Orgs | Example |",
+      "|---|---:|---:|---|",
+      ...r.suggestions
+        .slice(0, 25)
+        .map(
+          (x) =>
+            `| ${x.text.replace(/\|/g, "\\|")} | ${x.count} | ${x.tenants} | ${cell(x.examples[0] ?? "")} |`,
+        ),
+    );
+  }
+  if (r.rescued.length) {
+    lines.push(
+      "",
+      "## Refusals the guard overrode (model mistakes: add these to your evals)",
+      "",
+      ...r.rescued.slice(0, 25).map((x) => `- ${cell(x.prompt)} (\`${x.reason}\`)`),
     );
   }
   if (r.surfaces.length > 1) {

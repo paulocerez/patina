@@ -2,7 +2,7 @@
 
 # Function: buildOutputSchema()
 
-> **buildOutputSchema**(`m`, `spec`): `Json`
+> **buildOutputSchema**(`m`, `spec`, `options?`): `Json`
 
 Compiles the JSON Schema for the model's answer from the (restricted) manifest and the
 current spec. Node IDs, props, keys and values are enumerated, so most invalid patches
@@ -18,6 +18,10 @@ that structured outputs support.
 ### spec
 
 [`SurfaceSpec`](../interfaces/SurfaceSpec.md)
+
+### options?
+
+[`SchemaOptions`](../interfaces/SchemaOptions.md) = `{}`
 
 ## Returns
 

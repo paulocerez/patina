@@ -28,13 +28,14 @@ The default host is PostHog's EU cloud. Use `https://us.i.posthog.com` or your o
 
 Each request becomes one `patina request` event with these properties:
 
-| Property                             | Value                                                                               |
-| ------------------------------------ | ----------------------------------------------------------------------------------- |
-| `surface_id`                         | which view                                                                          |
-| `outcome`                            | `proposed`, `applied`, `refused`, `clarified`, `unavailable`, `over_quota`, `error` |
-| `reason`, `source`                   | why, and who decided (see [Insights](insights.md#the-request-log))                  |
-| `model`, `latency_ms`, `model_calls` | cost and speed                                                                      |
-| `proposal_id`, `tenant_id`           | to follow one request from preview to apply, and to filter per customer             |
+| Property                             | Value                                                                                           |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `surface_id`                         | which view                                                                                      |
+| `outcome`                            | `proposed`, `applied`, `refused`, `clarified`, `answered`, `unavailable`, `over_quota`, `error` |
+| `reason`, `source`                   | why, and who decided (see [Insights](insights.md#the-request-log))                              |
+| `detail_node`, `detail_wanted`       | what a refusal was about, e.g. `recentCalls` / `summary` (when known)                           |
+| `model`, `latency_ms`, `model_calls` | cost and speed                                                                                  |
+| `proposal_id`, `tenant_id`           | to follow one request from preview to apply, and to filter per customer                         |
 
 **Options:**
 
@@ -44,7 +45,9 @@ Each request becomes one `patina request` event with these properties:
   your users by another id.
 - `event`: the event name.
 
-**Privacy defaults:** the prompt is **not** sent; turn it on with `includePrompt: true`. Events
+**Privacy defaults:** the prompt is **not** sent; turn it on with `includePrompt: true`. If you
+also run with `logRequests: false`, turn it on: otherwise no prompt is recorded anywhere and
+you can't tell what users asked for. Events
 are sent with `$process_person_profile: false`, so PostHog doesn't create or update person
 profiles for them. Set `personProfiles: true` if you want it to.
 

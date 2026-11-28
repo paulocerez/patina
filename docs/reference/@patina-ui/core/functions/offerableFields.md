@@ -4,7 +4,8 @@
 
 > **offerableFields**(`s`): `Record`\<`string`, [`FieldDef`](../interfaces/FieldDef.md)\>
 
-Fields that may be offered to the model and used in new views.
+Fields that may appear in new views and capabilities: everything except `sensitive` /
+`privacy: "never"`. Includes display-only fields (columns only); see `queryableFields`.
 
 ## Parameters
 

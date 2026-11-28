@@ -60,6 +60,8 @@ export function posthogProperties(
     latency_ms: e.latencyMs,
     model_calls: e.modelCalls,
     proposal_id: e.proposalId,
+    ...(e.detail?.node ? { detail_node: e.detail.node } : {}),
+    ...(e.detail?.wanted ? { detail_wanted: e.detail.wanted } : {}),
     tenant_id: e.tenantId,
     ...(options.includePrompt ? { prompt: e.prompt } : {}),
     ...(options.personProfiles ? {} : { $process_person_profile: false }),

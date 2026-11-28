@@ -32,7 +32,7 @@ Human description of the reason code.
 
 ### source
 
-> **source**: `"model"` \| `"validator"` \| `"host"` \| `null`
+> **source**: `"model"` \| `"validator"` \| `"host"` \| `"guard"` \| `null`
 
 ***
 

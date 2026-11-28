@@ -5,6 +5,7 @@ import {
   PatinaProvider,
   PromptInput,
   ProposalPreview,
+  RedoButton,
   ResetButton,
   SkippedNotice,
   Surface,
@@ -194,11 +195,31 @@ function Customizer() {
       </AvailabilityNotice>
 
       <SurfaceMessage surfaceId={SURFACE}>
-        {(m) => (
-          <p className={`message message-${m.kind}`} role={m.kind === "error" ? "alert" : "status"}>
-            {m.text}
-          </p>
-        )}
+        {(m, { pick }) => {
+          // Answers to "what can I …?" come as a lead line and a list.
+          const [lead, ...items] = m.text.split("\n");
+          return (
+            <div
+              className={`message message-${m.kind}`}
+              role={m.kind === "error" ? "alert" : "status"}
+            >
+              <p>{lead}</p>
+              {items.length > 0 && (
+                <ul>
+                  {items.map((line) => (
+                    <li key={line}>{line.replace(/^- /, "")}</li>
+                  ))}
+                </ul>
+              )}
+              {/* A clarifying question's choices: each one is possible. */}
+              {m.options?.map((o) => (
+                <button key={o.label} type="button" onClick={() => pick(o.label)}>
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          );
+        }}
       </SurfaceMessage>
 
       <ProposalPreview surfaceId={SURFACE}>
@@ -224,6 +245,7 @@ function Customizer() {
 
       <div className="toolbar">
         <UndoButton surfaceId={SURFACE}>Undo</UndoButton>
+        <RedoButton surfaceId={SURFACE}>Redo</RedoButton>
         <ResetButton surfaceId={SURFACE}>Reset to default</ResetButton>
         <SkippedNotice surfaceId={SURFACE} className="skipped" />
       </div>

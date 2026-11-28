@@ -38,6 +38,20 @@ Computed from another field of the row instead of read from it (see `Derive`).
 
 ***
 
+### privacy?
+
+> `optional` **privacy?**: `"display"` \| `"never"`
+
+How far the field may be used. Default: everywhere (shown, filtered, grouped, aggregated).
+- "display": may be shown as a column in table/list views and listed in capabilities, but
+  never used to filter, group, sort or aggregate, and its values never reach the model
+  (it sees only the field's name, label and kind). Pick this when users already see the
+  value elsewhere in the app (e.g. a call summary on every call row).
+- "never": same as `sensitive: true`.
+`requires` applies at every level.
+
+***
+
 ### requires?
 
 > `optional` **requires?**: `string`
@@ -50,7 +64,8 @@ Permission the user needs (checked against `ctx.permissions`) to be offered this
 
 > `optional` **sensitive?**: `boolean`
 
-Never offered to the model and never usable in new views.
+Never offered to the model and never usable in new views. Same as `privacy: "never"`.
+Use it only for values users can't already see in your app.
 
 ***
 

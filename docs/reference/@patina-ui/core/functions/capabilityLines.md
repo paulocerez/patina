@@ -2,9 +2,10 @@
 
 # Function: capabilityLines()
 
-> **capabilityLines**(`caps`, `locale?`): `string`[]
+> **capabilityLines**(`caps`, `locale?`, `options?`): `string`[]
 
 One readable line per capability, in the manifest's locale ("Sections (…): reorder, hide").
+Long lists are shortened unless `all` is set.
 
 ## Parameters
 
@@ -15,6 +16,12 @@ One readable line per capability, in the manifest's locale ("Sections (…): reo
 ### locale?
 
 `string`
+
+### options?
+
+#### all?
+
+`boolean`
 
 ## Returns
 

@@ -99,6 +99,7 @@ export const catalog = defineCatalog({
       vet: f.string({ label: "Vet" }),
       owner: f.string({ label: "Owner" }),
       ownerPhone: f.string({ label: "Owner phone", sensitive: true }),
+      notes: f.string({ label: "Notes", privacy: "display" }), // shown on every row in the app
       status: f.enum(["scheduled", "completed", "cancelled", "noShow"], {
         label: "Status",
         valueLabels: { noShow: "No-show" },
@@ -113,9 +114,8 @@ Go through the draft and check each of these:
 
 - [ ] **Remove** sources users shouldn't build views from (summary endpoints, admin
       endpoints, anything that isn't a list).
-- [ ] **`sensitive: true`** on anything personal or confidential. Sensitive fields are never
-      offered to the model or to new views. The scan pre-flags names like phone, email,
-      address and birth date.
+- [ ] **Pick a privacy level** for anything personal or confidential (see below). The scan
+      pre-flags names like phone, email, address and birth date as `sensitive`.
 - [ ] **`requires: "permission"`** on fields or sources that only some users may see. It's
       checked against `ctx.permissions` from your `getContext`.
 - [ ] **`params`**: bind query params to page state with `{ from: "nodeId.prop" }` (for
@@ -276,10 +276,31 @@ Pass your own to go through your data layer, add headers, or use live page state
 >
 ```
 
+### Privacy levels
+
+| Level                                    | Shown as a column in new tables, listed in capabilities | Filter, group, sort, aggregate | The model sees            |
+| ---------------------------------------- | :-----------------------------------------------------: | :----------------------------: | ------------------------- |
+| (default)                                |                           yes                           |              yes               | name, label, kind, values |
+| `privacy: "display"`                     |                           yes                           |               no               | name, label and kind only |
+| `sensitive: true` (= `privacy: "never"`) |                           no                            |               no               | nothing                   |
+
+**How to pick: can the user already see this value somewhere in your app? Then `display`, not
+`sensitive`.** A call summary users read on every call row, a note on each appointment, a
+customer's name in a list: hiding them from Patina only stops users from putting data they
+already see where they want it, and those requests get refused. Keep `sensitive` for values
+users don't see in the app (internal scores, secrets, other people's contact details), and for
+anything you don't want the model to know exists.
+
+A display-only field's values never reach the model, even after `restrict.values`. It can't be
+used in `where`, `groupBy`, `sort` or `metric` (the validator rejects it with "can show … as a
+column, but not filter, group, sort or count by it"), and no derived field can read it.
+`requires` applies at every level. The browser's catalog keeps `privacy: "display"` on the field.
+
 ## What the model sees
 
 Each source's label, description, field kinds, labels and enum values, and whether it can be
-aggregated. It never sees endpoint paths, data rows, or sensitive or restricted fields. Its
+aggregated. Display-only fields appear with their name, label and kind only, marked
+`displayOnly`. It never sees endpoint paths, data rows, or sensitive or restricted fields. Its
 output schema lists only the sources and fields this user may use, so _"add a chart of
 revenue"_ for a user without `finance.read` is refused with a readable reason.
 

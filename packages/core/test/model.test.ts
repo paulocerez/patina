@@ -114,6 +114,7 @@ it("passes through refusals and clarifications", () => {
     kind: "refusal",
     reason: "I can only change the layout.",
     category: "data_access",
+    detail: null,
   });
   // Unknown or missing categories become "other".
   expect(
@@ -122,6 +123,7 @@ it("passes through refusals and clarifications", () => {
   expect(fromModelOutput({ kind: "clarify", message: "Which table?", ops: [] })).toEqual({
     kind: "clarify",
     question: "Which table?",
+    options: [],
   });
   expect(fromModelOutput("garbage")).toEqual({ kind: "patch", ops: [], summary: "" });
 });

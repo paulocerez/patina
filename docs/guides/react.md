@@ -166,15 +166,26 @@ s.notices; // shipped follow-ups for this user; s.dismissNotice(key)
 Every primitive takes `surfaceId`. Each renders minimal unstyled markup with `data-patina`
 attributes, or accepts a render-prop child for full control.
 
-| Component                    | Default markup                                             | Render prop gets                                           |
-| ---------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------- |
-| `PromptInput`                | `<form><input/><button/></form>`                           | `{ value, setValue, submit, busy, formProps, inputProps }` |
-| `ProposalPreview`            | change list + Apply / Discard (only while previewing)      | `{ changes, summary, commit, discard, busy }`              |
-| `SurfaceMessage`             | `<p role="status">` (or `alert` for errors)                | `{ kind, text }`                                           |
-| `UndoButton` / `ResetButton` | `<button>`, disabled when there's nothing to undo or reset | (button props pass through)                                |
-| `SkippedNotice`              | `<details>` listing changes that no longer apply           | `skipped[]`                                                |
+| Component                    | Default markup                                                                             | Render prop gets                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `PromptInput`                | `<form><input/><button/></form>`                                                           | `{ value, setValue, submit, busy, formProps, inputProps }`                    |
+| `ProposalPreview`            | change list + Apply / Discard (only while previewing)                                      | `{ changes, summary, commit, discard, busy }`                                 |
+| `SurfaceMessage`             | `<p role="status">` (or `alert` for errors); answers as a list, clarify options as buttons | `(message, { pick })`: `message` is `{ kind, text, options?, capabilities? }` |
+| `UndoButton` / `ResetButton` | `<button>`, disabled when there's nothing to undo or reset, or while a request runs        | (button props pass through)                                                   |
+| `RedoButton`                 | `<button>`, only shown after an undo that can be taken back                                | (button props pass through)                                                   |
+| `SkippedNotice`              | `<details>` listing changes that no longer apply                                           | `skipped[]`                                                                   |
 
-When customizing isn't available to the user, `PromptInput`, `UndoButton` and `ResetButton`
+`message.kind` is `refusal`, `clarify` (with `options`: choices that are each possible; `pick(label)`
+sends one as the reply), `answer` (to "what can I …?", with `capabilities` scoped to what was
+asked), `error`, or `info` for a reply kind this version doesn't know (it shows the reply's
+`message`). After a clarifying question, the next prompt is sent as the reply, together with the
+question and the original request.
+
+Undo, redo and reset send the history position the user saw (`expectedSeq`). A second click
+sent before the first one's answer is ignored by the store, and a stale one gets a 409 from the
+server, after which the current state is shown.
+
+When customizing isn't available to the user, `PromptInput`, `UndoButton`, `RedoButton` and `ResetButton`
 render nothing. `AvailabilityNotice` shows the host's message (`<p role="note">`, or a render
 prop with `{ customize, dataViews, message }`). See [Availability](availability.md).
 

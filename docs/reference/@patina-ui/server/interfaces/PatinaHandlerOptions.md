@@ -89,6 +89,8 @@ tenant. Return undefined for no limit. Needs a storage adapter with `incrementUs
 > `optional` **logRequests?**: `boolean`
 
 Store the request log through the storage adapter (if it supports it). Default true.
+With `false` (or a storage adapter without a request log) no prompt is stored anywhere:
+set `onEvent` to see what users ask for. The handler warns at startup if neither is on.
 
 ***
 
@@ -203,7 +205,8 @@ Called with unexpected errors (they are returned to the client as a generic 500)
 > `optional` **onEvent**(`event`): `void` \| `Promise`\<`void`\>
 
 Called once per customization request with what happened (proposed, applied, refused,
-clarified, unavailable, over_quota, error) and why. Forward it to your analytics.
+clarified, answered, unavailable, over_quota, error), why, the user's words (`prompt`), what
+they were shown (`message`) and structured `detail`. Forward it to your analytics.
 Errors thrown here are reported to onError and never affect the user.
 
 #### Parameters

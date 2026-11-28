@@ -18,10 +18,13 @@ export type {
   SettingCapability,
 } from "./capabilities.js";
 export {
+  answerText,
   capabilities,
   capabilityExamples,
   capabilityHint,
   capabilityLines,
+  isCapabilityQuestion,
+  scopeCapabilities,
 } from "./capabilities.js";
 export type {
   Catalog,
@@ -37,8 +40,10 @@ export {
   defineCatalog,
   f,
   fieldLabel,
+  fieldPrivacy,
   offerableFields,
   publicCatalog,
+  queryableFields,
   restrictCatalog,
   WEEKDAYS,
 } from "./catalog.js";
@@ -63,8 +68,10 @@ export {
   USER_KEY_PREFIX,
   validate,
 } from "./engine.js";
+export type { ClarifyOption, RefusalInfo, Rescue } from "./guard.js";
+export { mentionedNodes, relevantOptions, rescueRefusal } from "./guard.js";
 export type { HistoryEntry, Layer, Resolved } from "./history.js";
-export { effectivePatches, headSeq, resolve, undoTarget } from "./history.js";
+export { effectivePatches, headSeq, redoTarget, resolve, undoTarget } from "./history.js";
 export type { Locale, MessageKey, Text } from "./i18n.js";
 export {
   DEFAULT_LOCALE,
@@ -93,7 +100,14 @@ export {
 } from "./manifest.js";
 export type { Migration } from "./migrate.js";
 export { migratePatch, migrations } from "./migrate.js";
-export type { ModelRequest, ModelResult, RefusalCategory } from "./model.js";
+export type {
+  ClarifyThread,
+  ModelRefusalDetail,
+  ModelRequest,
+  ModelResult,
+  RefusalCategory,
+  SchemaOptions,
+} from "./model.js";
 export {
   buildCompactSchema,
   buildModelRequest,
@@ -105,7 +119,14 @@ export {
   REFUSAL_CATEGORIES,
   randomUserKey,
 } from "./model.js";
-export type { ErrorBody, Notice, ProposeResponse, SurfaceState } from "./protocol.js";
+export type {
+  ErrorBody,
+  HistoryRequest,
+  Notice,
+  ProposeRequest,
+  ProposeResponse,
+  SurfaceState,
+} from "./protocol.js";
 export type { AggOp, Bucket, Query, QueryDef, QueryResult, QueryShape } from "./query.js";
 export {
   aggregate,
@@ -115,5 +136,6 @@ export {
   runQuery,
   withDerived,
 } from "./query.js";
+export { identifierWords, mentions, mentionsAny, normalizeText, stem } from "./text.js";
 export * from "./types.js";
 export { checkValue, formatValue } from "./values.js";

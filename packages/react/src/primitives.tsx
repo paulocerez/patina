@@ -7,6 +7,7 @@ import {
 } from "@patina-ui/core";
 import { type ButtonHTMLAttributes, type FormEvent, type ReactNode, useId, useState } from "react";
 import { usePatinaText, useSurface } from "./context.js";
+import type { SurfaceMessageData } from "./store.js";
 
 /* All primitives are unstyled. Pass className/style, or use the render-prop form for full control. */
 
@@ -155,23 +156,58 @@ export function ProposalPreview({
 export interface SurfaceMessageProps {
   surfaceId: string;
   className?: string;
-  children?: (message: { kind: "refusal" | "clarify" | "error"; text: string }) => ReactNode;
+  /**
+   * Custom rendering. `message.options` (clarify) are the choices to offer; call `pick(label)`
+   * to send one. `message.capabilities` (answer) is what the user can change.
+   */
+  children?: (message: SurfaceMessageData, actions: { pick(label: string): void }) => ReactNode;
 }
 
-/** Shows a refusal, a clarifying question or an error from the last request. */
+/**
+ * Shows what the last request said back: a refusal, a clarifying question (with its options as
+ * buttons), an answer to "what can I …?" (as a list), or an error. Unstyled.
+ */
 export function SurfaceMessage({ surfaceId, className, children }: SurfaceMessageProps) {
-  const { message } = useSurface(surfaceId);
+  const { message, propose, busy } = useSurface(surfaceId);
   if (!message) return null;
-  if (children) return <>{children(message)}</>;
+  const pick = (label: string) => void propose(label);
+  if (children) return <>{children(message, { pick })}</>;
+  const [lead, ...rest] = message.text.split("\n");
+  const items = rest.map((l) => l.replace(/^- /, "")).filter(Boolean);
+  const role = message.kind === "error" ? "alert" : "status";
+  // A plain message stays a single paragraph (as before 0.7).
+  if (!items.length && !message.options?.length)
+    return (
+      <p className={className} data-patina="message" data-kind={message.kind} role={role}>
+        {message.text}
+      </p>
+    );
   return (
-    <p
-      className={className}
-      data-patina="message"
-      data-kind={message.kind}
-      role={message.kind === "error" ? "alert" : "status"}
-    >
-      {message.text}
-    </p>
+    <div className={className} data-patina="message" data-kind={message.kind} role={role}>
+      <p>{lead}</p>
+      {items.length > 0 && (
+        <ul>
+          {items.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      )}
+      {message.options && message.options.length > 0 && (
+        <div data-patina="options">
+          {message.options.map((o) => (
+            <button
+              key={o.label}
+              type="button"
+              data-patina="option"
+              disabled={busy}
+              onClick={() => pick(o.label)}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -191,6 +227,24 @@ export function UndoButton({ surfaceId, children, disabled, ...rest }: ButtonPro
       onClick={() => void s.undo()}
     >
       {children ?? t("undo")}
+    </button>
+  );
+}
+
+/** Takes back the last undo (e.g. after an accidental click). Hidden while there is nothing to redo. */
+export function RedoButton({ surfaceId, children, disabled, ...rest }: ButtonProps) {
+  const s = useSurface(surfaceId);
+  const { t } = usePatinaText();
+  if (!s.availability.customize || !s.canRedo) return null;
+  return (
+    <button
+      type="button"
+      {...rest}
+      data-patina="redo"
+      disabled={disabled || s.busy}
+      onClick={() => void s.redo()}
+    >
+      {children ?? t("redo")}
     </button>
   );
 }
