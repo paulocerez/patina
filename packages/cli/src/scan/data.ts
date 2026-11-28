@@ -5,7 +5,7 @@ import type { ScannedField, ScannedSource } from "./types.js";
 const CODE = /\.(ts|tsx|js|jsx|mjs|cjs)$/;
 const NOT_CODE = /\.(test|spec|stories|d)\.[jt]sx?$|(^|\/)(__tests__|__mocks__|fixtures?)\//;
 const SENSITIVE =
-  /phone|e-?mail|address|street|zip|postal|ssn|social|passport|password|secret|token|iban|account.?number|card.?number|birth|dob|salary|diagnos/i;
+  /phone|e-?mail|address|street|zip|postal|ssn|social|passport|password|secret|token|iban|account.?number|card.?number|birth|dob|salary|diagnos|(from|to|caller|mobile|cell|fax).?number|msisdn|(first|last|full|contact|customer|client|caller|patient|owner|from).?name|notes?$|comment|transcript(?!.*status)|summary|message$/i;
 const MONEY = /price|amount|revenue|total|cost|fee|balance|salary|income|spend|paid/i;
 const DATEISH = /(^|_)(date|day)$|Date$|At$|_at$|^date|Day$/;
 
@@ -25,6 +25,39 @@ function field(
   return f;
 }
 
+/** Exported string-literal unions (`export type Status = "new" | "done"`), by name. */
+const literalAliases = new Map<string, string[]>();
+
+function scanLiteralAliases(repo: Repo, files: string[]) {
+  literalAliases.clear();
+  for (const file of files) {
+    const src = repo.read(file);
+    if (!src?.includes("type ")) continue;
+    for (const m of src.matchAll(
+      /export\s+type\s+(\w+)\s*=\s*((?:\s*\|?\s*(['"])[^'"\n]*\3)+)\s*;?/g,
+    )) {
+      const values = [...(m[2] as string).matchAll(/(['"])([^'"\n]*)\1/g)].map(
+        (v) => v[2] as string,
+      );
+      if (values.length > 1 && !literalAliases.has(m[1] as string))
+        literalAliases.set(m[1] as string, values);
+    }
+    // `as const` arrays behind a derived type: `export const STATUSES = [...] as const; export type Status = (typeof STATUSES)[number]`
+    for (const m of src.matchAll(
+      /export\s+type\s+(\w+)\s*=\s*\(?\s*typeof\s+(\w+)\s*\)?\s*\[\s*number\s*\]/g,
+    )) {
+      const arr = new RegExp(
+        `(?:const|let)\\s+${m[2]}\\s*=\\s*\\[([^\\]]*)\\]\\s*as\\s+const`,
+      ).exec(src);
+      const values = arr
+        ? [...(arr[1] as string).matchAll(/(['"])([^'"\n]*)\1/g)].map((v) => v[2] as string)
+        : [];
+      if (values.length > 1 && !literalAliases.has(m[1] as string))
+        literalAliases.set(m[1] as string, values);
+    }
+  }
+}
+
 /** Maps a TS type expression to a field, or null if it isn't a plain displayable value. */
 function fromTsType(name: string, type: string, optional: boolean): ScannedField | null {
   const t = type
@@ -38,6 +71,8 @@ function fromTsType(name: string, type: string, optional: boolean): ScannedField
     return field(name, MONEY.test(name) ? "currency" : "number", opt);
   if (t === "boolean") return field(name, "bool", opt);
   if (t === "Date") return field(name, "date", opt);
+  const alias = literalAliases.get(t);
+  if (alias) return field(name, "enum", { values: [...alias], ...opt });
   const literals = t.split("|").map((p) => p.trim());
   if (literals.length > 1 && literals.every((p) => /^(['"]).*\1$/.test(p)))
     return field(name, "enum", { values: literals.map((p) => p.slice(1, -1)), ...opt });
@@ -167,6 +202,162 @@ interface Route {
   evidence: string;
   /** Type names seen near the handler (annotations, or functions with a declared return type). */
   typeHints: string[];
+  pathParams?: string[];
+  /** The response's wrapper key, from `res.json({ items, total })`. */
+  rows?: string;
+}
+
+/** Path params that name the tenant: kept, and filled in by the fetch layer. */
+const TENANT_PARAM =
+  /^(account|tenant|org|organization|workspace|team|company|project|store|shop|clinic|practice)Id$/;
+
+/**
+ * Paging and date-range params, guessed from the names a handler reads. Conservative: only
+ * pairs that are rarely anything else.
+ */
+export function guessParams(params: string[]): Pick<ScannedSource, "paging" | "dateRange"> {
+  const has = (n: string) => params.find((p) => p.toLowerCase() === n.toLowerCase());
+  const out: Pick<ScannedSource, "paging" | "dateRange"> = {};
+  const limit = has("limit") ?? has("take") ?? has("perPage") ?? has("pageSize");
+  const offset = has("offset") ?? has("skip");
+  const page = has("page");
+  const cursor = has("cursor") ?? has("after");
+  if (cursor) out.paging = { style: "cursor", cursor };
+  else if (limit && offset) out.paging = { style: "offset", limit, offset };
+  else if (page && limit) out.paging = { style: "page", page, pageSize: limit };
+  for (const [a, b] of [
+    ["fromDate", "toDate"],
+    ["startDate", "endDate"],
+    ["dateFrom", "dateTo"],
+    ["from", "to"],
+    ["start", "end"],
+    ["since", "until"],
+    ["after", "before"],
+  ] as const) {
+    const fa = has(a);
+    const fb = has(b);
+    if (fa && fb && fa !== cursor) {
+      out.dateRange = { from: fa, to: fb };
+      break;
+    }
+  }
+  return out;
+}
+
+type Imports = Map<string, [file: string, name: string]>;
+
+/** `import x from`, `import { a as b } from`, `import * as ns from` and `require` → file + export. */
+function parseImports(repo: Repo, file: string, src: string, known: Set<string>): Imports {
+  const imports: Imports = new Map();
+  const addNamed = (part: string, target: string | null) => {
+    const [orig, alias] = part
+      .trim()
+      .replace(/^type\s+/, "")
+      .split(/\s+as\s+/);
+    if (target && orig && /^\w+$/.test(orig))
+      imports.set((alias ?? orig).trim(), [target, orig.trim()]);
+  };
+  for (const m of src.matchAll(
+    /import\s+(\w+)\s*(?:,\s*\{([^}]*)\})?\s*from\s*["'`]([^"'`]+)["'`]/g,
+  )) {
+    const target = resolveImport(repo, file, m[3] as string, known);
+    if (target) imports.set(m[1] as string, [target, "default"]);
+    for (const part of (m[2] ?? "").split(",")) addNamed(part, target);
+  }
+  for (const m of src.matchAll(/import\s*\{([^}]*)\}\s*from\s*["'`]([^"'`]+)["'`]/g)) {
+    const target = resolveImport(repo, file, m[2] as string, known);
+    for (const part of (m[1] ?? "").split(",")) addNamed(part, target);
+  }
+  for (const m of src.matchAll(/import\s*\*\s*as\s+(\w+)\s+from\s*["'`]([^"'`]+)["'`]/g)) {
+    const target = resolveImport(repo, file, m[2] as string, known);
+    if (target) imports.set(m[1] as string, [target, "*"]);
+  }
+  for (const m of src.matchAll(
+    /(?:const|let|var)\s+(\w+)\s*=\s*require\(\s*["'`]([^"'`]+)["'`]\s*\)/g,
+  )) {
+    const target = resolveImport(repo, file, m[2] as string, known);
+    if (target) imports.set(m[1] as string, [target, "default"]);
+  }
+  return imports;
+}
+
+/**
+ * A return type annotation starting at `at` (": Promise<{ items: X[] }> {"), read up to the
+ * body's "{" or "=>" outside any <…> or {…} of the type itself.
+ */
+function annotationAfter(src: string, at: number): string | null {
+  const m = /^\s*:\s*/.exec(src.slice(at, at + 40));
+  if (!m) return null;
+  let depth = 0;
+  const start = at + m[0].length;
+  for (let i = start; i < src.length && i < start + 1500; i++) {
+    const c = src[i];
+    if (c === "<" || c === "(" || c === "[") depth++;
+    else if ((c === ">" && src[i - 1] !== "=") || c === ")" || c === "]") depth--;
+    else if (c === "{") {
+      if (depth === 0 && /[)>\]\w]\s*$/.test(src.slice(start, i)) && i > start)
+        return src.slice(start, i).trim();
+      depth++;
+    } else if (c === "}") depth--;
+    else if (depth === 0 && (c === ";" || src.startsWith("=>", i)))
+      return src.slice(start, i).trim();
+  }
+  return null;
+}
+
+/** The body of a function, arrow function or class method named `name` in `src`, or null. */
+function functionBody(src: string, name: string): string | null {
+  const head = new RegExp(
+    `(?:function\\s+${name}\\s*(?:<[^>]*>)?\\(|(?:const|let|var)\\s+${name}\\s*(?::[^=]+)?=\\s*(?:async\\s+)?(?:function\\s*)?\\(|(?:^|\\n)[ \\t]*(?:(?:public|private|protected|static|async)\\s+)*${name}\\s*(?:<[^>]*>)?\\()`,
+  );
+  const m = head.exec(src);
+  if (!m) return null;
+  const paren = (m.index ?? 0) + m[0].length - 1;
+  const params = callArgs(src, paren);
+  const open = src.indexOf("{", paren + params.length + 2);
+  if (open < 0) return null;
+  let depth = 0;
+  for (let i = open; i < src.length && i < open + 8000; i++) {
+    if (src[i] === "{") depth++;
+    else if (src[i] === "}" && --depth === 0) return src.slice(open, i + 1);
+  }
+  return src.slice(open, open + 8000);
+}
+
+/**
+ * The code of a route's handler when it's passed by reference (`router.get("/", controller.list)`,
+ * `asyncHandler(listOrders)`), looked up in this file or the one it's imported from.
+ */
+function handlerBody(repo: Repo, src: string, args: string, imports: Imports): string | null {
+  const last = args.split(",").pop()?.trim() ?? "";
+  const ref = /([A-Za-z_$][\w$]*)(?:\.([A-Za-z_$][\w$]*))?\s*\)*\s*$/.exec(last);
+  if (!ref) return null;
+  const [, obj, member] = ref as unknown as [string, string, string | undefined];
+  if (member) {
+    const imp = imports.get(obj);
+    const target = imp ? (repo.read(imp[0]) ?? "") : src;
+    return functionBody(target, member);
+  }
+  const imp = imports.get(obj);
+  if (imp && imp[1] !== "default" && imp[1] !== "*")
+    return functionBody(repo.read(imp[0]) ?? "", imp[1]);
+  return functionBody(src, obj);
+}
+
+/** The file a handler reference points into (for its same-file helpers). */
+function handlerFile(file: string, args: string, imports: Imports): string {
+  const last = args.split(",").pop()?.trim() ?? "";
+  const obj = /([A-Za-z_$][\w$]*)(?:\.[A-Za-z_$][\w$]*)?\s*\)*\s*$/.exec(last)?.[1];
+  return (obj && imports.get(obj)?.[0]) || file;
+}
+
+/** Bodies of same-file helpers a handler hands the request to (`parseListQuery(req)`). */
+function requestHelpers(src: string, body: string): string {
+  const names = new Set([...body.matchAll(/\b([a-z]\w*)\(\s*req\b/g)].map((m) => m[1] as string));
+  return [...names]
+    .map((n) => functionBody(src, n))
+    .filter(Boolean)
+    .join("\n");
 }
 
 function hintsIn(snippet: string, returnTypes: Map<string, string>): string[] {
@@ -190,15 +381,28 @@ function paramsIn(snippet: string): string[] {
 }
 
 function scanRoutes(repo: Repo, files: string[]): Route[] {
-  // Functions that declare an array return type: `function orders(...): Order[]`.
+  // Functions and methods that return a list of a named type: `function orders(): Order[]`,
+  // `async list(...): Promise<{ items: Call[]; total: number }>`, `Promise<Page<Call>>`.
   const returnTypes = new Map<string, string>();
   for (const file of files) {
     const src = repo.read(file) ?? "";
     for (const m of src.matchAll(
-      /function\s+(\w+)\s*(?:<[^>]*>)?\([^)]*\)\s*:\s*(?:Promise<)?(?:Array<)?([A-Z]\w*)(?:\[\]|>)/g,
-    ))
-      returnTypes.set(m[1] as string, m[2] as string);
+      /(?:function\s+|(?:^|\n)[ \t]*(?:(?:public|private|protected|static|async)\s+)*)(\w+)\s*(?:<[^>]*>)?\(/g,
+    )) {
+      const name = m[1] as string;
+      if (/^(if|for|while|switch|catch|return|function)$/.test(name)) continue;
+      const paren = (m.index ?? 0) + m[0].length - 1;
+      const params = callArgs(src, paren);
+      const ann = annotationAfter(src, paren + params.length + 2);
+      if (!ann) continue;
+      const listed =
+        /([A-Z]\w*)\[\]/.exec(ann) ??
+        /Array<([A-Z]\w*)>/.exec(ann) ??
+        /\b(?!Promise\b|Array\b|Record\b|Partial\b|Readonly\b)[A-Z]\w*<([A-Z]\w*)>/.exec(ann);
+      if (listed && !returnTypes.has(name)) returnTypes.set(name, listed[1] as string);
+    }
   }
+  const known = new Set(repo.files);
   const mounts = scanMounts(repo, files);
   const routes: Route[] = [];
   for (const file of files) {
@@ -206,24 +410,44 @@ function scanRoutes(repo: Repo, files: string[]): Route[] {
     if (!src) continue;
     // Express / Hono / Fastify / routers: router.get("/orders", …), resolved against the
     // prefixes the router is mounted under (app.use("/api/orders", router)).
+    const imports = parseImports(repo, file, src, known);
     for (const m of src.matchAll(/\b(\w+)\.get\(\s*["'`](\/[^"'`]*)["'`]/g)) {
       const receiver = m[1] as string;
       const local = m[2] as string;
       const start = m.index ?? 0;
       const after = start + m[0].length;
-      // The handler's code: up to the next route registration (or 1200 chars).
+      // The handler's code: inline up to the next route registration (or 1200 chars), plus the
+      // body of a handler passed by reference.
       const nextRoute = src
         .slice(after, start + 1200)
         .search(/\b\w+\.(get|post|put|patch|delete|use|all|route|listen)\(/);
-      const snippet = src.slice(start, nextRoute >= 0 ? after + nextRoute : start + 1200);
+      const inline = src.slice(start, nextRoute >= 0 ? after + nextRoute : start + 1200);
+      const args = callArgs(src, start + m[0].indexOf("("));
+      const ref = handlerBody(repo, src, args, imports);
+      const refFile = handlerFile(file, args, imports);
+      const helpers = ref ? requestHelpers(repo.read(refFile) ?? src, ref) : "";
+      const snippet = [inline, ref, helpers].filter(Boolean).join("\n");
+      // The key a list is wrapped under (`res.json({ items, total })`). Only list-like names:
+      // `res.json({ user })` is one object, not rows.
+      const wrapped = /res\.json\(\s*\{\s*([a-z]\w*)\s*[,}:]/.exec(snippet)?.[1];
+      const rows =
+        wrapped &&
+        (/^(data|items|rows|results|records|entries|list|nodes|edges)$/.test(wrapped) ||
+          /[^s]s$/.test(wrapped))
+          ? wrapped
+          : undefined;
       for (const prefix of mounts.prefixesFor(file, receiver)) {
         const path = joinPath(prefix, local);
-        if (/[:*]|\{/.test(path) || path === "/") continue;
+        const placeholders = [...path.matchAll(/:(\w+)/g)].map((p) => p[1] as string);
+        if (placeholders.some((p) => !TENANT_PARAM.test(p))) continue;
+        if (/[*]|\{/.test(path) || path === "/") continue;
         routes.push({
           path,
           params: paramsIn(snippet),
           evidence: file,
           typeHints: hintsIn(snippet, returnTypes),
+          ...(placeholders.length ? { pathParams: placeholders } : {}),
+          ...(rows && rows !== "error" ? { rows } : {}),
         });
       }
     }
@@ -328,30 +552,7 @@ function scanMounts(repo: Repo, files: string[]) {
   for (const file of files) {
     const src = repo.read(file);
     if (!src || !/\.(use|route)\(/.test(src)) continue;
-    // local name → [file, exported variable or "default"]
-    const imports = new Map<string, [string, string]>();
-    for (const m of src.matchAll(
-      /import\s+(\w+)\s*(?:,\s*\{([^}]*)\})?\s*from\s*["'`]([^"'`]+)["'`]/g,
-    )) {
-      const target = resolveImport(repo, file, m[3] as string, known);
-      if (target) imports.set(m[1] as string, [target, "default"]);
-      for (const part of (m[2] ?? "").split(",")) addNamed(part, target);
-    }
-    for (const m of src.matchAll(/import\s*\{([^}]*)\}\s*from\s*["'`]([^"'`]+)["'`]/g)) {
-      const target = resolveImport(repo, file, m[2] as string, known);
-      for (const part of (m[1] ?? "").split(",")) addNamed(part, target);
-    }
-    for (const m of src.matchAll(
-      /(?:const|let|var)\s+(\w+)\s*=\s*require\(\s*["'`]([^"'`]+)["'`]\s*\)/g,
-    )) {
-      const target = resolveImport(repo, file, m[2] as string, known);
-      if (target) imports.set(m[1] as string, [target, "default"]);
-    }
-    function addNamed(part: string, target: string | null) {
-      const [orig, alias] = part.trim().split(/\s+as\s+/);
-      if (target && orig && /^\w+$/.test(orig))
-        imports.set((alias ?? orig).trim(), [target, orig.trim()]);
-    }
+    const imports = parseImports(repo, file, src, known);
     for (const m of src.matchAll(/\b(\w+)\.(?:use|route)\(\s*["'`](\/[^"'`]*)["'`]\s*,/g)) {
       const args = callArgs(src, (m.index ?? 0) + m[0].indexOf("("));
       const last = /(\w+)\s*,?\s*$/.exec(args.trim())?.[1];
@@ -488,6 +689,7 @@ function sourceId(path: string): string {
 export function detectSources(repo: Repo): Record<string, ScannedSource> {
   const code = repo.files.filter((f) => CODE.test(f) && !NOT_CODE.test(f));
   const types = new Map<string, TypeInfo>();
+  scanLiteralAliases(repo, code);
   scanPrisma(repo, types);
   scanZod(repo, code, types);
   scanTsTypes(repo, code, types);
@@ -504,16 +706,23 @@ export function detectSources(repo: Repo): Record<string, ScannedSource> {
       .toLowerCase()
       .replace(/[-_]/g, "");
     const byHint = route.typeHints.map((h) => types.get(h)).find(Boolean);
-    const byName = [...types.entries()].find(([name]) => {
+    // Without a hint, match by name, preferring types near the route (same top-level
+    // folder): a public API's `CallResponse` elsewhere is a worse guess than the local one.
+    const area = route.evidence.split("/").slice(0, 2).join("/");
+    const named = [...types.entries()].filter(([name]) => {
       const n = name.replace(SUFFIXES, "").toLowerCase();
       return n === seg || n === singular(seg);
-    })?.[1];
+    });
+    const byName = (named.find(([, info]) => info.evidence.startsWith(area)) ?? named[0])?.[1];
     const t = byHint ?? byName;
     byPath.set(route.path, {
       endpoint: { path: route.path, method: "GET" },
       params: route.params,
       fields: t ? structuredClone(t.fields) : {},
       evidence: t ? [route.evidence, t.evidence] : [route.evidence],
+      ...(route.pathParams ? { pathParams: route.pathParams } : {}),
+      ...(route.rows ? { rows: route.rows } : {}),
+      ...guessParams(route.params),
     });
   }
 

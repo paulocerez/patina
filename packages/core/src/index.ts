@@ -136,6 +136,7 @@ export {
   runQuery,
   withDerived,
 } from "./query.js";
+export { asRelativeRange, rangeBounds } from "./ranges.js";
 export { identifierWords, mentions, mentionsAny, normalizeText, stem } from "./text.js";
 export * from "./types.js";
 export { checkValue, formatValue } from "./values.js";

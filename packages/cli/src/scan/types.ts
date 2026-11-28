@@ -18,6 +18,17 @@ export interface ScannedSource {
   fields: Record<string, ScannedField>;
   /** Where the evidence came from, e.g. "openapi.yaml#/paths/~1api~1orders", "src/types.ts#Order". */
   evidence: string[];
+  /** Tenant placeholders in the path (`/api/accounts/:accountId/…`), filled by the fetch layer. */
+  pathParams?: string[];
+  /** How the endpoint pages, guessed from its query params. */
+  paging?:
+    | { style: "offset"; limit: string; offset: string }
+    | { style: "page"; page: string; pageSize: string }
+    | { style: "cursor"; cursor: string };
+  /** Query params that look like a date range's start and end. */
+  dateRange?: { from: string; to: string };
+  /** Where the rows are in the response when it wraps them (`res.json({ items, total })`). */
+  rows?: string;
 }
 
 export interface ScannedComponent {

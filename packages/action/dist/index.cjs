@@ -7492,13 +7492,40 @@ function parseCatalogSource(text) {
 var import_yaml = __toESM(require_dist(), 1);
 var CODE = /\.(ts|tsx|js|jsx|mjs|cjs)$/;
 var NOT_CODE = /\.(test|spec|stories|d)\.[jt]sx?$|(^|\/)(__tests__|__mocks__|fixtures?)\//;
-var SENSITIVE = /phone|e-?mail|address|street|zip|postal|ssn|social|passport|password|secret|token|iban|account.?number|card.?number|birth|dob|salary|diagnos/i;
+var SENSITIVE = /phone|e-?mail|address|street|zip|postal|ssn|social|passport|password|secret|token|iban|account.?number|card.?number|birth|dob|salary|diagnos|(from|to|caller|mobile|cell|fax).?number|msisdn|(first|last|full|contact|customer|client|caller|patient|owner|from).?name|notes?$|comment|transcript(?!.*status)|summary|message$/i;
 var MONEY = /price|amount|revenue|total|cost|fee|balance|salary|income|spend|paid/i;
 var DATEISH = /(^|_)(date|day)$|Date$|At$|_at$|^date|Day$/;
 function field(name, kind, extra = {}) {
   const f = { kind, ...extra };
   if (SENSITIVE.test(name)) f.sensitive = true;
   return f;
+}
+var literalAliases = /* @__PURE__ */ new Map();
+function scanLiteralAliases(repo, files) {
+  literalAliases.clear();
+  for (const file of files) {
+    const src = repo.read(file);
+    if (!src?.includes("type ")) continue;
+    for (const m of src.matchAll(
+      /export\s+type\s+(\w+)\s*=\s*((?:\s*\|?\s*(['"])[^'"\n]*\3)+)\s*;?/g
+    )) {
+      const values = [...m[2].matchAll(/(['"])([^'"\n]*)\1/g)].map(
+        (v) => v[2]
+      );
+      if (values.length > 1 && !literalAliases.has(m[1]))
+        literalAliases.set(m[1], values);
+    }
+    for (const m of src.matchAll(
+      /export\s+type\s+(\w+)\s*=\s*\(?\s*typeof\s+(\w+)\s*\)?\s*\[\s*number\s*\]/g
+    )) {
+      const arr = new RegExp(
+        `(?:const|let)\\s+${m[2]}\\s*=\\s*\\[([^\\]]*)\\]\\s*as\\s+const`
+      ).exec(src);
+      const values = arr ? [...arr[1].matchAll(/(['"])([^'"\n]*)\1/g)].map((v) => v[2]) : [];
+      if (values.length > 1 && !literalAliases.has(m[1]))
+        literalAliases.set(m[1], values);
+    }
+  }
 }
 function fromTsType(name, type, optional) {
   const t = type.trim().replace(/\s*\|\s*(null|undefined)\b/g, "").replace(/;$/, "").trim();
@@ -7508,6 +7535,8 @@ function fromTsType(name, type, optional) {
     return field(name, MONEY.test(name) ? "currency" : "number", opt);
   if (t === "boolean") return field(name, "bool", opt);
   if (t === "Date") return field(name, "date", opt);
+  const alias = literalAliases.get(t);
+  if (alias) return field(name, "enum", { values: [...alias], ...opt });
   const literals = t.split("|").map((p) => p.trim());
   if (literals.length > 1 && literals.every((p) => /^(['"]).*\1$/.test(p)))
     return field(name, "enum", { values: literals.map((p) => p.slice(1, -1)), ...opt });
@@ -7615,6 +7644,125 @@ function scanPrisma(repo, types) {
     }
   }
 }
+var TENANT_PARAM = /^(account|tenant|org|organization|workspace|team|company|project|store|shop|clinic|practice)Id$/;
+function guessParams(params) {
+  const has = (n) => params.find((p) => p.toLowerCase() === n.toLowerCase());
+  const out = {};
+  const limit = has("limit") ?? has("take") ?? has("perPage") ?? has("pageSize");
+  const offset = has("offset") ?? has("skip");
+  const page = has("page");
+  const cursor = has("cursor") ?? has("after");
+  if (cursor) out.paging = { style: "cursor", cursor };
+  else if (limit && offset) out.paging = { style: "offset", limit, offset };
+  else if (page && limit) out.paging = { style: "page", page, pageSize: limit };
+  for (const [a, b] of [
+    ["fromDate", "toDate"],
+    ["startDate", "endDate"],
+    ["dateFrom", "dateTo"],
+    ["from", "to"],
+    ["start", "end"],
+    ["since", "until"],
+    ["after", "before"]
+  ]) {
+    const fa = has(a);
+    const fb = has(b);
+    if (fa && fb && fa !== cursor) {
+      out.dateRange = { from: fa, to: fb };
+      break;
+    }
+  }
+  return out;
+}
+function parseImports(repo, file, src, known) {
+  const imports = /* @__PURE__ */ new Map();
+  const addNamed = (part, target) => {
+    const [orig, alias] = part.trim().replace(/^type\s+/, "").split(/\s+as\s+/);
+    if (target && orig && /^\w+$/.test(orig))
+      imports.set((alias ?? orig).trim(), [target, orig.trim()]);
+  };
+  for (const m of src.matchAll(
+    /import\s+(\w+)\s*(?:,\s*\{([^}]*)\})?\s*from\s*["'`]([^"'`]+)["'`]/g
+  )) {
+    const target = resolveImport(repo, file, m[3], known);
+    if (target) imports.set(m[1], [target, "default"]);
+    for (const part of (m[2] ?? "").split(",")) addNamed(part, target);
+  }
+  for (const m of src.matchAll(/import\s*\{([^}]*)\}\s*from\s*["'`]([^"'`]+)["'`]/g)) {
+    const target = resolveImport(repo, file, m[2], known);
+    for (const part of (m[1] ?? "").split(",")) addNamed(part, target);
+  }
+  for (const m of src.matchAll(/import\s*\*\s*as\s+(\w+)\s+from\s*["'`]([^"'`]+)["'`]/g)) {
+    const target = resolveImport(repo, file, m[2], known);
+    if (target) imports.set(m[1], [target, "*"]);
+  }
+  for (const m of src.matchAll(
+    /(?:const|let|var)\s+(\w+)\s*=\s*require\(\s*["'`]([^"'`]+)["'`]\s*\)/g
+  )) {
+    const target = resolveImport(repo, file, m[2], known);
+    if (target) imports.set(m[1], [target, "default"]);
+  }
+  return imports;
+}
+function annotationAfter(src, at) {
+  const m = /^\s*:\s*/.exec(src.slice(at, at + 40));
+  if (!m) return null;
+  let depth = 0;
+  const start = at + m[0].length;
+  for (let i = start; i < src.length && i < start + 1500; i++) {
+    const c = src[i];
+    if (c === "<" || c === "(" || c === "[") depth++;
+    else if (c === ">" && src[i - 1] !== "=" || c === ")" || c === "]") depth--;
+    else if (c === "{") {
+      if (depth === 0 && /[)>\]\w]\s*$/.test(src.slice(start, i)) && i > start)
+        return src.slice(start, i).trim();
+      depth++;
+    } else if (c === "}") depth--;
+    else if (depth === 0 && (c === ";" || src.startsWith("=>", i)))
+      return src.slice(start, i).trim();
+  }
+  return null;
+}
+function functionBody(src, name) {
+  const head = new RegExp(
+    `(?:function\\s+${name}\\s*(?:<[^>]*>)?\\(|(?:const|let|var)\\s+${name}\\s*(?::[^=]+)?=\\s*(?:async\\s+)?(?:function\\s*)?\\(|(?:^|\\n)[ \\t]*(?:(?:public|private|protected|static|async)\\s+)*${name}\\s*(?:<[^>]*>)?\\()`
+  );
+  const m = head.exec(src);
+  if (!m) return null;
+  const paren = (m.index ?? 0) + m[0].length - 1;
+  const params = callArgs(src, paren);
+  const open = src.indexOf("{", paren + params.length + 2);
+  if (open < 0) return null;
+  let depth = 0;
+  for (let i = open; i < src.length && i < open + 8e3; i++) {
+    if (src[i] === "{") depth++;
+    else if (src[i] === "}" && --depth === 0) return src.slice(open, i + 1);
+  }
+  return src.slice(open, open + 8e3);
+}
+function handlerBody(repo, src, args, imports) {
+  const last = args.split(",").pop()?.trim() ?? "";
+  const ref = /([A-Za-z_$][\w$]*)(?:\.([A-Za-z_$][\w$]*))?\s*\)*\s*$/.exec(last);
+  if (!ref) return null;
+  const [, obj, member] = ref;
+  if (member) {
+    const imp2 = imports.get(obj);
+    const target = imp2 ? repo.read(imp2[0]) ?? "" : src;
+    return functionBody(target, member);
+  }
+  const imp = imports.get(obj);
+  if (imp && imp[1] !== "default" && imp[1] !== "*")
+    return functionBody(repo.read(imp[0]) ?? "", imp[1]);
+  return functionBody(src, obj);
+}
+function handlerFile(file, args, imports) {
+  const last = args.split(",").pop()?.trim() ?? "";
+  const obj = /([A-Za-z_$][\w$]*)(?:\.[A-Za-z_$][\w$]*)?\s*\)*\s*$/.exec(last)?.[1];
+  return obj && imports.get(obj)?.[0] || file;
+}
+function requestHelpers(src, body) {
+  const names = new Set([...body.matchAll(/\b([a-z]\w*)\(\s*req\b/g)].map((m) => m[1]));
+  return [...names].map((n) => functionBody(src, n)).filter(Boolean).join("\n");
+}
 function hintsIn(snippet, returnTypes) {
   const hints = [];
   for (const m of snippet.matchAll(/(?::|as|<)\s*(?:Array<)?([A-Z]\w*)(?:\[\]|>)/g))
@@ -7638,30 +7786,51 @@ function scanRoutes(repo, files) {
   for (const file of files) {
     const src = repo.read(file) ?? "";
     for (const m of src.matchAll(
-      /function\s+(\w+)\s*(?:<[^>]*>)?\([^)]*\)\s*:\s*(?:Promise<)?(?:Array<)?([A-Z]\w*)(?:\[\]|>)/g
-    ))
-      returnTypes.set(m[1], m[2]);
+      /(?:function\s+|(?:^|\n)[ \t]*(?:(?:public|private|protected|static|async)\s+)*)(\w+)\s*(?:<[^>]*>)?\(/g
+    )) {
+      const name = m[1];
+      if (/^(if|for|while|switch|catch|return|function)$/.test(name)) continue;
+      const paren = (m.index ?? 0) + m[0].length - 1;
+      const params = callArgs(src, paren);
+      const ann = annotationAfter(src, paren + params.length + 2);
+      if (!ann) continue;
+      const listed = /([A-Z]\w*)\[\]/.exec(ann) ?? /Array<([A-Z]\w*)>/.exec(ann) ?? /\b(?!Promise\b|Array\b|Record\b|Partial\b|Readonly\b)[A-Z]\w*<([A-Z]\w*)>/.exec(ann);
+      if (listed && !returnTypes.has(name)) returnTypes.set(name, listed[1]);
+    }
   }
+  const known = new Set(repo.files);
   const mounts = scanMounts(repo, files);
   const routes = [];
   for (const file of files) {
     const src = repo.read(file);
     if (!src) continue;
+    const imports = parseImports(repo, file, src, known);
     for (const m of src.matchAll(/\b(\w+)\.get\(\s*["'`](\/[^"'`]*)["'`]/g)) {
       const receiver = m[1];
       const local = m[2];
       const start = m.index ?? 0;
       const after = start + m[0].length;
       const nextRoute = src.slice(after, start + 1200).search(/\b\w+\.(get|post|put|patch|delete|use|all|route|listen)\(/);
-      const snippet = src.slice(start, nextRoute >= 0 ? after + nextRoute : start + 1200);
+      const inline = src.slice(start, nextRoute >= 0 ? after + nextRoute : start + 1200);
+      const args = callArgs(src, start + m[0].indexOf("("));
+      const ref = handlerBody(repo, src, args, imports);
+      const refFile = handlerFile(file, args, imports);
+      const helpers = ref ? requestHelpers(repo.read(refFile) ?? src, ref) : "";
+      const snippet = [inline, ref, helpers].filter(Boolean).join("\n");
+      const wrapped = /res\.json\(\s*\{\s*([a-z]\w*)\s*[,}:]/.exec(snippet)?.[1];
+      const rows = wrapped && (/^(data|items|rows|results|records|entries|list|nodes|edges)$/.test(wrapped) || /[^s]s$/.test(wrapped)) ? wrapped : void 0;
       for (const prefix of mounts.prefixesFor(file, receiver)) {
         const path = joinPath(prefix, local);
-        if (/[:*]|\{/.test(path) || path === "/") continue;
+        const placeholders = [...path.matchAll(/:(\w+)/g)].map((p) => p[1]);
+        if (placeholders.some((p) => !TENANT_PARAM.test(p))) continue;
+        if (/[*]|\{/.test(path) || path === "/") continue;
         routes.push({
           path,
           params: paramsIn(snippet),
           evidence: file,
-          typeHints: hintsIn(snippet, returnTypes)
+          typeHints: hintsIn(snippet, returnTypes),
+          ...placeholders.length ? { pathParams: placeholders } : {},
+          ...rows && rows !== "error" ? { rows } : {}
         });
       }
     }
@@ -7736,32 +7905,9 @@ function scanMounts(repo, files) {
     if (def) defaultExport.set(file, def[1]);
   }
   for (const file of files) {
-    let addNamed2 = function(part, target) {
-      const [orig, alias] = part.trim().split(/\s+as\s+/);
-      if (target && orig && /^\w+$/.test(orig))
-        imports.set((alias ?? orig).trim(), [target, orig.trim()]);
-    };
-    var addNamed = addNamed2;
     const src = repo.read(file);
     if (!src || !/\.(use|route)\(/.test(src)) continue;
-    const imports = /* @__PURE__ */ new Map();
-    for (const m of src.matchAll(
-      /import\s+(\w+)\s*(?:,\s*\{([^}]*)\})?\s*from\s*["'`]([^"'`]+)["'`]/g
-    )) {
-      const target = resolveImport(repo, file, m[3], known);
-      if (target) imports.set(m[1], [target, "default"]);
-      for (const part of (m[2] ?? "").split(",")) addNamed2(part, target);
-    }
-    for (const m of src.matchAll(/import\s*\{([^}]*)\}\s*from\s*["'`]([^"'`]+)["'`]/g)) {
-      const target = resolveImport(repo, file, m[2], known);
-      for (const part of (m[1] ?? "").split(",")) addNamed2(part, target);
-    }
-    for (const m of src.matchAll(
-      /(?:const|let|var)\s+(\w+)\s*=\s*require\(\s*["'`]([^"'`]+)["'`]\s*\)/g
-    )) {
-      const target = resolveImport(repo, file, m[2], known);
-      if (target) imports.set(m[1], [target, "default"]);
-    }
+    const imports = parseImports(repo, file, src, known);
     for (const m of src.matchAll(/\b(\w+)\.(?:use|route)\(\s*["'`](\/[^"'`]*)["'`]\s*,/g)) {
       const args = callArgs(src, (m.index ?? 0) + m[0].indexOf("("));
       const last = /(\w+)\s*,?\s*$/.exec(args.trim())?.[1];
@@ -7876,6 +8022,7 @@ function sourceId(path) {
 function detectSources(repo) {
   const code2 = repo.files.filter((f) => CODE.test(f) && !NOT_CODE.test(f));
   const types = /* @__PURE__ */ new Map();
+  scanLiteralAliases(repo, code2);
   scanPrisma(repo, types);
   scanZod(repo, code2, types);
   scanTsTypes(repo, code2, types);
@@ -7889,16 +8036,21 @@ function detectSources(repo) {
     }
     const seg = (route.path.split("/").filter(Boolean).pop() ?? "").toLowerCase().replace(/[-_]/g, "");
     const byHint = route.typeHints.map((h) => types.get(h)).find(Boolean);
-    const byName = [...types.entries()].find(([name]) => {
+    const area = route.evidence.split("/").slice(0, 2).join("/");
+    const named = [...types.entries()].filter(([name]) => {
       const n = name.replace(SUFFIXES, "").toLowerCase();
       return n === seg || n === singular(seg);
-    })?.[1];
+    });
+    const byName = (named.find(([, info]) => info.evidence.startsWith(area)) ?? named[0])?.[1];
     const t = byHint ?? byName;
     byPath.set(route.path, {
       endpoint: { path: route.path, method: "GET" },
       params: route.params,
       fields: t ? structuredClone(t.fields) : {},
-      evidence: t ? [route.evidence, t.evidence] : [route.evidence]
+      evidence: t ? [route.evidence, t.evidence] : [route.evidence],
+      ...route.pathParams ? { pathParams: route.pathParams } : {},
+      ...route.rows ? { rows: route.rows } : {},
+      ...guessParams(route.params)
     });
   }
   const out = {};

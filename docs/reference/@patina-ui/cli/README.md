@@ -29,6 +29,7 @@
 - [parseCatalogSource](functions/parseCatalogSource.md)
 - [renderBlocks](functions/renderBlocks.md)
 - [renderCatalog](functions/renderCatalog.md)
+- [renderFetch](functions/renderFetch.md)
 - [renderMarkdown](functions/renderMarkdown.md)
 - [scanRepo](functions/scanRepo.md)
 - [upsertPrComment](functions/upsertPrComment.md)

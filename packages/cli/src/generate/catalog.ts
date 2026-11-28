@@ -34,6 +34,29 @@ function renderField(name: string, f: ScannedField): string {
   }
 }
 
+const DURATION = /duration|length|seconds|minutes|age|wait/i;
+
+/** Commented derived fields worth considering, per field kind and name. */
+function derivedSuggestions(fields: Record<string, ScannedField>): string[] {
+  const out: string[] = [];
+  const date = Object.entries(fields).find(([, f]) => f.kind === "date")?.[0];
+  if (date) {
+    out.push(`weekday: f.weekday(${q(date)}, { label: "Weekday" }),`);
+    out.push(`hour: f.hour(${q(date)}, { label: "Hour" }),`);
+  }
+  for (const [name, f] of Object.entries(fields)) {
+    if (f.sensitive) continue;
+    if (
+      (f.kind === "number" || f.kind === "currency") &&
+      (DURATION.test(name) || f.kind === "currency")
+    )
+      out.push(
+        `${name}Range: f.ranges(${q(name)}, [{ value: "low", below: 0 /* TODO */ }, { value: "high" }], { label: ${q(`${humanLabel(name)} range`)} }),`,
+      );
+  }
+  return out;
+}
+
 export function renderCatalog(scan: ScanResult): string {
   const lines: string[] = [
     HEADER,
@@ -54,15 +77,38 @@ export function renderCatalog(scan: ScanResult): string {
     lines.push(`    label: ${q(humanLabel(id))},`);
     lines.push(`    // Found in: ${s.evidence.join(", ")}`);
     lines.push(`    endpoint: { path: ${q(s.endpoint.path)}, method: "GET" },`);
-    if (s.params.length) {
+    const handled = new Set([
+      ...(s.dateRange ? [s.dateRange.from, s.dateRange.to] : []),
+      ...(s.paging
+        ? Object.entries(s.paging)
+            .filter(([k]) => k !== "style")
+            .map(([, v]) => v)
+        : []),
+    ]);
+    const rest = s.params.filter((p) => !handled.has(p));
+    if (s.dateRange || rest.length) {
       lines.push(`    params: {`);
-      for (const p of s.params) lines.push(`      // ${p}: { from: "<nodeId>.<prop>" },`);
+      if (s.dateRange)
+        lines.push(
+          `      // A relative range ("last30Days", "thisWeek"); fetch.ts turns it into ${s.dateRange.from}/${s.dateRange.to}.`,
+          `      // range: { from: "<nodeId>.<prop>", choices: ["today", "thisWeek", "thisMonth", "last30Days"] },`,
+        );
+      for (const p of rest) lines.push(`      // ${p}: { from: "<nodeId>.<prop>" },`);
       lines.push(`    },`);
     }
-    lines.push(`    complete: false, // TODO: true if the endpoint returns all matching rows`);
+    lines.push(
+      s.paging
+        ? `    complete: true, // paged (${s.paging.style}): fetch.ts fetches every page. Keep only if it does.`
+        : `    complete: false, // TODO: true if the endpoint returns all matching rows`,
+    );
     if (s.fields.id) lines.push(`    rowKey: "id",`);
     lines.push(`    fields: {`);
     for (const [name, f] of fields) lines.push(`      ${name}: ${renderField(name, f)},`);
+    const suggestions = derivedSuggestions(s.fields);
+    if (suggestions.length) {
+      lines.push(`      // Derived fields: users ask for these more than for the raw values.`);
+      for (const sug of suggestions) lines.push(`      // ${sug}`);
+    }
     lines.push(`    },`);
     lines.push(`  },`);
   }

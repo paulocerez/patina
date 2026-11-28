@@ -38,8 +38,16 @@ This takes well under a second on a typical app, runs offline and costs nothing.
 | `components/**`                                                                   | your `Card`, `Table`, `Badge`… and how to import them (tsconfig `paths` aliases included)             |
 
 Routers mounted under a prefix (`app.use("/api/orders", ordersRouter)`, nested routers,
-`require`) are followed, so endpoints get their full path. Paths with parameters
-(`/accounts/:id/…`) are skipped.
+`require`) are followed, so endpoints get their full path. Paths with parameters are skipped,
+except tenant placeholders (`/api/accounts/:accountId/orders`, `:orgId`, `:workspaceId`…),
+which `fetch.ts` fills in.
+
+Handlers don't have to be inline. `router.get("/", controller.list)` is followed into
+`list`, into the helpers it hands `req` to (`parseListQuery(req)`), and to the return types
+of the services it calls, including methods and wrapped lists
+(`Promise<{ items: Order[]; total: number }>`). Exported string-literal unions
+(`type Status = "new" | "done"`) become enums. The scan also notes how each endpoint pages
+(`limit`/`offset`, `page`, `cursor`), its date-range params and the key its rows are under.
 
 An endpoint is matched to its row type by the type annotations or return types near its
 handler, or else by name (`/api/orders` → `Order`, `OrderSchema`, `model Order`). Detail
@@ -53,6 +61,7 @@ The scan writes three files to `patina/`:
 | `scan.json`  | a snapshot of what was found. **Commit it**: `patina check` and the GitHub Action compare against it | yes                                             |
 | `catalog.ts` | a **draft** data catalog for you to review                                                           | no: a re-scan writes `catalog.draft.ts` instead |
 | `blocks.tsx` | the data blocks, written with **your** UI kit, components, classes and colours                       | no: a re-scan writes `blocks.draft.tsx` instead |
+| `fetch.ts`   | a `fetchSource` for the provider: paging, response envelopes, date ranges, tenant path params        | no: a re-scan writes `fetch.draft.ts` instead   |
 
 Pass `--force` to overwrite the files you've edited.
 
@@ -259,6 +268,34 @@ Filters (`where`) are simple equality filters on enum and boolean fields. Aggreg
 plain arithmetic over the rows your endpoint returned, done in the browser.
 
 ## How data is fetched
+
+Most apps don't need to write this. `patina scan` drafts `patina/fetch.ts`:
+
+```ts
+import { createFetchSource } from "@patina-ui/react";
+
+export const appFetchSource = ({ accountId }: { accountId: string }) =>
+  createFetchSource({
+    baseUrl: import.meta.env.VITE_API_URL,
+    credentials: "include",
+    params: { accountId }, // also fills :accountId in paths
+    sources: {
+      calls: {
+        rows: "items",
+        paging: { style: "offset", size: 200, limit: "limit", offset: "offset", total: "total" },
+        dateRange: { from: "fromDate", to: "toDate" }, // a relative "range" param → two dates
+      },
+    },
+  });
+```
+
+With `paging`, every page is fetched one after another (up to `maxPages`, default 50), so a
+paged endpoint can be `complete: true`. `dateRange` turns a relative range ("today",
+"last7Days", "thisWeek", "lastMonth"…, case-insensitive) into the endpoint's own start and end,
+as timestamps or `format: "date"`. Write your own `fetchSource` only for what this doesn't
+cover.
+
+### Writing your own
 
 `useQuery` calls the provider's `fetchSource`. By default it does a same-origin GET of the
 source's path with the bound params and the user's cookies. It accepts a JSON array, or an
