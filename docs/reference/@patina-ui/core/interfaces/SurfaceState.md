@@ -30,6 +30,14 @@ Shown to the user when something is unavailable.
 
 ***
 
+### canRedo?
+
+> `optional` **canRedo?**: `boolean`
+
+Whether the last undo can be taken back (POST /surfaces/:id/redo).
+
+***
+
 ### canUndo
 
 > **canUndo**: `boolean`
@@ -88,6 +96,15 @@ Which props are slots and which are collections, per component, for the renderer
 #### slots
 
 > **slots**: `Record`\<`string`, `string`[]\>
+
+***
+
+### seq?
+
+> `optional` **seq?**: `number`
+
+The user's history position. Send it back as `expectedSeq` with undo, redo and reset: the
+server answers 409 instead of undoing a step the user didn't see (double clicks).
 
 ***
 

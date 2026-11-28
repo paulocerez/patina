@@ -46,6 +46,36 @@ Every request is logged with its outcome and reason, including refusals. `onEven
 each event to your analytics, and `insights: { allow }` serves a report to your staff at
 `GET {basePath}/insights`. See [Insights](insights.md).
 
+> With `logRequests: false` (or a storage adapter without a request log, such as
+> `postgresStorage({ requestLog: false })`) **no prompt is stored anywhere**: you can't find out
+> what users asked for. Set `onEvent` and include `prompt` and `message`:
+>
+> ```ts
+> onEvent: (e) => analytics.track("patina_request", {
+>   outcome: e.outcome, reason: e.reason, prompt: e.prompt, message: e.message, detail: e.detail,
+> }),
+> ```
+>
+> The handler logs a one-line warning at startup when neither the log nor `onEvent` is on.
+
+## How a request is answered
+
+1. **"What can I …?"** questions (_"Was kann ich bei den letzten Anrufen anzeigen?"_, _"Which
+   columns can I add?"_) are answered from the manifest, scoped to the part of the page named,
+   with no model call (`kind: "answer"`, outcome `answered`).
+2. Otherwise the model answers with a patch, a refusal, a clarifying question, or an answer.
+3. **A refusal gets a second look.** Every refusal except `safety` is sent back once, to the
+   backup model, with the refusal and the relevant part of the manifest: allowed values with
+   their labels in the user's language, collection keys, insertable presets and data fields.
+   A patch that doesn't validate gets the same single retry (repair). Never more than 2 calls.
+4. **The refusal guard** runs before any refusal by the model reaches the user. If the prompt names an
+   allowed value of a setting the refusal is about (_"Standard-Zeitraum auf Heute"_) or a column
+   that is only hidden, Patina proposes it, or asks which one when several match. It is
+   deterministic and logged as source `guard`, reason `rescued:<category>`.
+5. **Clarifying questions only offer what's possible.** Each option the model offers comes with
+   its ops, and options whose ops don't validate are dropped. The reply is sent with the
+   original request and the question (`thread`), and a reply can't get a second question.
+
 ## Mounting
 
 The handler is `(request: Request) => Promise<Response>`, so it works anywhere the Fetch API
@@ -152,9 +182,16 @@ interface StorageAdapter {
 ```
 
 History is **append-only**. Each commit appends a patch together with the user's original
-prompt and the model ID. Undo appends a `revert`, and reset appends a `reset`. Both can be
-undone themselves. `expectedSeq` provides optimistic concurrency between devices: on
-conflict, the handler reloads, re-validates and retries.
+prompt and the model ID. Undo appends a `revert`, and reset appends a `reset`. A reset can be
+undone, and **redo** (`POST {basePath}/surfaces/:id/redo`) takes back the last undo by appending
+a revert of that revert (a new change ends the redo chain). `expectedSeq` provides optimistic
+concurrency between devices: on conflict, the handler reloads, re-validates and retries.
+
+**Undo can't run away.** `SurfaceState.seq` is the user's history position. The React client
+sends it as `{ expectedSeq }` with undo, redo and reset. If the history moved on (a second click
+sent before the first one's answer arrived, or another tab), the server answers **409** instead
+of undoing one more step. Clients that send no `expectedSeq` (before 0.7) work as before. The
+React store also ignores history actions while a request is in flight.
 
 `memoryStorage()` keeps everything in-process, for tests and demos.
 `postgresStorage({ query })` is for production. It works with any driver, and you set it up

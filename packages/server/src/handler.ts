@@ -536,8 +536,9 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
     };
 
     /**
-     * Every refusal passes here (except safety and the host's own rules): if the prompt names
-     * something the manifest allows, propose it or ask which, instead of refusing.
+     * Every refusal passes here (except safety and the host's own rules). For the model's
+     * refusals, the guard checks the manifest first: if the prompt names something allowed,
+     * propose it or ask which, instead of refusing.
      */
     const refuse = async (
       category: string,
@@ -547,11 +548,13 @@ export function createPatinaHandler<Ctx extends PatinaContext>(options: PatinaHa
       modelDetail: ModelRefusalDetail | null = null,
     ) => {
       const detail = refusalDetail(manifest, loaded, modelDetail);
-      const rescue = rescueRefusal(m, spec, fullPrompt, {
-        category,
-        message: reason,
-        detail: modelDetail,
-      });
+      // Only the model's own refusals: a validator refusal means the model understood the
+      // request and tried something that isn't allowed ("chart by owner" for a display-only
+      // field must not turn into "show the owner column").
+      const rescue =
+        source === "model"
+          ? rescueRefusal(m, spec, fullPrompt, { category, message: reason, detail: modelDetail })
+          : null;
       if (rescue?.kind === "patch")
         return done(
           await save(rescue.ops, rescue.summary),

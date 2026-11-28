@@ -35,6 +35,14 @@ allowed while the first state is loading.
 
 ***
 
+### canRedo
+
+> **canRedo**: `boolean`
+
+An undo can be taken back (servers from 0.7).
+
+***
+
 ### canUndo
 
 > **canUndo**: `boolean`
@@ -49,9 +57,11 @@ allowed while the first state is loading.
 
 ### message
 
-> **message**: \{ `kind`: `"refusal"` \| `"clarify"` \| `"error"`; `text`: `string`; \} \| `null`
+> **message**: [`SurfaceMessageData`](SurfaceMessageData.md) \| `null`
 
-A refusal or clarifying question from the last request, for the user to read.
+What the last request said back, for the user to read: a refusal, a clarifying question
+(with the options it offers), an answer to "what can I …?" (with the capabilities it
+lists), an error, or "info" for a reply kind this version doesn't know.
 
 #### Inherited from
 
@@ -196,6 +206,18 @@ Last state from the server, or null while loading for the first time.
 ##### prompt
 
 `string`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
+### redo()
+
+> **redo**(): `Promise`\<`void`\>
+
+Takes back the last undo.
 
 #### Returns
 

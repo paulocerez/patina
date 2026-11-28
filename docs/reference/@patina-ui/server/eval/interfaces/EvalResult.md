@@ -8,7 +8,15 @@
 
 > **calls**: `number`
 
-Model calls for this case (2 = one repair round-trip).
+Model calls for this case (2 = one retry: repair or a second look at a refusal).
+
+***
+
+### category?
+
+> `optional` **category?**: `string` \| `null`
+
+For refusals: the category and detail the request log got.
 
 ***
 

@@ -84,11 +84,26 @@ Hides a notice right away and tells the server, so it doesn't come back.
 
 > **propose**(`prompt`): `Promise`\<`void`\>
 
+Asks for a change. Right after a clarifying question the prompt is sent as the reply to it
+(with the question and the original request), once.
+
 #### Parameters
 
 ##### prompt
 
 `string`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
+### redo()
+
+> **redo**(): `Promise`\<`void`\>
+
+Takes back the last undo.
 
 #### Returns
 

@@ -2,6 +2,6 @@
 
 # Type Alias: RequestOutcome
 
-> **RequestOutcome** = `"proposed"` \| `"applied"` \| `"refused"` \| `"clarified"` \| `"unavailable"` \| `"over_quota"` \| `"error"`
+> **RequestOutcome** = `"proposed"` \| `"applied"` \| `"refused"` \| `"clarified"` \| `"answered"` \| `"unavailable"` \| `"over_quota"` \| `"error"`
 
 What happened to one customization request.

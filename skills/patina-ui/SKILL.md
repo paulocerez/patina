@@ -57,14 +57,22 @@ npm i -D @patina-ui/cli
 9. **Don't put secrets in descriptions or labels.** The model sees them and can paraphrase them
    to users.
 10. **Data views read only existing GET endpoints.** In the catalog:
-   - mark personal fields `sensitive: true`;
+   - pick a privacy level per personal field. **Can the user already see this value in the
+     app? Then `privacy: "display"`, not `sensitive`**: it can be shown as a column, is never
+     filtered, grouped or aggregated, and its values never reach the model. Keep
+     `sensitive: true` for values users don't see in the app;
    - gate fields by permission with `requires`;
    - set `complete: true` only if the endpoint returns _all_ matching rows (no pagination).
    - read the request log before adding endpoints: most refusals need a **derived field**
      (`f.weekday`, `f.hour`, `f.ranges`, `f.contains`), **per-tenant values** for a text field
      (`restrict: async (ctx) => ({ values: { "source.field": [...] } })`), or a param with
      **`choices`** a single view may pick (e.g. "this week"). See docs/guides/data-views.md.
-11. **Keep the footprint small.** Aim for a handful of files in a first integration:
+11. **A refusal of something the manifest allows is a bug: add it to the evals.** Patina's
+    refusal guard catches most of these (insights list them as `rescued:…`), but each one means
+    a description, label or value is unclear to the model. Put the prompt in an eval set
+    (`runEval` from `@patina-ui/server/eval`; with `script` for the model's wrong answer, it
+    runs in CI without an API key) and fix the manifest wording.
+12. **Keep the footprint small.** Aim for a handful of files in a first integration:
    - **Existing page: use the hooks, not `<Surface>`.** `useSlot` / `useCollection` /
      `useSurfaceProp` keep the page's JSX and data flow. Don't split the page into components
      or add a data context just for Patina. With data views, use `useSlotItems` for the slot
@@ -316,7 +324,8 @@ npx patina scan        # writes patina/scan.json, patina/catalog.ts (draft), pat
 
 1. **Review `patina/catalog.ts`:**
    - remove endpoints users shouldn't build views from;
-   - mark personal fields `sensitive: true`;
+   - personal fields: `privacy: "display"` if users already see them in the app, otherwise
+     `sensitive: true`;
    - set `requires: "<permission>"` where needed;
    - bind params with `{ from: "nodeId.prop" }`;
    - set `complete: true` only for endpoints that return every row.
@@ -349,7 +358,7 @@ createPatinaHandler({
     // whenOff: "keep" (default) keeps saved customizations visible but frozen; "base" shows the default view
   }),
   limits: { monthlyProposals: (ctx) => (ctx.plan === "pro" ? { user: 500 } : { tenant: 50 }) },
-  onEvent: (e) => analytics.track(`patina_${e.outcome}`, e), // every request: outcome, reason, prompt
+  onEvent: (e) => analytics.track(`patina_${e.outcome}`, e), // outcome, reason, prompt, message, detail
   insights: { allow: (ctx) => ctx.isStaff }, // GET /api/patina/insights
 });
 ```
@@ -402,8 +411,13 @@ Ready-made integrations (use these rather than hand-rolling, and match what the 
    readable message and changes nothing.
 5. **Restricted things stay hidden:** a user without permission doesn't get restricted
    columns in `GET /api/patina/surfaces/<id>`.
-6. **With `ANTHROPIC_API_KEY` set,** try 5–10 real prompts. Add the ones users will type to an
-   eval set (`runEval` from `@patina-ui/server/eval`).
+6. **A question is answered:** "what can I change here?" (in the app's language) returns
+   `kind: "answer"` listing the page's options, without a model call.
+7. **Undo is one step per click:** double-click `<UndoButton>`; one change is undone. `<RedoButton>`
+   brings it back.
+8. **With `ANTHROPIC_API_KEY` set,** try 5–10 real prompts. Add the ones users will type to an
+   eval set (`runEval` from `@patina-ui/server/eval`). Any refusal of something the manifest
+   allows goes in too (rule 11).
 
 ## Common mistakes
 
@@ -414,5 +428,8 @@ Ready-made integrations (use these rather than hand-rolling, and match what the 
 | 404 from `/api/patina/...`                                                 | `basePath` doesn't match the mount path, or the surface `id` differs from `surfaceId` / `<Surface id>`                 |
 | A node renders nothing                                                     | no component registered under that name in `<Surface components>`                                                      |
 | Everything is refused                                                      | the request isn't expressible in the manifest; improve `description`s and `labels`, or open more props                 |
+| Refusals of things the manifest allows                                     | read `rescued:…` in insights; label enum values in the app's language (`t.enum(values, { labels })`) and add the prompts to the evals |
+| Users can't show data they already see elsewhere ("summary column")        | the field is `sensitive: true`; use `privacy: "display"` (columns only, values never reach the model)                  |
+| Nobody knows what users asked for                                          | the request log is off (`requestLog: false` / `logRequests: false`) and no `onEvent` is set; the server warns at startup |
 | A column the user asked for doesn't exist                                  | it isn't in `keys` (or `keysFrom`), or `restrict` / `requires` removed it for this user                                |
 | TypeScript says the manifest isn't assignable to `Manifest<PatinaContext>` | annotate `getContext`'s parameter (`(req: Request) =>`) or pass the context type: `createPatinaHandler<AppContext>(…)` |

@@ -1,6 +1,6 @@
 // Started from `patina scan`, then reviewed: dropped /api/data/metrics (one summary object,
 // not rows), bound the params to the page filters, set the currency, and marked revenue as
-// finance-only. `patina check` (and the GitHub Action) compares this file with the code.
+// finance-only, and made the owner display-only. `patina check` (and the GitHub Action) compares this file with the code.
 import { defineCatalog, f } from "@patina-ui/core";
 
 export const catalog = defineCatalog({
@@ -21,7 +21,9 @@ export const catalog = defineCatalog({
       patient: f.string({ label: "Patient", description: "The pet's name." }),
       species: f.string({ label: "Species" }),
       vet: f.string({ label: "Vet" }),
-      owner: f.string({ label: "Owner" }),
+      // Staff see the owner's name on every appointment already: shown as a column, but never
+      // grouped or filtered on, and never sent to the model (privacy: "display").
+      owner: f.string({ label: "Owner", privacy: "display" }),
       ownerPhone: f.string({ label: "Owner phone", sensitive: true }),
       status: f.enum(["scheduled", "completed", "cancelled", "noShow"], {
         label: "Status",

@@ -19,13 +19,10 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import type { ModelAdapter } from "@patina-ui/server";
 import { type EvalCase, runEval } from "@patina-ui/server/eval";
-import {
-  callsContexts,
-  callsDashboard,
-} from "../packages/server/test/fixtures/calls-dashboard.js";
 import { offlineModel } from "../examples/demo/server/offlineModel.js";
 import { dashboard } from "../examples/demo/server/surface.js";
 import { USERS } from "../examples/demo/server/users.js";
+import { callsContexts, callsDashboard } from "../packages/server/test/fixtures/calls-dashboard.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const { values } = parseArgs({

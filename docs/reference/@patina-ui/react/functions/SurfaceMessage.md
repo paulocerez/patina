@@ -4,13 +4,14 @@
 
 > **SurfaceMessage**(`__namedParameters`): `Element` \| `null`
 
-Shows a refusal, a clarifying question or an error from the last request.
+Shows what the last request said back: a refusal, a clarifying question (with its options as
+buttons), an answer to "what can I …?" (as a list), or an error. Unstyled.
 
 ## Parameters
 
 ### \_\_namedParameters
 
-`SurfaceMessageProps`
+[`SurfaceMessageProps`](../interfaces/SurfaceMessageProps.md)
 
 ## Returns
 

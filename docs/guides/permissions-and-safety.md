@@ -36,8 +36,11 @@ covers what Patina enforces and what remains your job.
   sources by ID and never sees or produces a URL.
 - **Your API serves the data**, called from the browser with the user's session. If it
   answers 403 or leaves a field out, the block shows nothing for it.
-- **`sensitive: true` fields** are never offered to the model, never usable in new views, and
-  never sent to the browser's catalog.
+- **`sensitive: true` fields** (`privacy: "never"`) are never offered to the model, never usable
+  in new views, and never sent to the browser's catalog.
+- **`privacy: "display"` fields** can be shown as table columns and are listed in capabilities,
+  but can't be filtered, grouped, sorted or aggregated, and their values never reach the model
+  (only the name, label and kind). Use it for values users already see elsewhere in your app.
 - **`requires: "permission"`** removes a field or source for users without it (checked
   against `ctx.permissions`), including views they saved before losing access.
 - **Aggregation is display-only arithmetic** over rows already returned, and only on

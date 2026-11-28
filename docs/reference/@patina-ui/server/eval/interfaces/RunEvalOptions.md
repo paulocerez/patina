@@ -24,9 +24,20 @@ Request contexts by name, e.g. { alice: {...}, bob: {...} }.
 
 ***
 
-### model
+### model?
 
-> **model**: [`ModelAdapter`](../../interfaces/ModelAdapter.md)
+> `optional` **model?**: [`ModelAdapter`](../../interfaces/ModelAdapter.md)
+
+Not needed with `scripted`.
+
+***
+
+### scripted?
+
+> `optional` **scripted?**: `boolean`
+
+Answer every model call from the case's `script` instead of a model: tests the
+deterministic parts (validation, the refusal guard, answers, clarification checks) in CI.
 
 ***
 
